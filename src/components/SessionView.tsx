@@ -468,12 +468,12 @@ const SessionView: React.FC = () => {
               </h2>
 
               <div className="flex gap-2">
-                <span className={`px - 3 py - 1 rounded - full text - xs font - bold border 
-                    ${['futuro', 'potencializacao'].includes(phase)
+                <span className={`px-3 py-1 rounded-full text-xs font-bold border 
+                    ${['potencializacao'].includes(phase)
                     ? (sudLevel > 7 ? 'bg-green-50 text-green-600 border-green-200' : 'bg-slate-50 text-slate-600 border-slate-200')
                     : (sudLevel > 7 ? 'bg-red-50 text-red-600 border-red-200' : 'bg-green-50 text-green-600 border-green-200')
                   } `}>
-                  {['futuro', 'potencializacao'].includes(phase) ? 'Nível Positivo' : 'SUD Atual'}: {sudLevel}
+                  {['potencializacao'].includes(phase) ? 'Nível Positivo' : 'SUD Atual'}: {sudLevel}
                 </span>
               </div>
             </div >
@@ -481,8 +481,8 @@ const SessionView: React.FC = () => {
             <SudScale
               value={sudLevel}
               onChange={handleSudChange}
-              scaleType={['futuro', 'potencializacao'].includes(phase) ? 'positive' : 'distress'}
-              label={['futuro', 'potencializacao'].includes(phase) ? 'Nível de Fortalecimento (0-10)' : undefined}
+              scaleType={['potencializacao'].includes(phase) ? 'positive' : 'distress'}
+              label={['potencializacao'].includes(phase) ? 'Nível de Fortalecimento (0-10)' : undefined}
             />
 
             {
