@@ -38,6 +38,7 @@ import { SessionTimer } from './Session/SessionTimer';
 import { SessionVideo } from './Session/SessionVideo';
 import { ProtocolPhases, ProtocolPhase } from './Session/ProtocolPhases';
 import { ChronologicalPhase } from './Session/ChronologicalPhase';
+import { StandardPhase } from './Session/StandardPhase';
 import { SessionNotes } from './Session/SessionNotes';
 import { SudScale } from './Session/SudScale';
 import { TherapistScript } from './Session/TherapistScript';
@@ -506,25 +507,100 @@ const SessionView: React.FC = () => {
 
             {
               phase === 'somatico' && (
-                <TherapistScript title="Foco Somático">
-                  "Concentre-se apenas na sensação física. Onde ela está localizada? Qual o tamanho? Tem cor? Temperatura?
-                  Apenas observe essa sensação, sem julgar, sem tentar mudar. Deixe que o seu cérebro faça o processamento..."
-                </TherapistScript>
+                <StandardPhase
+                  currentValue={sudLevel}
+                  onRegister={() => {
+                    const currentHistory = sessionData.somaticHistory || [];
+                    const newHistory = [...currentHistory, sudLevel];
+                    saveSessionData({ ...sessionData, somaticHistory: newHistory });
+                  }}
+                  history={sessionData.somaticHistory || []}
+                  type="distress"
+                  scriptTitle="Foco Somático"
+                  scriptContent={
+                    "Concentre-se apenas na sensação física. Onde ela está localizada? Qual o tamanho? Tem cor? Temperatura? Apenas observe essa sensação, sem julgar, sem tentar mudar. Deixe que o seu cérebro faça o processamento..."
+                  }
+                  customScriptContent={currentPhaseObj?.customScript}
+                  onUpdateScript={(val) => updateCustomScript(phase, val)}
+                />
               )
             }
 
             {
-              currentPhaseObj?.customScript && (
-                <TherapistScript title="Script Personalizado" editable onEdit={(val) => updateCustomScript(phase, val)}>
-                  {currentPhaseObj.customScript}
-                </TherapistScript>
+              phase === 'tematico' && (
+                <StandardPhase
+                  currentValue={sudLevel}
+                  onRegister={() => {
+                    const currentHistory = sessionData.thematicHistory || [];
+                    const newHistory = [...currentHistory, sudLevel];
+                    saveSessionData({ ...sessionData, thematicHistory: newHistory });
+                  }}
+                  history={sessionData.thematicHistory || []}
+                  type="distress"
+                  scriptTitle="Foco Temático"
+                  scriptContent={
+                    "Concentre-se no tema que estamos trabalhando. O que vem à mente agora? Qual a pior parte disso?"
+                  }
+                  customScriptContent={currentPhaseObj?.customScript}
+                  onUpdateScript={(val) => updateCustomScript(phase, val)}
+                />
               )
             }
 
             {
-              !['cronologico', 'somatico'].includes(phase) && !currentPhaseObj?.customScript && (
+              phase === 'futuro' && (
+                <StandardPhase
+                  currentValue={sudLevel}
+                  onRegister={() => {
+                    const currentHistory = sessionData.futureHistory || [];
+                    const newHistory = [...currentHistory, sudLevel];
+                    saveSessionData({ ...sessionData, futureHistory: newHistory });
+                  }}
+                  history={sessionData.futureHistory || []}
+                  type="distress"
+                  scriptTitle="Foco no Futuro"
+                  scriptContent={
+                    "Imagine a situação futura que te preocupa. Rode esse filme mentalmente. O que você sente ao imaginar isso?"
+                  }
+                  customScriptContent={currentPhaseObj?.customScript}
+                  onUpdateScript={(val) => updateCustomScript(phase, val)}
+                />
+              )
+            }
+
+            {
+              phase === 'potencializacao' && (
+                <StandardPhase
+                  currentValue={sudLevel}
+                  onRegister={() => {
+                    const currentHistory = sessionData.potentializationHistory || [];
+                    const newHistory = [...currentHistory, sudLevel];
+                    saveSessionData({ ...sessionData, potentializationHistory: newHistory });
+                  }}
+                  history={sessionData.potentializationHistory || []}
+                  type="positive"
+                  scriptTitle="Potencialização"
+                  scriptContent={
+                    "Conecte-se com essa sensação de vitória, de força. Sinta isso crescer dentro de você. De 0 a 10, quão forte é essa sensação boa?"
+                  }
+                  customScriptContent={currentPhaseObj?.customScript}
+                  onUpdateScript={(val) => updateCustomScript(phase, val)}
+                />
+              )
+            }
+
+            {
+              !['cronologico', 'somatico', 'tematico', 'futuro', 'potencializacao'].includes(phase) && !currentPhaseObj?.customScript && (
                 <TherapistScript title="Script Padrão" editable onEdit={(val) => updateCustomScript(phase, val)}>
                   "Concentre-se no desconforto remanescente. O que vem agora?"
+                </TherapistScript>
+              )
+            }
+
+            {
+              !['cronologico', 'somatico', 'tematico', 'futuro', 'potencializacao'].includes(phase) && currentPhaseObj?.customScript && (
+                <TherapistScript title="Script Personalizado" editable onEdit={(val) => updateCustomScript(phase, val)}>
+                  {currentPhaseObj.customScript}
                 </TherapistScript>
               )
             }
