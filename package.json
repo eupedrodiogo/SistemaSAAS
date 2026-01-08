@@ -1,0 +1,55 @@
+{
+  "name": "tera-nexus",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:api": "vercel dev",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "engines": {
+    "node": "20.x"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@stripe/react-stripe-js": "^5.4.1",
+    "@stripe/stripe-js": "^8.5.3",
+    "@supabase/supabase-js": "^2.87.0",
+    "@types/nodemailer": "^7.0.4",
+    "@vercel/blob": "^2.0.0",
+    "@vercel/node": "^3.2.0",
+    "@vercel/postgres": "^0.10.0",
+    "chart.js": "^4.5.1",
+    "clsx": "^2.1.1",
+    "dotenv": "^17.2.3",
+    "jsonwebtoken": "^9.0.2",
+    "jspdf": "^3.0.4",
+    "lucide-react": "^0.554.0",
+    "nodemailer": "^7.0.11",
+    "peerjs": "^1.5.5",
+    "pg": "^8.16.3",
+    "react": "^19.2.0",
+    "react-chartjs-2": "^5.3.1",
+    "react-dom": "^19.2.0",
+    "react-icons": "^5.5.0",
+    "react-router-dom": "^7.10.1",
+    "recharts": "^3.4.1",
+    "stripe": "^20.0.0",
+    "tailwind-merge": "^3.4.0",
+    "tesseract.js": "^7.0.0",
+    "twilio": "^5.10.7",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@types/pg": "^8.15.6",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0",
+    "vite-plugin-pwa": "^1.2.0"
+  }
+}

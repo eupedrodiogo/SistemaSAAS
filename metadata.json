@@ -1,0 +1,8 @@
+{
+  "name": "TRG Nexus - Desenvolvimento",
+  "description": "Sistema de Gestão Profissional para Terapia de Reprocessamento Generativo (TRG)",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
