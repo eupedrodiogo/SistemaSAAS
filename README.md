@@ -26,6 +26,8 @@
 
 [View Live Demo](https://trg-nexus.vercel.app/) | [Contact Developer](https://www.linkedin.com/in/pedro-diogo-developer/)
 
+[🇧🇷 Leia em Português](README.pt-br.md)
+
 </div>
 
 ---
