@@ -101,10 +101,12 @@ export const AddToCalendar: React.FC<AddToCalendarProps> = ({
         <div className={cn("relative inline-block text-left", className)}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl text-white hover:bg-white/20 transition-all duration-300 group shadow-lg"
+                className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/20 rounded-xl text-slate-700 dark:text-white hover:bg-slate-200 dark:hover:bg-white/20 transition-all duration-300 group shadow-sm dark:shadow-lg w-full justify-between"
             >
-                <Calendar className="w-4 h-4 text-sky-400 group-hover:scale-110 transition-transform" />
-                <span className="font-medium">Adicionar à Agenda</span>
+                <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-sky-600 dark:text-sky-400 group-hover:scale-110 transition-transform" />
+                    <span className="font-medium">Adicionar à Agenda</span>
+                </div>
                 <ChevronDown className={cn("w-4 h-4 opacity-50 transition-transform duration-300", isOpen && "rotate-180")} />
             </button>
 
@@ -114,17 +116,17 @@ export const AddToCalendar: React.FC<AddToCalendarProps> = ({
                         className="fixed inset-0 z-40"
                         onClick={() => setIsOpen(false)}
                     />
-                    <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-2xl bg-slate-900/90 backdrop-blur-xl border border-white/10 shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in duration-200">
+                    <div className="absolute right-0 bottom-full mb-2 w-56 origin-bottom-right rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-2xl z-[100] overflow-hidden animate-in fade-in zoom-in duration-200">
                         <div className="p-2 space-y-1">
                             <a
                                 href={googleUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={() => setIsOpen(false)}
-                                className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-slate-200 hover:bg-white/10 rounded-xl transition-colors group"
+                                className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 rounded-xl transition-colors group"
                             >
-                                <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                    <ExternalLink className="w-4 h-4 text-red-400" />
+                                <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                    <ExternalLink className="w-4 h-4 text-red-600 dark:text-red-400" />
                                 </div>
                                 <span>Google Calendar</span>
                             </a>
@@ -134,10 +136,10 @@ export const AddToCalendar: React.FC<AddToCalendarProps> = ({
                                     generateICS();
                                     setIsOpen(false);
                                 }}
-                                className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-slate-200 hover:bg-white/10 rounded-xl transition-colors group text-left"
+                                className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 rounded-xl transition-colors group text-left"
                             >
-                                <div className="w-8 h-8 rounded-lg bg-sky-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                    <Download className="w-4 h-4 text-sky-400" />
+                                <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                    <Download className="w-4 h-4 text-sky-600 dark:text-sky-400" />
                                 </div>
                                 <span>Outlook / Apple Mail</span>
                             </button>
@@ -148,21 +150,22 @@ export const AddToCalendar: React.FC<AddToCalendarProps> = ({
                                     setCopied(true);
                                     setTimeout(() => setCopied(false), 2000);
                                 }}
-                                className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-slate-200 hover:bg-white/10 rounded-xl transition-colors group text-left"
+                                className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 rounded-xl transition-colors group text-left"
                             >
-                                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                    {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Calendar className="w-4 h-4 text-emerald-400" />}
+                                <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                    {copied ? <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> : <Calendar className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />}
                                 </div>
                                 <span>{copied ? 'Copiado!' : 'Copiar Detalhes'}</span>
                             </button>
                         </div>
 
-                        <div className="bg-white/5 p-2 text-[10px] text-slate-500 text-center">
+                        <div className="bg-slate-50 dark:bg-white/5 p-2 text-[10px] text-slate-500 text-center border-t border-slate-100 dark:border-white/5">
                             Sincronização Segura TeraNexus
                         </div>
                     </div>
                 </>
-            )}
-        </div>
+            )
+            }
+        </div >
     );
 };
