@@ -7,11 +7,14 @@ import { supabase } from './lib/supabase';
 
 // Components
 import BookingWizard from './components/PatientBooking/BookingWizard';
+import TherapistPersonalPage from './components/PatientBooking/TherapistPersonalPage';
 import PatientLandingPage from './components/PatientBooking/PatientLandingPage';
 import LoginPage from './components/Auth/LoginPage';
 import RegisterPage from './components/Auth/RegisterPage';
 import TherapistDashboard from './components/TherapistDashboard/TherapistDashboard';
-import LandingPage from './components/LandingPage';
+// import LandingPage from './components/LandingPage'; // Using Beta Landing Page now
+import BetaLandingPage from './components/BetaLandingPage';
+import BetaLandingPageV2 from './components/BetaLandingPageV2';
 import InstallPrompt from './components/InstallPrompt';
 import PaymentSuccess from './components/PaymentSuccess';
 import ClientSessionView from './components/ClientSession/ClientSessionView';
@@ -31,6 +34,8 @@ import ValidatorDashboard from './components/Validator/ValidatorDashboard';
 import ForgotPasswordPage from './components/Auth/ForgotPasswordPage';
 import UpdatePasswordPage from './components/Auth/UpdatePasswordPage';
 import SystemTest from './components/Admin/SystemTest';
+import { getSubdomain } from './utils/subdomain';
+import UpdateNotification from './components/UpdateNotification';
 
 // Protected Route Component
 const ProtectedRoute = () => {
@@ -55,6 +60,11 @@ function AppContent() {
   const { isDarkMode, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
+  const subdomain = getSubdomain();
+
+  if (subdomain) {
+    return <TherapistPersonalPage directId={subdomain} />;
+  }
 
   useEffect(() => {
 
@@ -81,13 +91,16 @@ function AppContent() {
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'dark' : ''}`}>
+      <UpdateNotification />
       {/* Theme Toggle - Floating Removed (Duplicate) */}
 
       <InstallPrompt />
       <Routes>
         {/* Public Routes */}
         {/* Pass global theme context down to LandingPage if needed, or update LandingPage to use context too. For now passing props to maintain compatibility. */}
-        <Route path="/" element={<LandingPage onLoginClick={() => window.location.href = '/login'} isDarkMode={isDarkMode} toggleTheme={toggleTheme} />} />
+        {/* Using Beta Landing Page for Launch */}
+        <Route path="/" element={<BetaLandingPage onLoginClick={() => window.location.href = '/login'} isDarkMode={isDarkMode} toggleTheme={toggleTheme} />} />
+        <Route path="/beta-v2" element={<BetaLandingPageV2 onLoginClick={() => window.location.href = '/login'} />} />
         <Route path="/success" element={<PaymentSuccess />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -95,6 +108,8 @@ function AppContent() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/agendar" element={<BookingWizard />} />
         <Route path="/agendar/:step" element={<BookingWizard />} />
+        <Route path="/agendar/u/:therapistId" element={<BookingWizard />} />
+        <Route path="/t/:therapistId" element={<TherapistPersonalPage />} />
         <Route path="/cliente" element={<PatientLandingPage isDarkMode={isDarkMode} toggleTheme={toggleTheme} />} />
 
         {/* Validation Module (Stealth Mode) */}
