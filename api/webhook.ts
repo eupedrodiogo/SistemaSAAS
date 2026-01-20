@@ -2,7 +2,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
-import { sendBookingNotification } from './utils/notifications';
+import { sendBookingNotification } from './utils/notifications.js';
 
 // Disable bodyParser to receive raw body for Stripe signature verification
 export const config = {

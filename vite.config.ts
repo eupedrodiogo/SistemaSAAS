@@ -19,8 +19,8 @@ export default defineConfig(({ mode }) => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
         manifest: {
-          name: 'TRG Nexus',
-          short_name: 'TRG Nexus',
+          name: 'TeraNexus',
+          short_name: 'TeraNexus',
           description: 'Plataforma de Gestão para Terapeutas TRG',
           theme_color: '#020617',
           background_color: '#020617',
@@ -28,19 +28,19 @@ export default defineConfig(({ mode }) => {
           start_url: '/',
           icons: [
             {
-              src: 'logo.svg',
+              src: '/logo-new.jpg',
               sizes: '192x192',
-              type: 'image/svg+xml'
+              type: 'image/jpeg'
             },
             {
-              src: 'logo.svg',
+              src: '/logo-new.jpg',
               sizes: '512x512',
-              type: 'image/svg+xml'
+              type: 'image/jpeg'
             },
             {
-              src: 'logo.svg',
+              src: '/logo-new.jpg',
               sizes: '512x512',
-              type: 'image/svg+xml',
+              type: 'image/jpeg',
               purpose: 'any maskable'
             }
           ]

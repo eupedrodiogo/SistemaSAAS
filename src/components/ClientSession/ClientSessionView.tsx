@@ -96,7 +96,7 @@ const ClientSessionView: React.FC = () => {
     useEffect(() => {
         const patientId = localStorage.getItem('client_portal_id');
         if (patientId) {
-            fetch(`/api/recordings?patientId=${patientId}`)
+            fetch(`/api/client-portal?action=recordings&patientId=${patientId}`)
                 .then(res => res.json())
                 .then(data => {
                     if (Array.isArray(data)) {
@@ -287,7 +287,7 @@ const ClientSessionView: React.FC = () => {
 
             // Refresh recordings list
             if (patientId) {
-                fetch(`/api/recordings?patientId=${patientId}`)
+                fetch(`/api/client-portal?action=recordings&patientId=${patientId}`)
                     .then(res => res.json())
                     .then(data => {
                         if (Array.isArray(data)) {
@@ -468,6 +468,16 @@ const ClientSessionView: React.FC = () => {
                                     <Download size={20} className="md:w-6 md:h-6" />
                                 </button>
                             )}
+
+                            <div className="w-px h-6 md:h-8 bg-white/10 mx-1 md:mx-2"></div>
+
+                            <button
+                                onClick={() => setIsImmersiveMode(!isImmersiveMode)}
+                                className={`p-3 md:p-4 rounded-xl transition-all duration-200 ${isImmersiveMode ? 'bg-primary-600 text-white' : 'bg-slate-800 text-white hover:bg-slate-700'}`}
+                                title={isImmersiveMode ? "Sair do Modo Imersivo" : "Modo Imersivo"}
+                            >
+                                {isImmersiveMode ? <Minimize2 size={20} className="md:w-6 md:h-6" /> : <Maximize2 size={20} className="md:w-6 md:h-6" />}
+                            </button>
 
                             <div className="w-px h-6 md:h-8 bg-white/10 mx-1 md:mx-2"></div>
 

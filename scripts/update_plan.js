@@ -26,7 +26,7 @@ async function updatePlan() {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const TARGET_EMAIL = 'pedrodiogo.suporte@gmail.com';
+    const TARGET_EMAIL = 'pedrodiogo.mello@gmail.com';
     const NEW_PLAN = 'pro';
 
     try {

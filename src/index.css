@@ -4,3 +4,23 @@ html, body, #root {
 body {
   margin: 0;
 }
+
+.pattern-diagonal-lines-sm {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 5px,
+    rgba(100, 116, 139, 0.1) 5px,
+    rgba(100, 116, 139, 0.1) 10px
+  );
+}
+
+.dark .pattern-diagonal-lines-sm {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 5px,
+    rgba(255, 255, 255, 0.05) 5px,
+    rgba(255, 255, 255, 0.05) 10px
+  );
+}

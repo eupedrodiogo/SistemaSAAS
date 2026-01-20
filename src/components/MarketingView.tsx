@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import {
    Plus,
    Target,
@@ -17,7 +18,10 @@ import {
    Send,
    Loader2,
    CheckCircle2,
-   AlertCircle
+   AlertCircle,
+   Link as LinkIcon,
+   ExternalLink,
+   Layout
 } from 'lucide-react';
 import {
    BarChart,
@@ -71,7 +75,8 @@ const SCRIPTS = [
 ];
 
 const MarketingView: React.FC = () => {
-   const [activeTab, setActiveTab] = useState<'pipeline' | 'analytics' | 'resources'>('pipeline');
+   const { user } = useAuth();
+   const [activeTab, setActiveTab] = useState<'pipeline' | 'analytics' | 'resources' | 'integrations'>('pipeline');
    const [leads, setLeads] = useState<Lead[]>([]);
 
    useEffect(() => {
@@ -478,6 +483,7 @@ const MarketingView: React.FC = () => {
                   { id: 'pipeline', label: 'Pipeline (Kanban)', icon: GripVertical },
                   { id: 'analytics', label: 'Analytics', icon: BarChart2 },
                   { id: 'resources', label: 'Estúdio AI', icon: Wand2 },
+                  { id: 'integrations', label: 'Integrações', icon: LinkIcon },
                ].map(tab => (
                   <button
                      key={tab.id}
@@ -639,6 +645,128 @@ const MarketingView: React.FC = () => {
             </div>
          )}
 
+
+         {activeTab === 'integrations' && (
+            <div className="space-y-6">
+               <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+                  <div className="flex items-start justify-between">
+                     <div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-1">Link de Agendamento Direto</h3>
+                        <p className="text-sm text-gray-500 max-w-2xl">
+                           Use este link para conectar sua Landing Page externa ou redes sociais diretamente ao seu fluxo de agendamento no TeraNexus.
+                           Ao clicar, o paciente será direcionado para sua agenda, pulando a etapa de seleção.
+                        </p>
+                     </div>
+                     <div className="p-3 bg-indigo-50 rounded-full">
+                        <LinkIcon className="h-6 w-6 text-indigo-600" />
+                     </div>
+                  </div>
+
+                  <div className="mt-6">
+                     <label className="block text-sm font-medium text-gray-700 mb-2">Seu Link Exclusivo</label>
+                     <div className="flex rounded-md shadow-sm">
+                        <div className="relative flex-grow focus-within:z-10">
+                           <input
+                              type="text"
+                              readOnly
+                              value={`${window.location.origin}/agendar/u/${user?.id || 'seu-id-terapeuta'}`}
+                              className="focus:ring-indigo-500 focus:border-indigo-500 block w-full rounded-none rounded-l-md sm:text-sm border-gray-300 bg-gray-50 text-gray-500"
+                           />
+                        </div>
+                        <button
+                           onClick={() => {
+                              navigator.clipboard.writeText(`${window.location.origin}/agendar/u/${user?.id || 'seu-id-terapeuta'}`);
+                              alert('Link copiado!');
+                           }}
+                           className="-ml-px relative inline-flex items-center space-x-2 px-4 py-2 border border-gray-300 text-sm font-medium rounded-r-md text-gray-700 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                        >
+                           <Copy className="h-4 w-4 text-gray-400" />
+                           <span>Copiar</span>
+                        </button>
+                     </div>
+                     <p className="mt-2 text-xs text-gray-500">
+                        * Cole este link no botão "Agendar Consulta" do seu site ou no link da bio do Instagram.
+                     </p>
+                  </div>
+
+                  <div className="mt-8 border-t border-gray-100 pt-6">
+                     <h4 className="text-sm font-medium text-gray-900 mb-4">Como usar:</h4>
+                     <div className="grid md:grid-cols-2 gap-4">
+                        <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
+                           <div className="flex items-center mb-2">
+                              <ExternalLink className="h-4 w-4 text-indigo-500 mr-2" />
+                              <span className="font-semibold text-gray-700 text-sm">Landing Page Própria</span>
+                           </div>
+                           <p className="text-xs text-gray-600">
+                              Substitua o link do botão de WhatsApp pelo seu link exclusivo TeraNexus. A conversão é rastreada automaticamente.
+                           </p>
+                        </div>
+                        <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
+                           <div className="flex items-center mb-2">
+                              <Instagram className="h-4 w-4 text-pink-500 mr-2" />
+                              <span className="font-semibold text-gray-700 text-sm">Bio do Instagram</span>
+                           </div>
+                           <p className="text-xs text-gray-600">
+                              Use ferramentas como Linktree ou coloque direto na bio. "Agende sua sessão aqui: [link]"
+                           </p>
+                        </div>
+                     </div>
+                  </div>
+
+                  <div className="mt-8 pt-8 border-t border-gray-200">
+                     <div className="flex items-start justify-between">
+                        <div>
+                           <div className="flex items-center gap-2 mb-1">
+                              <h3 className="text-lg font-semibold text-gray-900">Seu Mini-Site Profissional</h3>
+                              <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs font-bold uppercase tracking-wide">Novo</span>
+                           </div>
+                           <p className="text-sm text-gray-500 max-w-2xl">
+                              Uma página completa com sua foto, bio, especialidades e avaliações. Ideal para compartilhar em grupos ou na bio do Instagram como seu "Site Oficial".
+                           </p>
+                        </div>
+                        <div className="p-3 bg-purple-50 rounded-full">
+                           <Layout className="h-6 w-6 text-purple-600" />
+                        </div>
+                     </div>
+
+                     <div className="mt-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Link do seu Perfil</label>
+                        <div className="flex rounded-md shadow-sm">
+                           <div className="relative flex-grow focus-within:z-10">
+                              <input
+                                 type="text"
+                                 readOnly
+                                 value={`${window.location.origin}/t/${user?.id || 'seu-id-terapeuta'}`}
+                                 className="focus:ring-purple-500 focus:border-purple-500 block w-full rounded-none rounded-l-md sm:text-sm border-gray-300 bg-gray-50 text-gray-500"
+                              />
+                           </div>
+                           <button
+                              onClick={() => {
+                                 navigator.clipboard.writeText(`${window.location.origin}/t/${user?.id || 'seu-id-terapeuta'}`);
+                                 alert('Link do perfil copiado!');
+                              }}
+                              className="-ml-px relative inline-flex items-center space-x-2 px-4 py-2 border border-gray-300 text-sm font-medium rounded-r-md text-gray-700 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+                           >
+                              <Copy className="h-4 w-4 text-gray-400" />
+                              <span>Copiar</span>
+                           </button>
+                        </div>
+                        <div className="mt-3 flex items-center gap-2">
+                           <a
+                              href={`/t/${user?.id || 'demo'}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-sm text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1"
+                           >
+                              <ExternalLink className="h-3 w-3" /> Visualizar meu site
+                           </a>
+                        </div>
+                     </div>
+                  </div>
+
+               </div>
+            </div>
+         )}
       </div>
    );
 };

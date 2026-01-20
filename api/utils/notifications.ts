@@ -1,5 +1,7 @@
 import nodemailer from 'nodemailer';
-import twilio from 'twilio';
+import { WHATSAPP_TEMPLATES } from '../notifications/templates.js';
+// removed twilio import as it was unused in the original file view or replaced by Meta API logic
+
 
 interface BookingNotificationData {
     name: string;
@@ -211,36 +213,24 @@ export async function sendBookingNotification(data: BookingNotificationData) {
 
         // A. Client Message
         if (data.phone) {
-            // Template: notificacao_sessao_cliente
-            // Components: {{1}} clientName, {{2}} therapistName, {{3}} date, {{4}} time
-            await sendMetaWhatsApp(data.phone, 'notificacao_sessao_cliente', 'pt_BR', [
-                {
-                    type: 'body', parameters: [
-                        { type: 'text', text: name },
-                        { type: 'text', text: therapistName || 'Terapeuta TRG' },
-                        { type: 'text', text: date },
-                        { type: 'text', text: time }
-                    ]
-                }
-            ]);
+            const template = WHATSAPP_TEMPLATES.SESSION_NOTIFICATION_CLIENT(
+                name,
+                therapistName || 'Terapeuta TRG',
+                date,
+                time
+            );
+            await sendMetaWhatsApp(data.phone, template.name, template.language.code, template.components);
         }
 
         // B. Therapist Message
         if (therapistPhone) {
-            // Template: confirmacao_agendamento
-            // Components: {{1}} therapistName, {{2}} patientName, {{3}} date, {{4}} time
-            // Note: Per manual.ts, valid template is 'confirmacao_agendamento' 
-            // for "BOOKING_CONFIRMATION" which likely is reused here for the therapist notification.
-            await sendMetaWhatsApp(therapistPhone, 'confirmacao_agendamento', 'pt_BR', [
-                {
-                    type: 'body', parameters: [
-                        { type: 'text', text: therapistName || 'Terapeuta' },
-                        { type: 'text', text: name },
-                        { type: 'text', text: date },
-                        { type: 'text', text: time }
-                    ]
-                }
-            ]);
+            const template = WHATSAPP_TEMPLATES.BOOKING_CONFIRMATION(
+                therapistName || 'Terapeuta',
+                name,
+                date,
+                time
+            );
+            await sendMetaWhatsApp(therapistPhone, template.name, template.language.code, template.components);
         }
 
         result.status = 'sent_meta_whatsapp';
@@ -257,17 +247,8 @@ export async function sendBookingCancellation(data: { name: string, email: strin
 
     // 1. WhatsApp Cancellation
     if (data.phone) {
-        // Template: cancelamento_agendamento
-        // Parameters: {{1}} recipientName, {{2}} date, {{3}} time
-        await sendMetaWhatsApp(data.phone, 'cancelamento_agendamento', 'pt_BR', [
-            {
-                type: 'body', parameters: [
-                    { type: 'text', text: data.name },
-                    { type: 'text', text: data.date },
-                    { type: 'text', text: data.time }
-                ]
-            }
-        ]);
+        const template = WHATSAPP_TEMPLATES.BOOKING_CANCELLATION(data.name, data.date, data.time);
+        await sendMetaWhatsApp(data.phone, template.name, template.language.code, template.components);
     }
     // TODO: Add Email Cancellation (Optional for now)
 }
@@ -276,15 +257,8 @@ export async function sendSessionReminder(data: { name: string, phone: string, d
     console.log('[Notification] Sending Reminder to:', data.name);
 
     if (data.phone) {
-        // Template: lembrete_sessao_15min_v2
-        // Parameters: {{1}} patientName
-        await sendMetaWhatsApp(data.phone, 'lembrete_sessao_15min_v2', 'pt_BR', [
-            {
-                type: 'body', parameters: [
-                    { type: 'text', text: data.name }
-                ]
-            }
-        ]);
+        const template = WHATSAPP_TEMPLATES.SESSION_REMINDER_15MIN(data.name);
+        await sendMetaWhatsApp(data.phone, template.name, template.language.code, template.components);
     }
 }
 
@@ -332,6 +306,10 @@ export async function sendMetaWhatsApp(to: string, templateName: string, languag
         }
 
         console.log(`Meta WhatsApp sent to ${cleanPhone}:`, data.messages?.[0]?.id);
+        if (data.error) {
+            console.error('Meta WhatsApp API Error Payload:', JSON.stringify(data));
+            return { success: false, error: data.error };
+        }
         return { success: true, id: data.messages?.[0]?.id };
 
     } catch (error: any) {

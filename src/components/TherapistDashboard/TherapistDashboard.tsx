@@ -18,6 +18,7 @@ import SettingsView from '../SettingsView';
 import { Loader2 } from 'lucide-react';
 import PasswordSetupModal from '../Auth/PasswordSetupModal';
 import AiAssistant from '../AiAssistant';
+import SiteBuilder from '../Dashboard/SiteBuilder';
 
 
 import { useTheme } from '../../contexts/ThemeContext';
@@ -88,7 +89,7 @@ const TherapistDashboard: React.FC = () => {
                 [AppView.DASHBOARD]: 'Painel Geral',
                 [AppView.AGENDA]: 'Agenda',
                 [AppView.PATIENTS]: 'Clientes',
-                [AppView.THERAPY]: 'Sessão TRG',
+                [AppView.THERAPY]: 'Sessão TeraNexus',
                 [AppView.FINANCIAL]: 'Financeiro',
                 [AppView.MARKETING]: 'Marketing & CRM',
                 [AppView.REPORTS]: 'Relatórios',
@@ -209,6 +210,8 @@ const TherapistDashboard: React.FC = () => {
                 return <ReportsView />;
             case AppView.SETTINGS:
                 return <SettingsView />;
+            case AppView.SITE_BUILDER:
+                return <SiteBuilder />;
             default:
                 return <MainDashboardView onChangeView={handleDashboardChangeView} />;
         }
@@ -252,7 +255,12 @@ const TherapistDashboard: React.FC = () => {
                     <button onClick={() => setIsMobileOpen(true)} className="p-2 text-slate-600 dark:text-slate-300">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
                     </button>
-                    <span className="font-bold text-slate-800 dark:text-white">TeraNexus</span>
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden shadow-lg shadow-primary-500/20">
+                            <img src="/logo-new.jpg" alt="TeraNexus" className="w-full h-full object-cover" />
+                        </div>
+                        <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white">Tera<span className="text-primary-600">Nexus</span></span>
+                    </div>
                     <div className="w-8" />
                 </header>
 

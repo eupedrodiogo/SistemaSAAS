@@ -15,24 +15,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         // LOGIN ACTION
         if (req.method === 'POST' && action === 'login') {
-            const { email } = req.body;
+            const { email, password } = req.body;
             if (!email) return res.status(400).json({ error: 'Email required' });
 
             const { data: patients, error } = await supabase
                 .from('patients')
-                .select('id, name, email')
-                .eq('email', email);
+                .select('id, name, email, password_hash')
+                .eq('email', email.toLowerCase());
 
             if (error) throw error;
 
             if (patients && patients.length > 0) {
+                const patient = patients[0];
+
+                // If patient has a password, verify it
+                if (patient.password_hash) {
+                    if (!password) {
+                        return res.status(401).json({ error: 'Sua conta requer uma senha.', requiresPassword: true });
+                    }
+
+                    // establishment of hashing logic (consistent with register.ts)
+                    const crypto = await import('crypto');
+                    const hashedPassword = crypto.createHash('sha256').update(password + process.env.STRIPE_SECRET_KEY).digest('hex');
+
+                    if (hashedPassword !== patient.password_hash) {
+                        return res.status(401).json({ error: 'Senha incorreta.' });
+                    }
+                }
+
                 return res.status(200).json({
-                    patientId: patients[0].id,
-                    name: patients[0].name,
-                    email: patients[0].email
+                    patientId: patient.id,
+                    name: patient.name,
+                    email: patient.email
                 });
             } else {
-                return res.status(404).json({ error: 'Email não encontrado.' });
+                return res.status(404).json({ error: 'E-mail não encontrado. Verifique se você já agendou uma sessão.' });
             }
         }
 
@@ -71,22 +88,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             });
         }
 
-        // GET SESSION PATIENT
-        if (req.method === 'GET' && action === 'get_session_patient') {
-            const { appointmentId } = req.query;
-            if (!appointmentId) return res.status(400).json({ error: 'Appointment ID required' });
+        // GET RECORDINGS
+        if (req.method === 'GET' && action === 'recordings') {
+            if (!patientId) return res.status(400).json({ error: 'Patient ID required' });
 
-            const { data: appointment, error } = await supabase
-                .from('appointments')
-                .select('patient_id')
-                .eq('id', appointmentId)
-                .single();
+            const { data: recordings, error: rError } = await supabase
+                .from('recordings')
+                .select('*')
+                .eq('patient_id', patientId)
+                .order('created_at', { ascending: false });
 
-            if (error || !appointment) {
-                return res.status(404).json({ error: 'Appointment not found' });
-            }
+            if (rError) throw rError;
 
-            return res.status(200).json({ patientId: appointment.patient_id });
+            return res.status(200).json(recordings || []);
         }
 
         return res.status(400).json({ error: 'Invalid action or method' });

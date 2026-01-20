@@ -11,6 +11,7 @@ export const PLAN_FEATURES: Record<TherapistPlan, AppView[]> = {
         AppView.MARKETING,
         AppView.REPORTS,
         AppView.SETTINGS,
+        AppView.SITE_BUILDER,
     ],
     [TherapistPlan.INICIANTE]: [
         AppView.DASHBOARD,
@@ -28,6 +29,7 @@ export const PLAN_FEATURES: Record<TherapistPlan, AppView[]> = {
         AppView.MARKETING,
         AppView.REPORTS,
         AppView.SETTINGS,
+        AppView.SITE_BUILDER,
     ],
     [TherapistPlan.CLINICA]: [
         AppView.DASHBOARD,
@@ -38,5 +40,6 @@ export const PLAN_FEATURES: Record<TherapistPlan, AppView[]> = {
         AppView.MARKETING,
         AppView.REPORTS,
         AppView.SETTINGS,
+        AppView.SITE_BUILDER,
     ],
 };

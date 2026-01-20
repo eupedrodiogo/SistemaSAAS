@@ -195,7 +195,7 @@ const TherapistSelectionStep: React.FC<TherapistSelectionStepProps> = ({ onSelec
                                             Ver Perfil
                                         </button>
                                         <button
-                                            onClick={() => window.location.href = `/agendar/${therapist.id}`}
+                                            onClick={() => onSelect(therapist.id)}
                                             className="w-full sm:w-auto justify-center bg-slate-900 dark:bg-white hover:bg-primary-600 dark:hover:bg-primary-500 text-white dark:text-slate-900 px-8 py-3 rounded-2xl font-bold text-sm transition-all flex items-center gap-2 shadow-lg shadow-slate-200/50 dark:shadow-none hover:shadow-xl active:scale-95"
                                         >
                                             Agendar
@@ -402,7 +402,7 @@ const TherapistSelectionStep: React.FC<TherapistSelectionStepProps> = ({ onSelec
                                     <button
                                         onClick={() => {
                                             if (viewingProfile) {
-                                                window.location.href = `/agendar/${viewingProfile.id}`;
+                                                onSelect(viewingProfile.id);
                                             }
                                         }}
                                         className="flex-[2] sm:flex-none px-10 py-4 bg-gradient-to-r from-primary-600 to-indigo-600 hover:from-primary-700 hover:to-indigo-700 text-white rounded-2xl font-black text-lg shadow-2xl shadow-primary-500/30 transition-all transform hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-3 group"

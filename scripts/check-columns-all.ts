@@ -11,10 +11,9 @@ async function run() {
     try {
         const client = await pool.connect();
         const res = await client.query(`
-      SELECT column_name, data_type 
+      SELECT column_name, data_type, is_nullable
       FROM information_schema.columns 
-      WHERE table_name = 'therapists' 
-      AND column_name IN ('crp', 'citrg_code');
+      WHERE table_name = 'blocked_slots';
     `);
 
         console.log('Columns found:', res.rows);

@@ -1,341 +1,467 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+    Check,
+    ChevronLeft,
+    ChevronRight,
+    ArrowRight,
+    User,
+    FileText,
+    Brain,
+    Activity,
+    CalendarClock
+} from 'lucide-react';
+import { ClientIntakeData } from '../../../../types';
 
-// --- 1. Definição da Estrutura das Perguntas (Baseado no PDF) ---
+// --- Listas de Opções (Baseadas nos Prints + Expansão TRG) ---
 
-interface FieldOption {
-    label: string;
-    value: string;
-}
+const DISORDERS_LIST = [
+    "Abandono", "Aborto", "Abuso Sexual", "Adoção", "Agressividade",
+    "Alcoolismo", "Alopécia", "Anorexia", "Ansiedade", "Apatia",
+    "Automutilação", "Baixa Autoestima", "Bulimia", "Burnout", "Ciúmes",
+    "Compulsão Alimentar", "Compulsão por Compras", "Culpa", "Dependência Emocional",
+    "Dependência Química", "Depressão", "Disfunção Sexual", "Divórcio",
+    "Estresse", "Estupro", "Fobias", "Insegurança", "Insônia", "Irritabilidade",
+    "Luto", "Medos", "Nervosismo", "Obesidade", "Obsessão", "Pânico",
+    "Paranoia", "Pensamentos Suicidas", "Procrastinação", "Prostituição",
+    "Rejeição", "Separação", "Síndrome do Pânico", "TDAH", "Timidez",
+    "TOC", "Traição", "Traumas", "Vergonha", "Vícios"
+].sort();
 
-interface FormField {
-    id: string;
-    label: string;
-    type: 'text' | 'textarea' | 'select' | 'radio' | 'intensity_scale';
-    options?: FieldOption[]; // Para selects ou radios
-    placeholder?: string;
-    width?: 'full' | 'half' | 'third'; // Para layout
-}
+const PHYSICAL_LIST = [
+    "Alergias", "Artrite", "Asma", "Bronquite", "Câncer",
+    "Cistite", "Colesterol Alto", "Cólicas", "Dermatite", "Diabetes",
+    "Doenças Autoimune", "Doenças Cardíacas", "Doenças na Pele",
+    "Dor Crônica", "Dores nas Articulações", "Dores nas Costas",
+    "Enxaqueca", "Fibromialgia", "Gastrite", "Hipertensão",
+    "Labirintite", "Obesidade", "Problemas Intestinais",
+    "Problemas Respiratórios", "Psoríase", "Rinite", "Sinusite",
+    "Tireoide", "Úlcera"
+].sort();
 
-interface FormSection {
-    title: string;
-    description?: string;
-    fields: FormField[];
-}
+const FUTURE_LIST = [
+    "Abandono", "Dependência Física", "Doenças", "Escassez", "Falência Financeira",
+    "Ficar sozinho(a)", "Fracasso", "Incapacidade", "Morte", "Perda de Autonomia",
+    "Perda de Entes Queridos", "Pobreza", "Solidão", "Traição", "Velhice"
+].sort();
 
-// Mapeamento completo do PDF MODELO-ANAMNESE-FORMACAO-TERAPEUTAS
-const anamnesisSections: FormSection[] = [
-    {
-        title: "Dados Pessoais",
-        description: "Informações básicas de identificação.",
-        fields: [
-            { id: 'nome', label: 'Nome Completo', type: 'text', width: 'full' },
-            { id: 'dataNascimento', label: 'Data de Nascimento', type: 'text', width: 'third' },
-            { id: 'rg', label: 'RG', type: 'text', width: 'third' },
-            { id: 'cpf', label: 'CPF', type: 'text', width: 'third' },
-            { id: 'endereco', label: 'Endereço', type: 'text', width: 'full' },
-            { id: 'bairro', label: 'Bairro', type: 'text', width: 'half' },
-            { id: 'cep', label: 'CEP', type: 'text', width: 'half' },
-            { id: 'cidade', label: 'Cidade', type: 'text', width: 'half' },
-            { id: 'uf', label: 'UF', type: 'text', width: 'half' },
-            { id: 'telefone', label: 'Telefone Residencial', type: 'text', width: 'half' },
-            { id: 'celular', label: 'Celular', type: 'text', width: 'half' },
-            { id: 'email', label: 'E-mail', type: 'text', width: 'full' },
-            { id: 'profissao', label: 'Profissão', type: 'text', width: 'half' },
-            { id: 'empresa', label: 'Empresa', type: 'text', width: 'half' },
-            {
-                id: 'estadoCivil', label: 'Estado Civil', type: 'select', width: 'third', options: [
-                    { label: 'Solteiro(a)', value: 'solteiro' },
-                    { label: 'Casado(a)', value: 'casado' },
-                    { label: 'Divorciado(a)', value: 'divorciado' },
-                    { label: 'Viúvo(a)', value: 'viuvo' }
-                ]
-            },
-            { id: 'religiao', label: 'Religião', type: 'text', width: 'third' },
-            { id: 'escolaridade', label: 'Escolaridade', type: 'text', width: 'third' },
-        ]
-    },
-    {
-        title: "Queixa Principal",
-        description: "O motivo da sua consulta.",
-        fields: [
-            { id: 'queixaPrincipal', label: 'O que te trouxe até aqui?', type: 'textarea', width: 'full', placeholder: 'Descreva detalhadamente...' }
-        ]
-    },
-    {
-        title: "Fase 01 - Vida Pessoal",
-        description: "Contexto familiar e social.",
-        fields: [
-            { id: 'motivoDivorcio', label: 'Se é divorciada(o), por qual motivo e como se sente?', type: 'textarea', width: 'full' },
-            { id: 'numeroFilhos', label: 'Número de filhos', type: 'text', width: 'half' },
-            { id: 'relacaoFilhos', label: 'Como é o relacionamento com seus filhos?', type: 'textarea', width: 'full' },
-            { id: 'relacaoParceiro', label: 'Como se sente no relacionamento com parceiro(a)?', type: 'textarea', width: 'full' },
-            { id: 'sentimentoCasa', label: 'Como se sente em sua casa (contexto familiar)?', type: 'textarea', width: 'full' },
-            { id: 'sentimentoTrabalho', label: 'Como se sente no seu trabalho?', type: 'textarea', width: 'full' },
-            { id: 'pertenceFamilia', label: 'Sente-se pertencendo ao Contexto Familiar? Por quê?', type: 'textarea', width: 'full' },
-            { id: 'pertenceSocial', label: 'Sente-se pertencendo ao Contexto Social? Por quê?', type: 'textarea', width: 'full' },
-            { id: 'frustracoes', label: 'Sente frustração em relação a Pais, Irmãos, Filhos ou Profissão?', type: 'textarea', width: 'full' },
-        ]
-    },
-    {
-        title: "Saúde e Hábitos",
-        description: "Histórico de saúde e hábitos diários.",
-        fields: [
-            { id: 'sexualidade', label: 'Como avalia sua vida sexual? (Traumática, Normal, Boa, Satisfatória)', type: 'text', width: 'full' },
-            { id: 'traumas', label: 'Algum trauma? Se sim, qual?', type: 'textarea', width: 'full' },
-            { id: 'fobias', label: 'Alguma fobia ou medo específico?', type: 'textarea', width: 'full' },
-            { id: 'drogas', label: 'Usa drogas? Quais?', type: 'text', width: 'full' },
-            { id: 'alcool', label: 'Usa bebidas alcoólicas? Frequência?', type: 'text', width: 'full' },
-            { id: 'insonia', label: 'Tem insônia? Frequência?', type: 'text', width: 'full' },
-            { id: 'doresCabeca', label: 'Dores de cabeça? Frequência?', type: 'text', width: 'full' },
-            { id: 'ideiasSuicidas', label: 'Tem ideias suicidas?', type: 'select', width: 'half', options: [{ label: 'Sim', value: 'sim' }, { label: 'Não', value: 'nao' }] },
-            { id: 'medicacao', label: 'Toma alguma medicação? Qual?', type: 'text', width: 'full' },
-            {
-                id: 'nivelStress', label: 'Nível de Stress', type: 'select', width: 'full', options: [
-                    { label: 'Alto', value: 'alto' }, { label: 'Médio', value: 'medio' }, { label: 'Baixo', value: 'baixo' }
-                ]
-            },
-        ]
-    },
-    {
-        title: "Fase 02 - Mental",
-        description: "Crenças e autoimagem.",
-        fields: [
-            { id: 'pensamentosSi', label: 'Pensamentos sobre si mesmo (Positivos/Negativos)', type: 'textarea', width: 'full' },
-            { id: 'pensamentosCorpo', label: 'Em relação à aparência física', type: 'textarea', width: 'full' },
-            { id: 'pensamentosCompetencia', label: 'Em relação à competência profissional', type: 'textarea', width: 'full' },
-            { id: 'visaoFuturo', label: 'Visão sobre o seu futuro', type: 'textarea', width: 'full' },
-            { id: 'felicidade', label: 'Você se considera feliz? Por quê?', type: 'textarea', width: 'full' },
-            { id: 'mudanca', label: 'Se pudesse mudar algo em você, o que mudaria?', type: 'textarea', width: 'full' },
-        ]
-    },
-    {
-        title: "Fase 03 - Infância",
-        description: "Relação com pais e criação.",
-        fields: [
-            { id: 'criadoPais', label: 'Foi criado pelos pais?', type: 'select', width: 'third', options: [{ label: 'Sim', value: 'sim' }, { label: 'Não', value: 'nao' }] },
-            { id: 'relacaoPai', label: 'Como é/era a relação com o Pai?', type: 'textarea', width: 'full' },
-            { id: 'relacaoMae', label: 'Como é/era a relação com a Mãe?', type: 'textarea', width: 'full' },
-            { id: 'paisAgressivos', label: 'Seus pais foram agressivos?', type: 'select', width: 'half', options: [{ label: 'Sim', value: 'sim' }, { label: 'Não', value: 'nao' }] },
-            { id: 'paisAlcool', label: 'Pais usavam álcool/drogas?', type: 'select', width: 'half', options: [{ label: 'Sim', value: 'sim' }, { label: 'Não', value: 'nao' }] },
-            { id: 'relacaoEntrePais', label: 'Relacionamento entre os pais (Excelente a Péssimo)', type: 'text', width: 'full' },
-            { id: 'crencaRelacionamento', label: 'Qual crença adquiriu sobre relacionamentos observando seus pais?', type: 'textarea', width: 'full' },
-            { id: 'magoaInfancia', label: 'Algo que o magoou muito na infância?', type: 'textarea', width: 'full' },
-            { id: 'medoInfancia', label: 'Quando criança tinha medo de quê?', type: 'text', width: 'full' },
-        ]
-    },
-    {
-        title: "Fase 04 - Emocional",
-        description: "Padrões emocionais atuais.",
-        fields: [
-            { id: 'maioresMedosHoje', label: 'Quais são seus maiores medos hoje?', type: 'textarea', width: 'full' },
-            { id: 'papelVida', label: 'Na vida, age mais como Vítima ou Responsável?', type: 'select', width: 'full', options: [{ label: 'Vítima', value: 'vitima' }, { label: 'Responsável', value: 'responsavel' }] },
-            { id: 'dominanteSubmisso', label: 'Prefere ser Dominante ou Submisso?', type: 'select', width: 'full', options: [{ label: 'Dominante', value: 'dominante' }, { label: 'Submisso', value: 'submisso' }] },
-            { id: 'raivaRancor', label: 'Sente raiva ou rancor de alguém? Quem?', type: 'text', width: 'full' },
-            { id: 'sentimentoCulpa', label: 'Existe algo que o faz sentir-se culpado?', type: 'textarea', width: 'full' },
-        ]
-    },
-    {
-        title: "Tabela de Sentimentos",
-        description: "Classifique a intensidade dos sentimentos hoje.",
-        fields: [
-            // Gerando a tabela baseada no source 307 e 310
-            { id: 'int_raiva', label: 'Raiva', type: 'intensity_scale', width: 'full' },
-            { id: 'int_medo', label: 'Medo', type: 'intensity_scale', width: 'full' },
-            { id: 'int_culpa', label: 'Culpa', type: 'intensity_scale', width: 'full' },
-            { id: 'int_tristeza', label: 'Tristeza', type: 'intensity_scale', width: 'full' },
-            { id: 'int_ansiedade', label: 'Ansiedade', type: 'intensity_scale', width: 'full' },
-            { id: 'int_solidão', label: 'Solidão', type: 'intensity_scale', width: 'full' },
-            { id: 'int_desanimo', label: 'Desânimo', type: 'intensity_scale', width: 'full' },
-            { id: 'int_angustia', label: 'Angústia', type: 'intensity_scale', width: 'full' },
-        ]
-    }
-];
-
-// --- 2. O Componente React ---
+// --- Componente Principal ---
 
 interface AnamnesisStepProps {
-    data: any;
-    onUpdate: (data: any) => void;
+    data: ClientIntakeData;
+    onUpdate: (data: ClientIntakeData) => void;
     onNext: () => void;
     onBack: () => void;
 }
 
 const AnamnesisStep: React.FC<AnamnesisStepProps> = ({ data, onUpdate, onNext, onBack }) => {
-    // Estado para controlar quais secções estão abertas (tipo acordeão) para não poluir a tela
-    const [openSections, setOpenSections] = useState<{ [key: number]: boolean }>({ 0: true });
+    const [currentStep, setCurrentStep] = useState(0);
 
-    // Pre-fill data from RegisterStep (name -> nome, email -> email, phone -> celular)
+    // Initial Data Mapping
     useEffect(() => {
         const updates: any = {};
+        if (data['name'] && !data.nome) updates.nome = data['name'];
+        if (data['phone'] && !data.celular) updates.celular = data['phone'];
+        if (data['email'] && !data.email) updates.email = data['email'];
 
-        // Map name to nome (if nome is empty and name exists)
-        if (data.name && !data.nome) {
-            updates.nome = data.name;
-        }
-
-        // Map phone to celular (if celular is empty and phone exists)
-        if (data.phone && !data.celular) {
-            updates.celular = data.phone;
-        }
-
-        // Email uses same key, but ensure it's mapped
-        if (data.email && !data.email) {
-            updates.email = data.email;
-        }
-
-        // Only update if there are changes
         if (Object.keys(updates).length > 0) {
             onUpdate({ ...data, ...updates });
         }
-    }, []); // Run only once on mount
+    }, []);
 
-    const toggleSection = (index: number) => {
-        setOpenSections(prev => ({ ...prev, [index]: !prev[index] }));
+    const handleChange = (field: keyof ClientIntakeData, value: any) => {
+        onUpdate({ ...data, [field]: value });
     };
 
-    const handleChange = (id: string, value: string) => {
-        onUpdate({ ...data, [id]: value });
+
+    const handleCheckboxChange = (listName: 'transtornos' | 'doresFisicas' | 'temasFuturo', item: string) => {
+        const currentList = data[listName] || [];
+        const exists = currentList.find(i => i.name === item);
+
+        let newList;
+        if (exists) {
+            newList = currentList.filter(i => i.name !== item);
+        } else {
+            newList = [...currentList, { name: item, level: 5 }]; // Default level 5
+        }
+        handleChange(listName, newList);
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        onNext();
+    const handleLevelChange = (listName: 'transtornos' | 'doresFisicas' | 'temasFuturo', item: string, level: number) => {
+        const currentList = data[listName] || [];
+        const newList = currentList.map(i => i.name === item ? { ...i, level } : i);
+        handleChange(listName, newList);
     };
 
-    // Renderiza o input correto baseado no tipo definido no array
-    const renderField = (field: FormField) => {
-        const value = data[field.id] || '';
-        const baseClasses = "w-full p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none transition-all";
+    const LevelSelector = ({ listName, item, currentLevel }: { listName: 'transtornos' | 'doresFisicas' | 'temasFuturo', item: string, currentLevel: number }) => {
+        const getLevelColor = (level: number) => {
+            if (level <= 3) return 'bg-emerald-500 border-emerald-600 shadow-emerald-500/30';
+            if (level <= 6) return 'bg-amber-500 border-amber-600 shadow-amber-500/30';
+            return 'bg-rose-500 border-rose-600 shadow-rose-500/30';
+        };
 
-        switch (field.type) {
-            case 'textarea':
-                return (
-                    <textarea
-                        value={value}
-                        onChange={(e) => handleChange(field.id, e.target.value)}
-                        className={`${baseClasses} min-h-[100px]`}
-                        placeholder={field.placeholder}
-                    />
-                );
-            case 'select':
-                return (
-                    <select
-                        value={value}
-                        onChange={(e) => handleChange(field.id, e.target.value)}
-                        className={baseClasses}
-                    >
-                        <option value="">Selecione...</option>
-                        {field.options?.map(opt => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                    </select>
-                );
-            case 'intensity_scale':
-                return (
-                    <div className="flex flex-wrap gap-2 items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{field.label}</span>
-                        <div className="flex gap-4">
-                            {['Nenhuma', 'Pouca', 'Média', 'Muita'].map((level) => (
-                                <label key={level} className="flex items-center gap-1 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name={field.id}
-                                        value={level}
-                                        checked={value === level}
-                                        onChange={(e) => handleChange(field.id, e.target.value)}
-                                        className="text-primary-600 focus:ring-primary-500"
-                                    />
-                                    <span className="text-xs text-slate-600 dark:text-slate-400">{level}</span>
-                                </label>
-                            ))}
-                        </div>
+        return (
+            <div className="mt-3 pl-0 sm:pl-4 animate-fade-in w-full max-w-md" onClick={e => e.stopPropagation()}>
+                <div className="flex flex-col gap-2 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50">
+                    <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Nível de Desconforto
+                        </span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${currentLevel <= 3 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' :
+                            currentLevel <= 6 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' :
+                                'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
+                            }`}>
+                            {currentLevel} - {currentLevel <= 3 ? 'Leve' : currentLevel <= 6 ? 'Moderado' : 'Intenso'}
+                        </span>
                     </div>
-                );
-            default: // text
-                return (
-                    <input
-                        type="text"
-                        value={value}
-                        onChange={(e) => handleChange(field.id, e.target.value)}
-                        className={baseClasses}
-                        placeholder={field.placeholder}
-                    />
-                );
+
+                    <div className="flex justify-between gap-1">
+                        {Array.from({ length: 11 }, (_, i) => i).map(num => {
+                            const isSelected = currentLevel === num;
+                            return (
+                                <button
+                                    key={num}
+                                    onClick={() => handleLevelChange(listName, item, num)}
+                                    className={`
+                                        flex-1 h-9 rounded-md text-xs font-bold transition-all duration-200 flex items-center justify-center
+                                        ${isSelected
+                                            ? `${getLevelColor(num)} text-white transform scale-105 shadow-md ring-2 ring-offset-1 ring-offset-white dark:ring-offset-slate-900 ring-opacity-60`
+                                            : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 hover:border-primary-200'}
+                                    `}
+                                    type="button"
+                                >
+                                    {num}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <div className="flex justify-between px-1 mt-1 text-[10px] text-slate-400 font-medium uppercase tracking-wider">
+                        <span>Leve (0-3)</span>
+                        <span>Moderado (4-6)</span>
+                        <span>Intenso (7-10)</span>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const steps = [
+        {
+            title: "Dados Pessoais",
+            subtitle: "Identificação básica",
+            icon: <User className="w-5 h-5" />,
+            isComplete: !!data.nome && !!data.celular
+        },
+        {
+            title: "Queixa Principal",
+            subtitle: "Motivo da consulta",
+            icon: <FileText className="w-5 h-5" />,
+            isComplete: !!data.complaint
+        },
+        {
+            title: "Transtornos",
+            subtitle: "Emocionais e Mentais",
+            icon: <Brain className="w-5 h-5" />,
+            isComplete: (data.transtornos?.length || 0) > 0
+        },
+        {
+            title: "Corpo Físico",
+            subtitle: "Dores e Doenças",
+            icon: <Activity className="w-5 h-5" />,
+            isComplete: false // Optional
+        },
+        {
+            title: "Futuro",
+            subtitle: "Medos e Angústias",
+            icon: <CalendarClock className="w-5 h-5" />,
+            isComplete: false // Optional
+        }
+    ];
+
+    // Persistence: Restore step from localStorage
+    useEffect(() => {
+        const savedStep = localStorage.getItem('anamnesis_step_index');
+        if (savedStep) {
+            const stepIndex = parseInt(savedStep);
+            if (!isNaN(stepIndex) && stepIndex >= 0 && stepIndex < steps.length) {
+                setCurrentStep(stepIndex);
+            }
+        }
+    }, []);
+
+    // Persistence: Save step to localStorage
+    useEffect(() => {
+        localStorage.setItem('anamnesis_step_index', currentStep.toString());
+    }, [currentStep]);
+
+    const nextStep = () => {
+        if (currentStep < steps.length - 1) {
+            setCurrentStep(prev => prev + 1);
+            window.scrollTo(0, 0);
+        } else {
+            // Clear persistence when finishing the wizard
+            localStorage.removeItem('anamnesis_step_index');
+            onNext();
+        }
+    };
+
+    const prevStep = () => {
+        if (currentStep > 0) {
+            setCurrentStep(prev => prev - 1);
+            window.scrollTo(0, 0);
+        } else {
+            onBack();
         }
     };
 
     return (
-        <div className="max-w-4xl mx-auto animate-fade-in pb-10">
-            <div className="flex items-center gap-3 mb-6">
-                <div className="p-3 bg-primary-100 dark:bg-primary-900/30 rounded-full text-primary-600 dark:text-primary-400">
-                    <FileText size={24} />
+        <div className="max-w-3xl mx-auto pb-20">
+            {/* Header / Progress Wizard */}
+            <div className="mb-8">
+                <div className="flex items-center justify-between relative">
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-slate-200 dark:bg-slate-700 -z-10 rounded-full"></div>
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary-500 -z-10 rounded-full transition-all duration-500"
+                        style={{ width: `${(currentStep / (steps.length - 1)) * 100}%` }}></div>
+
+                    {steps.map((step, index) => {
+                        const isCompleted = index < currentStep;
+                        const isCurrent = index === currentStep;
+
+                        return (
+                            <div key={index} className="flex flex-col items-center">
+                                <div
+                                    className={`w-10 h-10 rounded-full flex items-center justify-center border-4 transition-all duration-300 z-10
+                                        ${isCompleted
+                                            ? 'bg-primary-500 border-primary-500 text-white'
+                                            : isCurrent
+                                                ? 'bg-white dark:bg-slate-800 border-primary-500 text-primary-600'
+                                                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-400'
+                                        }`}
+                                >
+                                    {isCompleted ? <Check size={20} /> : <span className="font-bold text-sm">{index + 1}</span>}
+                                </div>
+                                <span className={`hidden md:block mt-2 text-xs font-medium transition-colors ${isCurrent ? 'text-primary-600' : 'text-slate-500'}`}>
+                                    {step.title}
+                                </span>
+                            </div>
+                        );
+                    })}
                 </div>
-                <div>
-                    <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Ficha de Anamnese</h2>
-                    <p className="text-slate-500 dark:text-slate-400">Preencha os dados com calma. Todas as informações são confidenciais. <strong>Não é obrigatório o preenchimento de todos os campos.</strong></p>
+
+                <div className="mt-6 text-center">
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-white">{steps[currentStep].title}</h2>
+                    <p className="text-slate-500 dark:text-slate-400">{steps[currentStep].subtitle}</p>
                 </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Content Card */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 min-h-[400px]">
 
-                {anamnesisSections.map((section, index) => (
-                    <div key={index} className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
-
-                        {/* Cabeçalho da Seção (Clicável para expandir/recolher) */}
-                        <button
-                            type="button"
-                            onClick={() => toggleSection(index)}
-                            className="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                        >
-                            <div className="text-left">
-                                <h3 className="text-lg font-semibold text-slate-800 dark:text-white">{section.title}</h3>
-                                {section.description && <p className="text-sm text-slate-500 dark:text-slate-400">{section.description}</p>}
+                {/* DO NOT REMOVE: Form content logic */}
+                {currentStep === 0 && (
+                    <div className="space-y-4 animate-fade-in">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome Completo</label>
+                                <input
+                                    type="text"
+                                    value={data.nome || ''}
+                                    onChange={e => handleChange('nome', e.target.value)}
+                                    className="w-full p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-primary-500 outline-none"
+                                />
                             </div>
-                            {openSections[index] ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                        </button>
-
-                        {/* Corpo da Seção */}
-                        {openSections[index] && (
-                            <div className="p-6 grid grid-cols-1 md:grid-cols-12 gap-4">
-                                {section.fields.map((field) => {
-                                    // Cálculo de largura do grid do Tailwind
-                                    const colSpan = field.width === 'third' ? 'md:col-span-4' :
-                                        field.width === 'half' ? 'md:col-span-6' :
-                                            'md:col-span-12';
-
-                                    return (
-                                        <div key={field.id} className={`${colSpan} col-span-12`}>
-                                            {field.type !== 'intensity_scale' && (
-                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                                                    {field.label}
-                                                </label>
-                                            )}
-                                            {renderField(field)}
-                                        </div>
-                                    );
-                                })}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data de Nascimento</label>
+                                <input
+                                    type="text"
+                                    placeholder="DD/MM/AAAA"
+                                    value={data.dataNascimento || ''}
+                                    onChange={e => handleChange('dataNascimento', e.target.value)}
+                                    className="w-full p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-primary-500 outline-none"
+                                />
                             </div>
-                        )}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Celular / WhatsApp</label>
+                                <input
+                                    type="text"
+                                    value={data.celular || ''}
+                                    onChange={e => handleChange('celular', e.target.value)}
+                                    className="w-full p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-primary-500 outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Profissão</label>
+                                <input
+                                    type="text"
+                                    value={data.profissao || ''}
+                                    onChange={e => handleChange('profissao', e.target.value)}
+                                    className="w-full p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-primary-500 outline-none"
+                                />
+                            </div>
+                        </div>
                     </div>
-                ))}
+                )}
 
-                <div className="flex gap-4 pt-4 sticky bottom-0 bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm p-4 border-t border-slate-200 dark:border-slate-800 z-10">
+                {currentStep === 1 && (
+                    <div className="space-y-4 animate-fade-in">
+                        <h3 className="text-lg font-semibold text-slate-800 dark:text-white">O que te trouxe até aqui?</h3>
+                        <p className="text-sm text-slate-500 mb-4">Descreva em poucas palavras o principal motivo de buscar a terapia.</p>
+                        <textarea
+                            value={data.complaint || ''}
+                            onChange={e => handleChange('complaint', e.target.value)}
+                            className="w-full h-40 p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-primary-500 outline-none resize-none"
+                            placeholder="Ex: Tenho sentido muita ansiedade ultimamente..."
+                        />
+                    </div>
+                )}
+
+                {currentStep === 2 && (
+                    <div className="animate-fade-in">
+                        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-xl mb-6 text-sm">
+                            <span className="font-bold">Você possui algum desses transtornos?</span>
+                            <br />
+                            Dentre os temas listados abaixo, selecione aqueles que você deseja tratar na terapia.
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {DISORDERS_LIST.map(item => {
+                                const selectedItem = (data.transtornos || []).find(i => i.name === item);
+                                const isSelected = !!selectedItem;
+                                return (
+                                    <div key={item}
+                                        className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-center
+                                        ${isSelected
+                                                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                                                : 'border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                            }`}
+                                        onClick={() => handleCheckboxChange('transtornos', item)}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0
+                                                ${isSelected
+                                                    ? 'bg-primary-500 border-primary-500 text-white'
+                                                    : 'border-slate-300 dark:border-slate-600'
+                                                }`}
+                                            >
+                                                {isSelected && <Check size={14} />}
+                                            </div>
+                                            <span className="text-slate-700 dark:text-slate-300">{item}</span>
+                                        </div>
+                                        {isSelected && (
+                                            <LevelSelector listName="transtornos" item={item} currentLevel={selectedItem.level} />
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {currentStep === 3 && (
+                    <div className="animate-fade-in">
+                        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-xl mb-6 text-sm">
+                            <span className="font-bold">Você possui alguma dor, doença ou desconforto no corpo físico?</span>
+                            <br />
+                            Selecione tudo que se aplica.
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {PHYSICAL_LIST.map(item => {
+                                const selectedItem = (data.doresFisicas || []).find(i => i.name === item);
+                                const isSelected = !!selectedItem;
+                                return (
+                                    <div key={item}
+                                        className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-center
+                                        ${isSelected
+                                                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                                                : 'border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                            }`}
+                                        onClick={() => handleCheckboxChange('doresFisicas', item)}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0
+                                                ${isSelected
+                                                    ? 'bg-primary-500 border-primary-500 text-white'
+                                                    : 'border-slate-300 dark:border-slate-600'
+                                                }`}
+                                            >
+                                                {isSelected && <Check size={14} />}
+                                            </div>
+                                            <span className="text-slate-700 dark:text-slate-300">{item}</span>
+                                        </div>
+                                        {isSelected && (
+                                            <LevelSelector listName="doresFisicas" item={item} currentLevel={selectedItem.level} />
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {currentStep === 4 && (
+                    <div className="animate-fade-in">
+                        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-xl mb-6 text-sm">
+                            <span className="font-bold">Em relação ao futuro, algum desses temas te trazem medo, angústia ou desconforto?</span>
+                            <br />
+                            Selecione os principais gatilhos.
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {FUTURE_LIST.map(item => {
+                                const selectedItem = (data.temasFuturo || []).find(i => i.name === item);
+                                const isSelected = !!selectedItem;
+                                return (
+                                    <div key={item}
+                                        className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-center
+                                        ${isSelected
+                                                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                                                : 'border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                            }`}
+                                        onClick={() => handleCheckboxChange('temasFuturo', item)}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0
+                                                ${isSelected
+                                                    ? 'bg-primary-500 border-primary-500 text-white'
+                                                    : 'border-slate-300 dark:border-slate-600'
+                                                }`}
+                                            >
+                                                {isSelected && <Check size={14} />}
+                                            </div>
+                                            <span className="text-slate-700 dark:text-slate-300">{item}</span>
+                                        </div>
+                                        {isSelected && (
+                                            <LevelSelector listName="temasFuturo" item={item} currentLevel={selectedItem.level} />
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Sticky Actions */}
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 dark:bg-slate-950/90 backdrop-blur border-t border-slate-200 dark:border-slate-800 flex justify-center z-50">
+                <div className="flex gap-4 w-full max-w-3xl">
                     <button
-                        type="button"
-                        onClick={onBack}
-                        className="w-1/3 py-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-all"
+                        onClick={prevStep}
+                        className="px-6 py-4 rounded-xl font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition flex items-center gap-2"
                     >
+                        <ChevronLeft size={20} />
                         Voltar
                     </button>
+
                     <button
-                        type="submit"
-                        className="flex-1 py-4 bg-primary-600 hover:bg-primary-500 text-white font-bold rounded-xl shadow-lg shadow-primary-500/20 transition-all active:scale-95"
+                        onClick={nextStep}
+                        className="flex-1 px-6 py-4 rounded-xl font-bold bg-primary-600 text-white hover:bg-primary-500 transition shadow-lg shadow-primary-500/25 flex items-center justify-center gap-2"
                     >
-                        Salvar e Continuar
+                        {currentStep === steps.length - 1 ? (
+                            <>Concluir <Check size={20} /></>
+                        ) : (
+                            <>Avançar <ChevronRight size={20} /></>
+                        )}
                     </button>
                 </div>
-            </form>
+            </div>
         </div>
     );
 };

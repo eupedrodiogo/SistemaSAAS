@@ -49,10 +49,10 @@ const ClientLayout: React.FC<ClientLayoutProps> = ({ children, activePage }) => 
             {/* Mobile Header */}
             <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 z-50 transition-all duration-300">
                 <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-600 to-primary-700 flex items-center justify-center shadow-lg shadow-primary-600/20">
-                        <ShieldCheck size={20} className="text-white" />
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center overflow-hidden shadow-lg shadow-primary-500/20">
+                        <img src="/logo-new.jpg" alt="TeraNexus" className="w-full h-full object-cover" />
                     </div>
-                    <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white">TRG<span className="text-primary-600">Nexus</span></span>
+                    <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white">Tera<span className="text-primary-600">Nexus</span></span>
                 </div>
                 <button
                     onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -66,10 +66,10 @@ const ClientLayout: React.FC<ClientLayoutProps> = ({ children, activePage }) => 
             <aside className={`fixed lg:static inset-y-0 left-0 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 transition-transform duration-200 z-40 flex flex-col pt-16 lg:pt-0`}>
                 <div className="h-16 hidden lg:flex items-center px-6 border-b border-slate-200 dark:border-slate-800">
                     <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center">
-                            <ShieldCheck size={20} className="text-white" />
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden shadow-lg shadow-primary-500/20">
+                            <img src="/logo-new.jpg" alt="TeraNexus" className="w-full h-full object-cover" />
                         </div>
-                        <span className="font-bold text-lg tracking-tight">TRG<span className="text-primary-600">Nexus</span></span>
+                        <span className="font-bold text-lg tracking-tight">Tera<span className="text-primary-600">Nexus</span></span>
                     </div>
                 </div>
 

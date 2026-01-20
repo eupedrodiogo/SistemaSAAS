@@ -8,6 +8,7 @@ export enum AppView {
     MARKETING = 'marketing', // New Module
     REPORTS = 'reports',
     SETTINGS = 'settings',
+    SITE_BUILDER = 'site_builder'
 }
 
 // Subscription Plans

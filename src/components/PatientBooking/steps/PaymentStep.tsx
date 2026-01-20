@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CreditCard, Lock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { useTheme } from '../../../contexts/ThemeContext';
 
 // Initialize Stripe outside component to avoid reloading
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
@@ -13,7 +14,7 @@ interface PaymentStepProps {
     onComplete: () => void;
 }
 
-const CheckoutForm = ({ onBack, onComplete, amount }: { onBack: () => void, onComplete: () => void, amount: string }) => {
+const CheckoutForm = ({ onBack, onComplete, amount, clientSecret, appointmentId }: { onBack: () => void, onComplete: () => void, amount: string, clientSecret: string, appointmentId: string | null }) => {
     const stripe = useStripe();
     const elements = useElements();
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -44,7 +45,23 @@ const CheckoutForm = ({ onBack, onComplete, amount }: { onBack: () => void, onCo
             setErrorMessage(error.message ?? 'Erro ao processar pagamento.');
             setIsProcessing(false);
         } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-            // Payment successful
+            // Success! 
+            // Trigger manual confirmation to guarantee backend update & WhatsApp
+            try {
+                // Don't await this to keep UI snappy, or await if we want to show loading?
+                // Better to await to ensure we don't redirect too fast
+                await fetch('/api/manual-confirm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        paymentIntentId: paymentIntent.id,
+                        appointmentId: appointmentId
+                    })
+                });
+            } catch (err) {
+                console.error('Manual confirm failed, relying on webhook:', err);
+            }
+
             onComplete();
         } else {
             setErrorMessage('O status do pagamento é incerto. Verifique seu extrato.');
@@ -107,6 +124,43 @@ const CheckoutForm = ({ onBack, onComplete, amount }: { onBack: () => void, onCo
                 </button>
             </div>
 
+            {/* Fallback Check Button */}
+            <div className="text-center mt-4">
+                <button
+                    type="button"
+                    onClick={async () => {
+                        if (!stripe || !elements) return;
+                        setIsProcessing(true);
+
+                        // Check status via Stripe
+                        try {
+                            const { paymentIntent } = await stripe.retrievePaymentIntent(clientSecret); // clientSecret from props
+
+                            if (paymentIntent && paymentIntent.status === 'succeeded') {
+                                // Trigger manual confirm
+                                await fetch('/api/manual-confirm', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        paymentIntentId: paymentIntent.id,
+                                        appointmentId: appointmentId
+                                    })
+                                });
+                                onComplete();
+                            } else {
+                                setErrorMessage(`Status atual: ${paymentIntent?.status}. Se pagou, aguarde.`);
+                            }
+                        } catch (err: any) {
+                            setErrorMessage(err.message);
+                        }
+                        setIsProcessing(false);
+                    }}
+                    className="text-xs text-primary-600 dark:text-primary-400 hover:underline cursor-pointer"
+                >
+                    Já fiz o pagamento, mas a tela não mudou? Clique aqui.
+                </button>
+            </div>
+
             <div className="flex items-center gap-2 text-xs text-slate-500 justify-center">
                 <Lock size={12} /> Pagamento processado via Stripe com criptografia SSL.
             </div>
@@ -115,6 +169,7 @@ const CheckoutForm = ({ onBack, onComplete, amount }: { onBack: () => void, onCo
 };
 
 const PaymentStep: React.FC<PaymentStepProps> = ({ data, appointmentId, onBack, onComplete }) => {
+    const { isDarkMode } = useTheme();
     const [clientSecret, setClientSecret] = useState('');
     const [isLoadingSecret, setIsLoadingSecret] = useState(true);
     // Use dynamic price or default fallback
@@ -125,6 +180,8 @@ const PaymentStep: React.FC<PaymentStepProps> = ({ data, appointmentId, onBack, 
     };
 
     const DISPLAY_PRICE = formatCurrency(actualPrice);
+
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!appointmentId) return;
@@ -140,19 +197,27 @@ const PaymentStep: React.FC<PaymentStepProps> = ({ data, appointmentId, onBack, 
                 metadata: { appointmentId }
             })
         })
-            .then((res) => res.json())
-            .then((data) => {
+            .then(async (res) => {
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'Erro ao criar pagamento');
                 setClientSecret(data.clientSecret);
                 setIsLoadingSecret(false);
             })
             .catch((err) => {
                 console.error('Error creating payment intent:', err);
+                setError(err.message || 'Erro desconhecido ao iniciar pagamento.');
                 setIsLoadingSecret(false);
             });
     }, [appointmentId, actualPrice, data.therapistName]);
 
     return (
         <div className="max-w-md mx-auto animate-fade-in">
+            {!appointmentId && (
+                <div className="mb-4 bg-yellow-50 text-yellow-800 p-4 rounded-xl border border-yellow-200 text-sm">
+                    <p className="font-bold">Atenção: Identificador do agendamento não encontrado.</p>
+                    <p>Por favor, retorne e tente novamente ou contate o suporte.</p>
+                </div>
+            )}
             <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">Pagamento Seguro</h2>
             <p className="text-slate-500 dark:text-slate-400 mb-6">Finalize seu agendamento com segurança.</p>
 
@@ -188,15 +253,32 @@ const PaymentStep: React.FC<PaymentStepProps> = ({ data, appointmentId, onBack, 
                         clientSecret,
                         locale: 'pt-BR',
                         appearance: {
-                            theme: 'stripe',
+                            theme: isDarkMode ? 'night' : 'stripe',
+                            labels: 'floating',
+                            variables: {
+                                colorPrimary: '#34d399',
+                                colorBackground: isDarkMode ? '#1e293b' : '#ffffff',
+                                colorText: isDarkMode ? '#f8fafc' : '#334155',
+                                colorDanger: '#ef4444',
+                                fontFamily: 'Inter, system-ui, sans-serif',
+                                spacingUnit: '4px',
+                                borderRadius: '8px',
+                            },
                         },
                     }}
                 >
-                    <CheckoutForm onBack={onBack} onComplete={onComplete} amount={DISPLAY_PRICE} />
+                    <CheckoutForm
+                        onBack={onBack}
+                        onComplete={onComplete}
+                        amount={DISPLAY_PRICE}
+                        clientSecret={clientSecret}
+                        appointmentId={appointmentId}
+                    />
                 </Elements>
             ) : (
                 <div className="text-center text-red-500 p-4 border border-red-200 rounded-xl bg-red-50">
-                    Erro ao carregar sistema de pagamento. Tente recarregar a página.
+                    <p className="font-bold mb-1">Erro no Pagamento</p>
+                    <p className="text-sm">{error || 'Erro ao carregar sistema de pagamento. Tente recarregar a página.'}</p>
                 </div>
             )}
         </div>

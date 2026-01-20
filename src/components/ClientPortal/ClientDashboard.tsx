@@ -35,7 +35,7 @@ const ClientDashboard: React.FC = () => {
 
                     {/* Quick Actions Bar */}
                     <div className="flex items-center gap-3 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0 no-scrollbar w-full lg:w-auto">
-                        <Link to="/portal-paciente/agendamentos" className="flex items-center gap-2 px-4 py-2 bg-primary-600 dark:bg-primary-600 text-white rounded-xl shadow-lg shadow-primary-500/20 dark:shadow-primary-600/20 hover:bg-primary-700 dark:hover:bg-primary-700 transition-all active:scale-95 whitespace-nowrap">
+                        <Link to="/agendar" className="flex items-center gap-2 px-4 py-2 bg-primary-600 dark:bg-primary-600 text-white rounded-xl shadow-lg shadow-primary-500/20 dark:shadow-primary-600/20 hover:bg-primary-700 dark:hover:bg-primary-700 transition-all active:scale-95 whitespace-nowrap">
                             <Calendar size={18} />
                             <span className="font-bold text-sm">Novo Agendamento</span>
                         </Link>
@@ -94,7 +94,7 @@ const ClientDashboard: React.FC = () => {
                                     <p className="text-xs text-slate-400">Marque sua próxima sessão para continuar.</p>
                                 </div>
                                 <div className="mt-4">
-                                    <Link to="/portal-paciente/agendamentos" className="text-sm font-bold text-primary-600 hover:underline">Agendar agora &rarr;</Link>
+                                    <Link to="/agendar" className="text-sm font-bold text-primary-600 hover:underline">Agendar agora &rarr;</Link>
                                 </div>
                             </div>
                         )}

@@ -40,7 +40,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         } else {
             const { data: newP, error: pError } = await supabase.from('patients').insert({
                 name, email, phone, therapist_id: therapistId, status: 'active',
-                notes: `Queixa Principal: ${anamnesisData.queixaPrincipal || 'Não informado'}`
+                notes: `Queixa: ${anamnesisData.complaint || anamnesisData.queixaPrincipal || 'Não informado'} | Transtornos: ${(anamnesisData.transtornos || []).map((t: any) => `${t.name} (${t.level})`).join(', ')}`
             }).select('id').single();
             if (pError) throw pError;
             patientId = newP.id;
@@ -79,13 +79,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 therapistName: therapistData?.name || 'Terapeuta TRG',
                 therapistEmail: therapistData?.email,
                 therapistPhone: therapistData?.phone, // Add phone for WhatsApp
-                mainComplaint: anamnesisData.queixaPrincipal,
+                mainComplaint: anamnesisData.complaint || anamnesisData.queixaPrincipal,
                 location: 'Sessão Online'
             };
 
             // We use the centralized notification utility to ensure iCal and other premium features are applied
             try {
-                const { sendBookingNotification } = await import('./utils/notifications');
+                const { sendBookingNotification } = await import('./utils/notifications.js');
                 await sendBookingNotification(notificationData);
             } catch (nError) {
                 console.error('[Booking] Notification Error:', nError);

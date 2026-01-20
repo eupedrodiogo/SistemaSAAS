@@ -107,8 +107,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLoginClick, isDarkMode, tog
       <header className="fixed top-0 left-0 right-0 z-50 bg-slate-950/90 backdrop-blur-md border-b border-slate-800 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-lg shadow-primary-500/20">
-              <BrainCircuit size={24} className="text-white" />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden shadow-lg shadow-primary-500/20">
+              <img src="/logo-new.jpg" alt="TeraNexus Logo" className="w-full h-full object-cover" />
             </div>
             <span className="font-bold text-xl tracking-tight text-white">
               Tera<span className="text-primary-400">Nexus</span>
@@ -190,7 +190,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLoginClick, isDarkMode, tog
             <div className="absolute -inset-1 bg-gradient-to-r from-primary-500 to-secondary-600 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
             <div className="relative bg-slate-900 border border-slate-700 rounded-2xl p-2 shadow-2xl shadow-black/50 overflow-hidden ring-1 ring-white/10">
               <img
-                src="https://placehold.co/1200x700/1e293b/cbd5e1?text=Dashboard+TRG+Nexus+Preview"
+                src="https://placehold.co/1200x700/1e293b/cbd5e1?text=Dashboard+TeraNexus+Preview"
                 alt="Plataforma TeraNexus - Visão Geral"
                 className="rounded-xl w-full opacity-100 transform transition-transform duration-700 group-hover:scale-[1.01]"
               />
@@ -462,8 +462,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLoginClick, isDarkMode, tog
       < footer className="bg-slate-950 border-t border-slate-900 py-16" >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-8">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/20">
-              <BrainCircuit size={24} className="text-white" />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden shadow-lg shadow-primary-500/20">
+              <img src="/logo-new.jpg" alt="TeraNexus Logo" className="w-full h-full object-cover" />
             </div>
             <span className="font-bold text-2xl text-white tracking-tight">TeraNexus</span>
           </div>

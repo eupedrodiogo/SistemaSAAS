@@ -10,7 +10,7 @@ const ClientRecordings: React.FC = () => {
         <ClientLayout activePage="recordings">
             <div className="p-6 md:p-8 max-w-6xl mx-auto">
                 <div className="mb-8">
-                    <h1 className="text-2xl font-bold text-white mb-2">Minhas Gravações</h1>
+                    <h1 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">Minhas Gravações</h1>
                     <p className="text-slate-400">Acesse o histórico das suas sessões gravadas.</p>
                 </div>
 

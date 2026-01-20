@@ -29,11 +29,11 @@ const PatientLandingPage: React.FC<PatientLandingPageProps> = ({ isDarkMode, tog
             <nav className="fixed w-full z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
                 <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/20">
-                            <BrainCircuit size={24} className="text-white" />
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden shadow-lg shadow-primary-500/20">
+                            <img src="/logo-new.jpg" alt="TeraNexus" className="w-full h-full object-cover" />
                         </div>
                         <span className="font-bold text-xl tracking-tight text-slate-800 dark:text-white">
-                            TRG<span className="text-primary-500">Nexus</span>
+                            Tera<span className="text-primary-500">Nexus</span>
                         </span>
                     </div>
                     <div className="flex items-center gap-4">
@@ -201,9 +201,11 @@ const PatientLandingPage: React.FC<PatientLandingPageProps> = ({ isDarkMode, tog
             <footer className="bg-slate-900 text-slate-400 py-12 border-t border-slate-800">
                 <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
                     <div className="flex items-center gap-2">
-                        <BrainCircuit size={24} className="text-primary-500" />
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden">
+                            <img src="/logo-new.jpg" alt="TeraNexus" className="w-full h-full object-cover" />
+                        </div>
                         <span className="font-bold text-xl text-white">
-                            TRG<span className="text-primary-500">Nexus</span>
+                            Tera<span className="text-primary-500">Nexus</span>
                         </span>
                     </div>
                     <div className="text-sm">

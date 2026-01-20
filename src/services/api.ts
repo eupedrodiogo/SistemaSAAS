@@ -31,7 +31,10 @@ const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
   const baseUrl = getBaseUrl();
   // if (!baseUrl) throw new Error('No Server URL'); // REMOVED: Allow relative paths
 
-  const token = getToken();
+  // Try to get token from Supabase session first, then fallback to localStorage
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token || getToken();
+
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
@@ -39,7 +42,10 @@ const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
   };
 
   const response = await fetch(`${baseUrl}${endpoint}`, { ...options, headers });
-  if (!response.ok) throw new Error('API Error');
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw new Error(`API Error ${response.status}: ${response.statusText} - ${errorText.substring(0, 50)}`);
+  }
   return response.json();
 };
 
@@ -125,7 +131,7 @@ export const api = {
 
           if (data && !error) return data as Patient[];
         }
-      } catch (err) { console.warn('Supabase fetch failed', err); }
+      } catch (err) { console.warn('Supabase fetch failed', err); /* showNotification(`Erro: ${err.message}`, 'error'); */ }
 
       await delay(600);
       const local = localStorage.getItem('TRG_LOCAL_PATIENTS');
@@ -146,7 +152,7 @@ export const api = {
 
     update: async (id: string, data: Partial<Patient>) => {
       try {
-        return await apiFetch(`/api/patients/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+        return await apiFetch(`/api/patients?id=${id}`, { method: 'PUT', body: JSON.stringify(data) });
       } catch (e) { console.warn('Update patient failed, using local'); }
 
       const current = await api.patients.list();
@@ -157,7 +163,7 @@ export const api = {
 
     delete: async (id: string) => {
       try {
-        return await apiFetch(`/api/patients/${id}`, { method: 'DELETE' });
+        return await apiFetch(`/api/patients?id=${id}`, { method: 'DELETE' });
       } catch (e) { console.warn('Delete patient failed, using local'); }
 
       const current = await api.patients.list();
@@ -228,9 +234,9 @@ export const api = {
       return newApt;
     },
     update: async (id: string, data: Partial<Appointment>) => {
-      try {
-        return await apiFetch(`/api/appointments/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-      } catch (e) { console.warn('Update appointment failed, using local'); }
+      // try {
+      return await apiFetch(`/api/appointments?id=${id}`, { method: 'PUT', body: JSON.stringify(data) });
+      // } catch (e) { console.warn('Update appointment failed, using local'); }
 
       const local = (await api.appointments.list()) as Appointment[];
       const updated = local.map(a => a.id === id ? { ...a, ...data } : a);
@@ -239,7 +245,7 @@ export const api = {
     },
     delete: async (id: string) => {
       try {
-        return await apiFetch(`/api/appointments/${id}`, { method: 'DELETE' });
+        return await apiFetch(`/api/appointments?id=${id}`, { method: 'DELETE' });
       } catch (e) { console.warn('Delete appointment failed, using local'); }
 
       const local = (await api.appointments.list()) as Appointment[];
@@ -259,18 +265,10 @@ export const api = {
       return saved ? JSON.parse(saved) : [];
     },
     create: async (data: any) => {
-      try {
-        return await apiFetch('/api/blocked-slots', { method: 'POST', body: JSON.stringify(data) });
-      } catch (e) {
-        console.warn('Create blocked time failed, using local');
-        // Fallback to local
-        throw new Error('Fallback not implemented for create (use online)');
-      }
+      return await apiFetch('/api/blocked-slots', { method: 'POST', body: JSON.stringify(data) });
     },
     delete: async (id: string) => {
-      try {
-        return await apiFetch(`/api/blocked-slots?id=${id}`, { method: 'DELETE' });
-      } catch (e) { console.warn('Delete blocked time failed'); }
+      return await apiFetch(`/api/blocked-slots?id=${id}`, { method: 'DELETE' });
     }
   },
 

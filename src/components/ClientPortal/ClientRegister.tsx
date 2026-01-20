@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrainCircuit, Lock, Mail, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Lock, Mail, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react';
 
 const ClientRegister: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -103,11 +103,11 @@ const ClientRegister: React.FC = () => {
             <div className="max-w-md w-full">
                 {/* Logo */}
                 <div className="flex items-center justify-center gap-2 mb-8">
-                    <div className="w-12 h-12 rounded-xl bg-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/20">
-                        <BrainCircuit size={28} className="text-white" />
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden shadow-lg shadow-primary-500/20">
+                        <img src="/logo-new.jpg" alt="TeraNexus" className="w-full h-full object-cover" />
                     </div>
                     <span className="font-bold text-2xl tracking-tight text-slate-800 dark:text-white">
-                        TRG<span className="text-primary-500">Nexus</span>
+                        Tera<span className="text-primary-500">Nexus</span>
                     </span>
                 </div>
 

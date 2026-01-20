@@ -55,10 +55,10 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, onBack }) => {
 
         {/* Logo Section */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-700 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-primary-500/30 mb-4">
-            <BrainCircuit size={32} className="text-white" />
+          <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-primary-500/30 mb-4 overflow-hidden">
+            <img src="/logo-new.jpg" alt="TeraNexus" className="w-full h-full object-cover" />
           </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">TRG<span className="text-primary-400">Nexus</span></h1>
+          <h1 className="text-3xl font-bold text-white tracking-tight">Tera<span className="text-primary-400">Nexus</span></h1>
           <p className="text-slate-400 mt-2 text-sm">Sistema de Gestão para Terapia de Reprocessamento</p>
         </div>
 

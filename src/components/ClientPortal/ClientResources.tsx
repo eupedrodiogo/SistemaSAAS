@@ -3,6 +3,8 @@ import ClientLayout from './ClientLayout';
 import { BookOpen, Download, PlayCircle, Wind, FileText } from 'lucide-react';
 
 const ClientResources: React.FC = () => {
+    const [isSafetyActive, setIsSafetyActive] = useState(false);
+
     return (
         <ClientLayout activePage="resources">
             <div className="space-y-8">
@@ -14,18 +16,43 @@ const ClientResources: React.FC = () => {
                 {/* Safety Mechanism Highlight */}
                 <div className="bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 rounded-2xl p-6 border border-red-100 dark:border-red-900/30">
                     <div className="flex items-start gap-4">
-                        <div className="p-3 bg-red-100 dark:bg-red-900/40 rounded-xl text-red-600 dark:text-red-400">
+                        <div className="p-3 bg-red-100 dark:bg-red-900/40 rounded-xl text-red-600 dark:text-red-400 mt-1">
                             <Wind size={32} />
                         </div>
-                        <div>
+                        <div className="flex-1">
                             <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Mecanismo de Segurança</h2>
                             <p className="text-slate-600 dark:text-slate-300 mb-4 max-w-2xl">
                                 Utilize este recurso sempre que sentir desconforto intenso, ansiedade ou necessidade de se recentrar.
                             </p>
-                            <button className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-sm transition-colors shadow-lg shadow-red-500/20">
-                                <PlayCircle size={18} />
-                                Iniciar Áudio Guiado
+                            <button
+                                onClick={() => setIsSafetyActive(!isSafetyActive)}
+                                className={`flex items-center gap-2 px-4 py-2 ${isSafetyActive ? 'bg-slate-800 dark:bg-slate-700' : 'bg-red-600 hover:bg-red-700'} text-white rounded-lg font-bold text-sm transition-all shadow-lg hover:scale-105 active:scale-95`}
+                            >
+                                {isSafetyActive ? (
+                                    <>Parar Instrução</>
+                                ) : (
+                                    <>
+                                        <PlayCircle size={18} />
+                                        Iniciar Guia de Relaxamento
+                                    </>
+                                )}
                             </button>
+
+                            {isSafetyActive && (
+                                <div className="mt-6 p-6 bg-white/50 dark:bg-black/20 rounded-xl border border-red-200 dark:border-red-800 animate-fade-in">
+                                    <p className="text-lg font-medium text-red-700 dark:text-red-400 italic mb-4 text-center leading-relaxed">
+                                        "Feche os olhos, repouse suas mãos ao lado do corpo... Inspire profundamente pelo nariz, sentindo o ar renovar sua energia."
+                                    </p>
+                                    <div className="flex flex-col items-center gap-3">
+                                        <div className="px-6 py-3 bg-red-100 dark:bg-red-900/40 rounded-full border border-red-200 dark:border-red-800 animate-pulse">
+                                            <p className="text-sm font-bold text-red-700 dark:text-red-400 uppercase tracking-widest">
+                                                "Cheira a florzinha 🌸 ... e sopra a velinha 🕯️"
+                                            </p>
+                                        </div>
+                                        <p className="text-xs text-slate-500 uppercase tracking-tighter">Repita este processo 3 vezes</p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

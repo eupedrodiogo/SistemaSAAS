@@ -30,7 +30,11 @@ const RecordingGallery: React.FC<RecordingGalleryProps> = ({ patientId, userType
         const fetchRecordings = async () => {
             try {
                 setLoading(true);
-                const response = await fetch(`/api/recordings?patientId=${patientId}`);
+                const endpoint = userType === 'client'
+                    ? `/api/client-portal?action=recordings&patientId=${patientId}`
+                    : `/api/recordings?patientId=${patientId}`;
+
+                const response = await fetch(endpoint);
                 if (!response.ok) throw new Error('Falha ao carregar gravações');
                 const data = await response.json();
                 setRecordings(data);

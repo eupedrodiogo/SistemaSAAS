@@ -17,7 +17,8 @@ import {
   EyeOff,
   BarChart2,
   MessageSquareHeart,
-  Lock
+  Lock,
+  Globe
 } from 'lucide-react';
 import { AppView, NavItem } from 'types';
 import UpgradeModal from './Shared/UpgradeModal';
@@ -63,9 +64,10 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: AppView.DASHBOARD, label: 'Painel Geral', icon: LayoutDashboard },
     { id: AppView.AGENDA, label: 'Agenda', icon: Calendar },
     { id: AppView.PATIENTS, label: 'Clientes', icon: Users },
-    { id: AppView.THERAPY, label: 'Sessão TRG', icon: BrainCircuit },
+    { id: AppView.THERAPY, label: 'Sessão TeraNexus', icon: BrainCircuit },
     { id: AppView.FINANCIAL, label: 'Financeiro', icon: Wallet },
     { id: AppView.MARKETING, label: 'Marketing & CRM', icon: Megaphone },
+    { id: AppView.SITE_BUILDER, label: 'Site Profissional', icon: Globe },
     { id: AppView.REPORTS, label: 'Relatórios', icon: BarChart2 },
     { id: AppView.SETTINGS, label: 'Configurações', icon: Settings },
   ];
@@ -112,8 +114,8 @@ const Sidebar: React.FC<SidebarProps> = ({
 
           {/* Logo Content */}
           <div className={`flex items-center gap-3 ${isDesktopCollapsed ? 'md:hidden' : 'flex'}`}>
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-lg shadow-primary-500/20">
-              <BrainCircuit size={20} className="text-white" />
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden shadow-lg shadow-primary-500/20">
+              <img src="/logo-new.jpg" alt="TeraNexus" className="w-full h-full object-cover" />
             </div>
             <span className="font-bold text-xl tracking-tight">
               Tera<span className="text-primary-500 dark:text-secondary-400">Nexus</span>

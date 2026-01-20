@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
-import { ShieldCheck, ArrowRight, Mail, FileText, Shield } from 'lucide-react';
+import { ArrowRight, Mail, FileText, Shield, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import LegalModal from '../Legal/LegalModal';
 
 const ClientLogin: React.FC = () => {
     const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [requiresPassword, setRequiresPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [legalModal, setLegalModal] = useState<{ isOpen: boolean; type: 'terms' | 'privacy' }>({
         isOpen: false,
         type: 'terms'
@@ -17,12 +21,13 @@ const ClientLogin: React.FC = () => {
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
+        setError(null);
 
         try {
             const response = await fetch('/api/client-portal?action=login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email })
+                body: JSON.stringify({ email, password })
             });
 
             let data;
@@ -39,11 +44,14 @@ const ClientLogin: React.FC = () => {
                 localStorage.setItem('client_portal_email', data.email);
                 window.location.href = '/portal-paciente/dashboard';
             } else {
-                alert(data.error || 'Erro ao entrar. Verifique seu e-mail.');
+                if (data.requiresPassword) {
+                    setRequiresPassword(true);
+                }
+                setError(data.error || 'Erro ao entrar. Verifique seu e-mail.');
             }
         } catch (error: any) {
             console.error('Login error:', error);
-            alert(`Erro de conexão: ${error.message}`);
+            setError(`Erro de conexão: ${error.message}`);
         } finally {
             setIsLoading(false);
         }
@@ -53,10 +61,11 @@ const ClientLogin: React.FC = () => {
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4 font-sans">
             <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-xl p-8 border border-slate-200 dark:border-slate-800">
                 <div className="flex flex-col items-center mb-8">
-                    <div className="w-16 h-16 bg-primary-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-primary-500/30">
-                        <ShieldCheck size={40} className="text-white" />
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-primary-500/30 overflow-hidden">
+                        <img src="/logo-new.jpg" alt="TeraNexus" className="w-full h-full object-cover" />
                     </div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Portal do Cliente</h1>
+                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Tera<span className="text-primary-500">Nexus</span></h1>
+                    <h2 className="text-lg font-medium text-slate-600 dark:text-slate-300 mt-1">Portal do Cliente</h2>
                     <p className="text-slate-500 text-center mt-2">
                         Acesse sua área exclusiva para gerenciar suas sessões e materiais.
                     </p>
@@ -82,6 +91,41 @@ const ClientLogin: React.FC = () => {
                         </div>
                     </div>
 
+                    {(requiresPassword || password) && (
+                        <div className="animate-slide-down">
+                            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
+                                Senha
+                            </label>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                    <Shield size={20} />
+                                </div>
+                                <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    required
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="Digite sua senha"
+                                    className="w-full pl-10 pr-12 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all text-slate-900 dark:text-white"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                                >
+                                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {error && (
+                        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-sm font-medium flex items-center gap-2">
+                            <AlertCircle size={18} />
+                            {error}
+                        </div>
+                    )}
+
                     <button
                         type="submit"
                         disabled={isLoading}
@@ -94,7 +138,7 @@ const ClientLogin: React.FC = () => {
                             </>
                         ) : (
                             <>
-                                Entrar no Portal <ArrowRight size={20} />
+                                {requiresPassword ? 'Entrar com Senha' : 'Entrar no Portal'} <ArrowRight size={20} />
                             </>
                         )}
                     </button>

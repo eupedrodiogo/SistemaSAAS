@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import {
-    FileText, AlertCircle, Users, Target, PenTool, AlertTriangle, Edit2
+    FileText, AlertCircle, Users, Target, PenTool, AlertTriangle, Edit2, Activity, Calendar
 } from 'lucide-react';
 import { ClientIntakeData } from 'types';
 
@@ -16,6 +16,38 @@ export const SessionNotes: React.FC<SessionNotesProps> = ({
     observation,
     onObservationChange
 }) => {
+    // Helper to extract clean complaint if it contains pipe separator
+    const getCleanComplaint = (text?: string) => {
+        if (!text) return "Não informado";
+        if (text.includes('|')) {
+            // Assume format: "Complaint | Transtornos: ... | Dores: ..."
+            // We only want the first part
+            return text.split('|')[0].replace('Queixa:', '').trim();
+        }
+        return text;
+    };
+
+    // Helper specific for Level Items (Transtornos, Dores, Futuro)
+    const renderLevelItems = (items?: { name: string; level: number }[], emptyText = "Nenhum relatado") => {
+        if (!items || items.length === 0) return <p className="text-slate-500 italic">{emptyText}</p>;
+
+        return (
+            <div className="flex flex-wrap gap-2">
+                {items.map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg">
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{item.name}</span>
+                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${item.level <= 3 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                            item.level <= 6 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                                'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'
+                            }`}>
+                            {item.level}
+                        </span>
+                    </div>
+                ))}
+            </div>
+        );
+    };
+
     return (
         <div className="space-y-6 animate-fade-in">
             {intakeData ? (
@@ -41,7 +73,7 @@ export const SessionNotes: React.FC<SessionNotesProps> = ({
                                             <AlertCircle size={14} /> Queixa Principal
                                         </h5>
                                         <p className="text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800 leading-relaxed text-lg">
-                                            {intakeData.complaint || "Não informado"}
+                                            {getCleanComplaint(intakeData.complaint)}
                                         </p>
                                     </div>
 
@@ -107,6 +139,32 @@ export const SessionNotes: React.FC<SessionNotesProps> = ({
                                     </div>
                                 </div>
                             </div>
+
+                            {/* NEW SECTIONS: Transtornos, Dores, Futuro (If available) */}
+                            {(intakeData.transtornos?.length || intakeData.doresFisicas?.length || intakeData.temasFuturo?.length) ? (
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-slate-100 dark:border-slate-800">
+                                    <div className="space-y-3">
+                                        <h5 className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                            <Activity size={14} className="text-red-500" /> Transtornos & Mental
+                                        </h5>
+                                        {renderLevelItems(intakeData.transtornos)}
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <h5 className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                            <Activity size={14} className="text-amber-500" /> Dores Físicas (Somatização)
+                                        </h5>
+                                        {renderLevelItems(intakeData.doresFisicas)}
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <h5 className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                            <Calendar size={14} className="text-blue-500" /> Questões de Futuro
+                                        </h5>
+                                        {renderLevelItems(intakeData.temasFuturo)}
+                                    </div>
+                                </div>
+                            ) : null}
 
                             {/* 2. Contexto Familiar e Pessoal */}
                             <div className="border-t border-slate-100 dark:border-slate-800 pt-6">

@@ -50,7 +50,7 @@ const InstallPrompt: React.FC = () => {
 
                     <div className="flex items-center gap-3 relative z-10">
                         <div className="w-11 h-11 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/20 shadow-sm">
-                            <img src="/logo.svg" alt="App Icon" className="w-8 h-8 object-contain" />
+                            <img src="/logo-new.jpg" alt="App Icon" className="w-8 h-8 object-contain" />
                         </div>
                         <div>
                             <h3 className="font-bold text-white text-lg leading-tight tracking-tight">TeraNexus</h3>

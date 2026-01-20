@@ -28,7 +28,7 @@ const PushNotificationManager: React.FC = () => {
 
             if (!subscription) {
                 // Subscribe the user
-                const response = await fetch('/logo.svg'); // placeholder to ensure public key is available or just use the hardcoded one
+                const response = await fetch('/logo-new.jpg'); // placeholder to ensure public key is available or just use the hardcoded one
                 const vapidPublicKey = 'BJ7-wfrZYbt4dQE2E5SCIS5BExiOgZ0jwQ30U7JpZM25hghTidUkyaCZmC0uegvJgIiCwyGBBlj1n1s9YxrNRYI';
 
                 subscription = await registration.pushManager.subscribe({

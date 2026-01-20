@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   ArrowLeft,
-  BrainCircuit,
+
   Settings,
   X,
   PlusCircle,
@@ -650,7 +650,7 @@ const SessionView: React.FC = () => {
           </button>
           <div className="flex flex-col">
             <h1 className="text-lg font-bold text-slate-800 dark:text-white leading-tight flex items-center gap-2">
-              Sessão de Terapia
+              Sessão TeraNexus
               <span className="px-2 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-[10px] rounded-full uppercase tracking-wider font-extrabold border border-primary-200 dark:border-primary-800">TRG</span>
             </h1>
 
@@ -700,7 +700,7 @@ const SessionView: React.FC = () => {
             onClick={() => setShowAiModal(true)}
             className="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none hover:bg-indigo-700 transition-all font-bold text-sm"
           >
-            <BrainCircuit size={18} /> <span className="hidden sm:inline">Nexus AI</span>
+            <img src="/logo-new.jpg" alt="TeraNexus Logo" className="w-[18px] h-[18px]" /> <span className="hidden sm:inline">Nexus AI</span>
           </button>
         </div>
       </header>
@@ -767,7 +767,7 @@ const SessionView: React.FC = () => {
             <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-indigo-50 dark:bg-indigo-900/10">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 rounded-lg">
-                  <BrainCircuit size={20} />
+                  <img src="/logo-new.jpg" alt="TeraNexus Logo" className="w-5 h-5" />
                 </div>
                 <h3 className="font-bold text-slate-800 dark:text-white">Assistente Nexus AI</h3>
               </div>

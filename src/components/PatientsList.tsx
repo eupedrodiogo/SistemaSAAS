@@ -25,7 +25,7 @@ import {
   PenTool,
   Printer,
   ChevronRight,
-  BrainCircuit,
+
   FileBadge,
   Save,
   UploadCloud,
@@ -1027,7 +1027,7 @@ const ClientsList: React.FC<PatientsListProps> = ({ highlightPatientId, onNaviga
             <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-primary-50 dark:bg-primary-900/10">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-white dark:bg-slate-800 text-primary-600 dark:text-primary-400 rounded-lg shadow-sm">
-                  <BrainCircuit size={20} />
+                  <img src="/logo-new.jpg" alt="TeraNexus Logo" className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-800 dark:text-white text-sm">Registro de Sessão</h3>

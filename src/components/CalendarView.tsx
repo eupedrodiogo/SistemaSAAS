@@ -18,10 +18,11 @@ import {
    Trash2,
    Zap,
    Search,
+   BrainCircuit,
    MoreHorizontal,
    DollarSign,
    Percent,
-   BrainCircuit,
+
    CalendarDays,
    Filter,
    Sun,
@@ -55,6 +56,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
    const [statusFilter, setStatusFilter] = useState<string>('all');
    const [blockedTimes, setBlockedTimes] = useState<BlockedTime[]>([]);
    const [suggestedSlot, setSuggestedSlot] = useState<{ date: string, time: string } | null>(null);
+   const [isRescheduling, setIsRescheduling] = useState(false);
+   const [reschedulingAppointment, setReschedulingAppointment] = useState<Appointment | null>(null);
    const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
    const [blockForm, setBlockForm] = useState({ type: 'date', date: '', dayOfWeek: 1, startTime: '12:00', endTime: '13:00', label: '' });
    const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'warning' | 'info' | 'error' } | null>(null);
@@ -179,8 +182,16 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
 
    const handleReschedule = () => {
       if (!selectedAppointment) return;
-      setSelectedAppointment(null);
-      showNotification('Modo de reagendamento iniciado.', 'info');
+      setIsRescheduling(true);
+      setReschedulingAppointment(selectedAppointment);
+      setSelectedAppointment(null); // Close modal
+      showNotification('Modo de reagendamento ativo. Clique no novo horário desejado.', 'info');
+   };
+
+   const cancelReschedule = () => {
+      setIsRescheduling(false);
+      setReschedulingAppointment(null);
+      showNotification('Reagendamento cancelado.', 'info');
    };
 
    const handleUpdatePrice = async (newPrice: number) => {
@@ -315,8 +326,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
          setBlockedTimes(updatedBlocks);
          setIsBlockModalOpen(false);
          showNotification('Horário bloqueado com sucesso.', 'success');
-      } catch (e) {
-         showNotification('Erro ao bloquear horário.', 'error');
+      } catch (e: any) {
+         console.error(e);
+         showNotification(`Erro ao bloquear horário: ${e.message || 'Falha na comunicação'}`, 'error');
       }
    };
 
@@ -354,6 +366,25 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
          showNotification("Este horário já está ocupado ou bloqueado.", "error");
          return;
       }
+
+      if (isRescheduling && reschedulingAppointment) {
+         if (window.confirm(`Mover agendamento de ${reschedulingAppointment.patientName} para ${formatDateKey(date)} às ${time}?`)) {
+            const dateKey = formatDateKey(date);
+            api.appointments.update(reschedulingAppointment.id, {
+               date: dateKey,
+               time: time
+            }).then((updated) => {
+               // Update local list logic could be improved with a full fetch, but let's try manual update first
+               setAppointments(prev => prev.map(a => a.id === reschedulingAppointment.id ? { ...a, date: dateKey, time: time } : a));
+
+               showNotification('Agendamento reagendado com sucesso!', 'success');
+               setIsRescheduling(false);
+               setReschedulingAppointment(null);
+            }).catch((err) => showNotification(`Erro: ${err.message}`, 'error'));
+         }
+         return;
+      }
+
       if (window.confirm(`Agendar novo paciente para ${time}?`)) {
          const dateKey = formatDateKey(date);
          api.appointments.create({
@@ -455,7 +486,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
    const getBlockedTimeForDay = (date: Date) => {
       const d = date.getDay();
       const k = formatDateKey(date);
-      return blockedTimes.filter(b => (b.date === k) || (b.dayOfWeek === d));
+      return blockedTimes.filter(b => {
+         const blockDate = b.date ? (typeof b.date === 'string' ? b.date.split('T')[0] : b.date) : null;
+         return (blockDate === k) || (b.dayOfWeek === d);
+      });
    };
    const weekDays = [{ val: 0, label: 'Domingo', short: 'Dom' }, { val: 1, label: 'Segunda', short: 'Seg' }, { val: 2, label: 'Terça', short: 'Ter' }, { val: 3, label: 'Quarta', short: 'Qua' }, { val: 4, label: 'Quinta', short: 'Qui' }, { val: 5, label: 'Sexta', short: 'Sex' }, { val: 6, label: 'Sábado', short: 'Sáb' }];
 
@@ -490,16 +524,27 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
                      if (!date) return <div key={idx} className="bg-slate-50/30 dark:bg-slate-950/30 border-r border-b border-slate-100 dark:border-slate-800"></div>;
 
                      const apts = getAppointmentsForDate(date);
+                     const blocked = getBlockedTimeForDay(date);
+                     const isFullDayBlocked = blocked.some(b => b.startTime === '00:00' && b.endTime === '23:59');
                      const isToday = isSameDate(date, new Date());
                      const isSelected = isSameDate(date, selectedDay);
 
                      return (
                         <div
                            key={idx}
-                           onClick={() => setSelectedDay(date)}
+                           onClick={() => {
+                              setSelectedDay(date);
+                              setCurrentDate(date);
+                              if (isRescheduling) {
+                                 setViewType('day');
+                                 showNotification(`Dia ${date.getDate()} selecionado. Agora clique no horário desejado.`, 'info');
+                              }
+                           }}
                            className={`
                         p-2 border-r border-b border-slate-100 dark:border-slate-800 relative cursor-pointer transition-colors group
-                        ${isSelected ? 'bg-primary-50 dark:bg-slate-800 ring-inset ring-2 ring-primary-500' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}
+                        ${isSelected ? 'bg-primary-50 dark:bg-slate-800 ring-inset ring-2 ring-primary-500' :
+                                 isFullDayBlocked ? 'bg-slate-100 dark:bg-slate-900/40 pattern-diagonal-lines-sm' :
+                                    'hover:bg-slate-50 dark:hover:bg-slate-800'}
                       `}
                         >
                            <div className="flex justify-between items-start mb-1">
@@ -510,6 +555,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
                            </div>
 
                            <div className="hidden md:block space-y-1 overflow-y-auto max-h-[80px] custom-scrollbar">
+                              {blocked.filter(b => !(b.startTime === '00:00' && b.endTime === '23:59')).map((b, i) => (
+                                 <div key={`blk-${i}`} className="text-[9px] px-1.5 py-0.5 rounded border border-slate-200 bg-slate-100 text-slate-500 flex items-center gap-1 truncate">
+                                    <Ban size={8} /> {b.startTime}
+                                 </div>
+                              ))}
                               {apts.map(apt => (
                                  <div
                                     key={apt.id}
@@ -523,9 +573,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
                                     {apt.time} {apt.patientName.split(' ')[0]}
                                  </div>
                               ))}
+                              {isFullDayBlocked && (
+                                 <div className="text-[9px] px-1.5 py-0.5 rounded border border-red-100 bg-red-50 text-red-400 dark:bg-red-900/10 dark:border-red-900/20 text-center font-medium">
+                                    Bloqueado
+                                 </div>
+                              )}
                            </div>
 
-                           <div className="md:hidden flex justify-center gap-1 mt-1">
+                           <div className="md:hidden flex flex-wrap justify-center gap-1 mt-1">
+                              {isFullDayBlocked && <div className="w-1.5 h-1.5 rounded-full bg-red-400" />}
                               {apts.slice(0, 3).map(apt => (
                                  <div key={apt.id} className={`w-1.5 h-1.5 rounded-full ${(apt.status === 'scheduled' || apt.status === 'Agendado') ? 'bg-primary-500' :
                                     apt.status === 'pending_payment' ? 'bg-amber-500' :
@@ -584,6 +640,22 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
                   </div>
                ) : (
                   <div className="relative pl-4 border-l-2 border-slate-100 dark:border-slate-800 space-y-4">
+                     {blocked.map((b, i) => (
+                        <div key={`mob-blk-${i}`} className="relative group">
+                           <div className="absolute -left-[21px] top-1.5 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900 bg-red-400" />
+                           <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700 opacity-75">
+                              <div className="flex justify-between items-start mb-1">
+                                 <span className="font-bold text-slate-500 dark:text-white text-sm">
+                                    {b.startTime === '00:00' && b.endTime === '23:59' ? 'Dia Todo' : `${b.startTime} - ${b.endTime}`}
+                                 </span>
+                                 <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded border shadow-sm bg-red-50 text-red-500 border-red-100 dark:bg-red-900/10 dark:text-red-300 dark:border-red-900/30">
+                                    Bloqueado
+                                 </span>
+                              </div>
+                              <h4 className="font-bold text-slate-600 dark:text-slate-400 text-sm mb-0.5">{b.label || 'Indisponível'}</h4>
+                           </div>
+                        </div>
+                     ))}
                      {apts.map(apt => (
                         <div key={apt.id} className="relative group" onClick={() => setSelectedAppointment(apt)}>
                            <div className={`absolute -left-[21px] top-1.5 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900 ${(apt.status === 'scheduled' || apt.status === 'Agendado') ? 'bg-primary-500' :
@@ -600,7 +672,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
                                  </span>
                               </div>
                               <h4 className="font-bold text-primary-700 dark:text-primary-400 text-sm mb-0.5">{apt.patientName}</h4>
-                              <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1"><BrainCircuit size={12} /> {apt.type}</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1"><img src="/logo-new.jpg" alt="Logo" className="w-3 h-3 opacity-70" /> {apt.type}</p>
                            </div>
                         </div>
                      ))}
@@ -687,6 +759,18 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
       <div className="flex flex-col h-full min-h-[600px] animate-fade-in pb-20 md:pb-0 relative bg-white dark:bg-slate-900">
          {toast && toast.show && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] animate-slide-up"><div className={`px-4 py-3 rounded-xl shadow-xl border flex items-center gap-3 ${toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' : toast.type === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-slate-800 border-slate-700 text-white'}`}>{toast.type === 'error' ? <AlertTriangle size={18} /> : toast.type === 'warning' ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}<span className="text-sm font-bold">{toast.message}</span></div></div>}
 
+         {isRescheduling && (
+            <div className="bg-amber-100 dark:bg-amber-900/40 border-b border-amber-200 dark:border-amber-800 p-3 text-center flex items-center justify-center gap-4 animate-fade-in absolute top-0 left-0 right-0 z-50">
+               <span className="text-amber-800 dark:text-amber-200 font-bold flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  Modo Reagendamento: Selecione um novo horário para {reschedulingAppointment?.patientName}
+               </span>
+               <button onClick={cancelReschedule} className="px-3 py-1 bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-100 text-xs font-bold rounded shadow-sm hover:bg-amber-50 dark:hover:bg-amber-900 border border-amber-200 dark:border-amber-700">
+                  Cancelar
+               </button>
+            </div>
+         )}
+
          <div className="flex flex-col xl:flex-row justify-between gap-4 mb-6 shrink-0">
             <div className="flex items-center gap-4 bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm">
                <div className="flex items-center gap-1"><button onClick={handlePrev} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"><ChevronLeft size={20} /></button><button onClick={handleNext} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"><ChevronRight size={20} /></button><button onClick={handleToday} className="px-3 py-1.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg ml-1">Hoje</button></div>
@@ -741,7 +825,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
                {renderMiniCalendar()}
                {/* Weather Widget Removed (was mock data) */}
                <button onClick={handleOptimizeSchedule} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 group"><Wand2 size={18} className="group-hover:rotate-12 transition-transform" /> Otimização Inteligente</button>
-               <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm"><h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2"><BrainCircuit size={16} /> Insights</h3><div className="space-y-4"><div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-950/50 rounded-xl border border-slate-100 dark:border-slate-800"><div className="flex items-center gap-3"><div className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-lg"><Percent size={18} /></div><div><p className="text-xs text-slate-500 font-bold">Ocupação</p><p className="text-lg font-bold text-slate-800 dark:text-white">{insights.occupancy}%</p></div></div></div><div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-950/50 rounded-xl border border-slate-100 dark:border-slate-800"><div className="flex items-center gap-3"><div className="p-2 bg-green-100 dark:bg-green-900/30 text-green-600 rounded-lg"><DollarSign size={18} /></div><div><p className="text-xs text-slate-500 font-bold">Receita Est.</p><p className="text-lg font-bold text-slate-800 dark:text-white">R$ {insights.revenue}</p></div></div></div></div></div>
+               <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm"><h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2"><img src="/logo-new.jpg" alt="Logo" className="w-4 h-4 opacity-50 grayscale" /> Insights</h3><div className="space-y-4"><div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-950/50 rounded-xl border border-slate-100 dark:border-slate-800"><div className="flex items-center gap-3"><div className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-lg"><Percent size={18} /></div><div><p className="text-xs text-slate-500 font-bold">Ocupação</p><p className="text-lg font-bold text-slate-800 dark:text-white">{insights.occupancy}%</p></div></div></div><div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-950/50 rounded-xl border border-slate-100 dark:border-slate-800"><div className="flex items-center gap-3"><div className="p-2 bg-green-100 dark:bg-green-900/30 text-green-600 rounded-lg"><DollarSign size={18} /></div><div><p className="text-xs text-slate-500 font-bold">Receita Est.</p><p className="text-lg font-bold text-slate-800 dark:text-white">R$ {insights.revenue}</p></div></div></div></div></div>
                <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm"><h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2"><AlertCircle size={16} /> Pendências</h3><div className="space-y-3">
                   {/* Todo: Fetch pending items from API */}
                   <div className="text-center py-4 text-slate-400 text-xs">Nenhuma pendência.</div>
@@ -765,7 +849,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
                      <div className="flex gap-4">
                         <div className="flex-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
                            <p className="text-xs text-slate-400 font-bold uppercase mb-1">Data</p>
-                           <p className="font-semibold text-slate-800 dark:text-white flex items-center gap-2"><CalendarIcon size={16} /> {new Date(selectedAppointment.date).toLocaleDateString('pt-BR')}</p>
+                           <p className="font-semibold text-slate-800 dark:text-white flex items-center gap-2"><CalendarIcon size={16} /> {new Date(selectedAppointment.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</p>
                         </div>
                         <div className="flex-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
                            <p className="text-xs text-slate-400 font-bold uppercase mb-1">Horário</p>

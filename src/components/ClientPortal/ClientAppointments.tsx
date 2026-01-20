@@ -13,9 +13,9 @@ const ClientAppointments: React.FC = () => {
             <div className="space-y-6">
                 <div className="flex items-center justify-between">
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Meus Agendamentos</h1>
-                    <button className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-bold text-sm transition-colors">
+                    <Link to="/agendar" className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-bold text-sm transition-colors">
                         + Novo Agendamento
-                    </button>
+                    </Link>
                 </div>
 
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">

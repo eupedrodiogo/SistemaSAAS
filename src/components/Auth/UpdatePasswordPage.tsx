@@ -97,11 +97,11 @@ const UpdatePasswordPage: React.FC = () => {
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
             <div className="sm:mx-auto sm:w-full sm:max-w-md">
                 <div className="flex justify-center items-center gap-2 mb-6">
-                    <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/20">
-                        <BrainCircuit size={24} className="text-white" />
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden shadow-lg shadow-primary-500/20">
+                        <img src="/logo-new.jpg" alt="TeraNexus" className="w-full h-full object-cover" />
                     </div>
                     <span className="font-bold text-2xl tracking-tight text-slate-800 dark:text-white">
-                        TRG<span className="text-primary-500">Nexus</span>
+                        Tera<span className="text-primary-500">Nexus</span>
                     </span>
                 </div>
                 <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-slate-900 dark:text-white">

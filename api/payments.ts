@@ -46,11 +46,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
 
             const sessionParams: Stripe.Checkout.SessionCreateParams = {
-                payment_method_types: ['card'],
+                payment_method_types: ['card', 'pix'],
                 line_items: [lineItem],
                 mode: mode as Stripe.Checkout.Session.Mode,
                 success_url: successUrl,
                 cancel_url: cancelUrl,
+                payment_intent_data: {
+                    metadata: req.body.metadata, // Pass metadata to PaymentIntent
+                },
+                metadata: req.body.metadata, // Also pass to Session for easy access
             };
 
             if (couponId) {

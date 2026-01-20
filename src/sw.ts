@@ -9,7 +9,7 @@ self.addEventListener('push', (event: any) => {
 
     const options = {
         body: data.body,
-        icon: '/logo.svg',
+        icon: '/logo-new.jpg',
         badge: '/favicon.ico',
         data: data.data || {},
         actions: data.actions || [],

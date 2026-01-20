@@ -6,24 +6,39 @@ import * as jwt from 'jsonwebtoken';
 
 // Inlined auth utilities
 const getSecret = () => process.env.SECRET_KEY || 'change-this-secret-in-prod';
-function verifyAuth(req: VercelRequest, res: VercelResponse): { id: string; email: string } | null {
+async function verifyAuth(req: VercelRequest, res: VercelResponse): Promise<{ id: string; email: string } | null> {
     const auth = req.headers['authorization'];
     if (!auth) {
         res.status(401).json({ message: 'Token não fornecido' });
         return null;
     }
     const token = (Array.isArray(auth) ? auth[0] : auth).split(' ')[1];
-    try {
-        const decoded = jwt.verify(token, getSecret()) as any;
-        return decoded;
-    } catch {
-        res.status(403).json({ message: 'Token inválido' });
+
+    // Validate using Supabase Auth instead of manual JWT verify
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY; // Service key needed to verify any valid token
+
+    if (!supabaseUrl || !supabaseKey) {
+        console.error('Supabase Config Missing in verifyAuth');
+        // Fallback to old unsecured check or fail? Fails safe.
+        res.status(500).json({ message: 'Server Configuration Error' });
         return null;
     }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+
+    if (error || !user) {
+        console.warn('Auth Failed:', error?.message);
+        res.status(403).json({ message: 'Token inválido ou expirado' });
+        return null;
+    }
+
+    return { id: user.id, email: user.email || '' };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    const user = verifyAuth(req, res);
+    const user = await verifyAuth(req, res);
     if (!user) return;
 
     const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;

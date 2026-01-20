@@ -160,6 +160,11 @@ export interface ClientIntakeData {
   familyHistory?: string;
   traumaHistory?: string;
   resources?: string;
+
+  // Novos Campos Anamnese (Wizard)
+  transtornos?: { name: string; level: number }[]; // Lista de transtornos selecionados
+  doresFisicas?: { name: string; level: number }[]; // Lista de dores/doenças físicas
+  temasFuturo?: { name: string; level: number }[]; // Temas de medo/angústia sobre o futuro
 }
 
 export interface Lead {

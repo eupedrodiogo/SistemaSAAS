@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { BrainCircuit, Check } from 'lucide-react';
 import RegisterStep from './steps/RegisterStep';
 import AnamnesisStep from './steps/AnamnesisStep';
@@ -8,6 +9,9 @@ import TherapistSelectionStep from './steps/TherapistSelectionStep';
 import { AddToCalendar } from '../AddToCalendar';
 
 const BookingWizard: React.FC = () => {
+    const { step, therapistId } = useParams();
+    const navigate = useNavigate();
+
     // Step 1: Therapist Selection (skipped if therapistId in URL)
     // Step 2: Schedule
     // Step 3: Register
@@ -29,6 +33,8 @@ const BookingWizard: React.FC = () => {
     });
     const [isCompleted, setIsCompleted] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [appointmentId, setAppointmentId] = useState<string | null>(null);
+    const [patientId, setPatientId] = useState<string | null>(null);
 
     // Track if we should skip the first step (Therapist Selection)
     const [skipTherapistSelection, setSkipTherapistSelection] = useState(false);
@@ -67,27 +73,86 @@ const BookingWizard: React.FC = () => {
                 const parsed = JSON.parse(savedData);
                 // Only merge if it's a draft
                 setFormData(prev => ({ ...prev, ...parsed }));
+                if (parsed.appointmentId) {
+                    setAppointmentId(parsed.appointmentId);
+                }
             } catch (e) {
                 console.error("Failed to load draft", e);
             }
         }
 
-        // Extract therapistId from URL: /agendar/123
-        const pathParts = window.location.pathname.split('/');
-        // pathParts[0] = "", pathParts[1] = "agendar", pathParts[2] = "123" (optional)
-        if (pathParts.length > 2 && pathParts[2]) {
-            setFormData(prev => ({ ...prev, therapistId: pathParts[2] }));
+        // Initialize from URL params
+        if (therapistId) {
+            setFormData(prev => ({ ...prev, therapistId }));
             setSkipTherapistSelection(true);
-            setCurrentStep(2); // Jump straight to Schedule
+            setCurrentStep(2);
+        } else if (step) {
+            const stepNum = parseInt(step);
+            if (!isNaN(stepNum) && stepNum >= 1 && stepNum <= 5) {
+                setCurrentStep(stepNum);
+            }
         }
-    }, []);
+
+        // Handle Stripe Redirect Return
+        const query = new URLSearchParams(window.location.search);
+        const redirectStatus = query.get('redirect_status');
+        const paymentIntentId = query.get('payment_intent');
+
+        // Use a flag to prevent double-firing if strict mode is on, though useEffect should be fine
+        if (redirectStatus === 'succeeded' && paymentIntentId) {
+            // Retrieve appointment ID from local storage (it's the only place we have it if we lost state)
+            // But wait, the wizard state might be re-initialized from localStorage 'booking_draft'
+            // We need to confirm the appointment.
+            const confirmRedirect = async () => {
+                let currentAppointmentId = appointmentId;
+
+                // Try to find appointmentId in localStorage if not in state
+                if (!currentAppointmentId) {
+                    const savedData = localStorage.getItem('booking_draft');
+                    if (savedData) {
+                        try {
+                            const parsed = JSON.parse(savedData);
+                            currentAppointmentId = parsed.appointmentId;
+                        } catch (e) {
+                            console.error("Error parsing saved data to find appointmentId", e);
+                        }
+                    }
+                }
+
+                if (currentAppointmentId) {
+                    try {
+                        // Call manual-confirm to ensure status is updated in database
+                        await fetch('/api/manual-confirm', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                paymentIntentId,
+                                appointmentId: currentAppointmentId
+                            })
+                        });
+                    } catch (e) {
+                        console.error("Manual confirmation failed", e);
+                    }
+                }
+
+                // Show success view
+                setIsCompleted(true);
+            };
+
+            confirmRedirect();
+        }
+    }, [therapistId, step]);
 
     // Persist form data on change
     useEffect(() => {
-        if (formData.name || formData.email || formData.date) { // Only save if there's some data
-            localStorage.setItem('booking_draft', JSON.stringify(formData));
+        const draft = {
+            ...formData,
+            appointmentId // persist appointmentId too
+        };
+        if (formData.name || formData.email || formData.date || appointmentId) {
+            localStorage.setItem('booking_draft', JSON.stringify(draft));
         }
-    }, [formData]);
+    }, [formData, appointmentId]);
 
     const updateData = (data: any) => {
         setFormData(prev => ({ ...prev, ...data }));
@@ -101,8 +166,7 @@ const BookingWizard: React.FC = () => {
         nextStep();
     }
 
-    const [patientId, setPatientId] = useState<string | null>(null);
-    const [appointmentId, setAppointmentId] = useState<string | null>(null);
+
 
     const createPendingBooking = async (): Promise<boolean> => {
         if (appointmentId) return true; // Already created
@@ -141,7 +205,7 @@ const BookingWizard: React.FC = () => {
             const timer = setTimeout(() => {
                 // Redirect to login page so client can set up credentials
                 window.location.href = '/portal-paciente/cadastro';
-            }, 3000); // 3 seconds
+            }, 6000); // 6 seconds
             return () => clearTimeout(timer);
         }
     }, [isCompleted]);
@@ -221,11 +285,11 @@ const BookingWizard: React.FC = () => {
             {/* Header */}
             <header className="h-20 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-6 lg:px-12 sticky top-0 z-50">
                 <div className="flex items-center gap-2">
-                    <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/20">
-                        <BrainCircuit size={24} className="text-white" />
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden shadow-lg shadow-primary-500/20">
+                        <img src="/logo-new.jpg" alt="TeraNexus" className="w-full h-full object-cover" />
                     </div>
                     <span className="font-bold text-xl tracking-tight text-slate-800 dark:text-white">
-                        TRG<span className="text-primary-500">Nexus</span>
+                        Tera<span className="text-primary-500">Nexus</span>
                     </span>
                 </div>
 
