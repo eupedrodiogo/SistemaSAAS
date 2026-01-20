@@ -78,8 +78,23 @@ function generateIcsContent(data: BookingNotificationData): string {
     ].join('\r\n');
 }
 
+// Helper to format YYYY-MM-DD to DD/MM/YYYY
+function formatDateToBr(dateStr: string): string {
+    if (!dateStr) return dateStr;
+    // Check for YYYY-MM-DD
+    if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        const [year, month, day] = dateStr.split('-');
+        return `${day}/${month}/${year}`;
+    }
+    return dateStr;
+}
+
 export async function sendBookingNotification(data: BookingNotificationData) {
     console.log('Preparing to send notifications for:', data.email);
+
+    // Ensure date is in BR format for display
+    data.date = formatDateToBr(data.date);
+
     let result = { status: 'pending', error: null, info: null };
 
     // 1. Email Notification - Setup Transporter
@@ -247,7 +262,9 @@ export async function sendBookingCancellation(data: { name: string, email: strin
 
     // 1. WhatsApp Cancellation
     if (data.phone) {
-        const template = WHATSAPP_TEMPLATES.BOOKING_CANCELLATION(data.name, data.date, data.time);
+        // Ensure date is in BR format
+        const formattedDate = formatDateToBr(data.date);
+        const template = WHATSAPP_TEMPLATES.BOOKING_CANCELLATION(data.name, formattedDate, data.time);
         await sendMetaWhatsApp(data.phone, template.name, template.language.code, template.components);
     }
     // TODO: Add Email Cancellation (Optional for now)
