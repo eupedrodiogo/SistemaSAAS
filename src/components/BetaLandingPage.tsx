@@ -84,7 +84,7 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                         Pare de ser secretário(a) <br /> <span className="text-blue-600 dark:text-blue-500">da sua própria carreira.</span>
                     </h1>
                     <p className="text-xl text-slate-600 dark:text-slate-400 mb-10 max-w-2xl mx-auto">
-                        O primeiro sistema de gestão focado em devolver o tempo do Terapeuta TRG. Agendamento, Pagamento e Prontuário no piloto automático.
+                        O primeiro sistema de gestão focado em devolver o tempo do Terapeuta TRG. Agendamento, Pagamento e Registro de dados no piloto automático.
                     </p>
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                         <button
@@ -156,7 +156,7 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                             },
                             {
                                 icon: <FileText size={28} />,
-                                title: '"Meus prontuários são cadernos espalhados"',
+                                title: '"Meus registros de dados são cadernos espalhados"',
                                 desc: 'Anotar a evolução de cada cliente em papel é lento, inseguro e impossível de acessar de qualquer lugar.'
                             },
                             {
@@ -224,7 +224,7 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                             },
                             {
                                 icon: <FileText size={24} className="text-blue-400" />,
-                                badge: 'Prontuário Digital',
+                                badge: 'Registro de Dados Digital',
                                 title: 'Evolução de cada cliente na palma da mão',
                                 desc: 'Registre sessões, protocolos e observações de qualquer dispositivo. Seguro, organizado e sempre disponível.'
                             },
@@ -351,7 +351,7 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                                 <ul className="space-y-3 mb-8 text-left text-sm text-slate-300">
                                     <li className="flex gap-2 items-start"><Check size={16} className="text-emerald-400 shrink-0 mt-0.5" /> Acesso completo por <strong className="text-white ml-1">1 mês</strong></li>
                                     <li className="flex gap-2 items-start"><Check size={16} className="text-emerald-400 shrink-0 mt-0.5" /> Até 10 Clientes</li>
-                                    <li className="flex gap-2 items-start"><Check size={16} className="text-emerald-400 shrink-0 mt-0.5" /> Agenda & Prontuário</li>
+                                    <li className="flex gap-2 items-start"><Check size={16} className="text-emerald-400 shrink-0 mt-0.5" /> Agenda & Registro de Dados</li>
                                     <li className="flex gap-2 items-start"><Check size={16} className="text-emerald-400 shrink-0 mt-0.5" /> Suporte pelo WhatsApp</li>
                                 </ul>
                                 <button
@@ -373,7 +373,7 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                             <ul className="space-y-3 mb-8 text-left text-sm text-slate-300">
                                 <li className="flex gap-2"><Check size={16} /> Até 10 Clientes</li>
                                 <li className="flex gap-2"><Check size={16} /> Agenda Básica</li>
-                                <li className="flex gap-2"><Check size={16} /> Prontuário Simples</li>
+                                <li className="flex gap-2"><Check size={16} /> Registro de Dados Simples</li>
                             </ul>
                             <button
                                 onClick={() => handleCheckout('price_1ScuH5KPo7EypB7VnIs6qfbQ')}

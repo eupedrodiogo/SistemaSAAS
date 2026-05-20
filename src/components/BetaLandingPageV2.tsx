@@ -140,7 +140,7 @@ const BetaLandingPage: React.FC = () => {
                             <div className="space-y-6">
                                 <FeatureCard
                                     icon={<Calendar className="w-5 h-5 text-[#2dd4bf]" />}
-                                    title="Prontuário Inteligente"
+                                    title="Registro de Dados Inteligente"
                                     status="Disponível"
                                     description="Histórico completo do paciente com templates personalizáveis e busca rápida."
                                     active
@@ -206,7 +206,7 @@ const BetaLandingPage: React.FC = () => {
                         <PrivacyCard
                             icon={<Lock className="w-6 h-6 text-[#2dd4bf]" />}
                             title="Criptografia Ponta-a-Ponta"
-                            description="Nem nós temos acesso aos seus prontuários. Tudo é criptografado antes de sair do seu dispositivo."
+                            description="Nem nós temos acesso aos seus registros de dados. Tudo é criptografado antes de sair do seu dispositivo."
                         />
                         <PrivacyCard
                             icon={<EyeOff className="w-6 h-6 text-[#2dd4bf]" />}
