@@ -93,7 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             // We use the centralized notification utility to ensure iCal and other premium features are applied
             try {
-                const { sendBookingNotification } = await import('./utils/notifications.js');
+                const { sendBookingNotification } = await import('../utils/notifications.js');
                 await sendBookingNotification(notificationData);
             } catch (nError) {
                 console.error('[Booking] Notification Error:', nError);

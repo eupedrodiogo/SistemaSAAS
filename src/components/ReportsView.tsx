@@ -5,6 +5,7 @@ import {
 } from 'react-icons/fi';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { api } from '../services/api';
 import { Line } from 'react-chartjs-2';
 import {
    Chart as ChartJS,
@@ -82,11 +83,8 @@ export function ReportsView() {
    const loadPatients = async () => {
       try {
          setLoading(true);
-         const response = await fetch(`/api/patients?therapistId=${user?.id || 'demo-therapist'}`);
-         if (response.ok) {
-            const data = await response.json();
-            setPatients(data);
-         }
+         const data = await api.patients.list();
+         setPatients(data);
       } catch (error) {
          console.error('Failed to load patients', error);
       } finally {

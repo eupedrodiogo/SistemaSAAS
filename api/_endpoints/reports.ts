@@ -1,7 +1,7 @@
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import pg from 'pg';
-import { verifyAuth } from './utils/auth';
+import { verifyAuth } from '../utils/auth';
 
 const { Pool } = pg;
 

@@ -8,7 +8,7 @@
     },
     {
       "source": "/api/(.*)",
-      "destination": "/api/$1"
+      "destination": "/api/index.ts"
     },
     {
       "source": "/((?!assets|api).*)",
@@ -18,7 +18,7 @@
   "crons": [
     {
       "path": "/api/cron/reminders",
-      "schedule": "0 * * * *"
+      "schedule": "0 9 * * *"
     },
     {
       "path": "/api/cron/keep-alive",
