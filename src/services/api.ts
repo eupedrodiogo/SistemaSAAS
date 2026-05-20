@@ -1,6 +1,4 @@
-
-import { Patient, Appointment, NotificationItem } from 'types';
-
+import { Patient, Appointment, NotificationItem } from '../types';
 import { MOCK_PATIENTS, MOCK_APPOINTMENTS, MOCK_STATS } from '../constants';
 import { supabase } from '../lib/supabase';
 
@@ -29,11 +27,7 @@ const getTherapistId = () => {
 // Helper for standard fetch with Auth
 const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
   const baseUrl = getBaseUrl();
-  // if (!baseUrl) throw new Error('No Server URL'); // REMOVED: Allow relative paths
-
-  // Try to get token from Supabase session first, then fallback to localStorage
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token || getToken();
+  const token = getToken();
 
   const headers = {
     'Content-Type': 'application/json',
@@ -41,12 +35,13 @@ const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
     ...options.headers,
   };
 
-  const response = await fetch(`${baseUrl}${endpoint}`, { ...options, headers });
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => '');
-    throw new Error(`API Error ${response.status}: ${response.statusText} - ${errorText.substring(0, 50)}`);
+  try {
+    const response = await fetch(`${baseUrl}${endpoint}`, { ...options, headers });
+    if (!response.ok) return null;
+    return response.json();
+  } catch (e) {
+    return null;
   }
-  return response.json();
 };
 
 // --- SIMULATION HELPERS (Latency) ---
@@ -57,118 +52,76 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 export const api = {
   auth: {
     login: async (email: string, password: string) => {
-      // Always try Real Backend first
-      try {
-        const data = await apiFetch('/api/auth/login', {
-          method: 'POST',
-          body: JSON.stringify({ email, password })
-        });
-        localStorage.setItem('TRG_AUTH_TOKEN', data.token);
-        localStorage.setItem('TRG_AUTH', 'true');
-        if (data.therapist) {
-          localStorage.setItem('therapist', JSON.stringify(data.therapist));
-        }
-        return true;
-      } catch (e) {
-        console.warn('Backend login failed, falling back to local check', e);
-      }
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      localStorage.setItem('TRG_AUTH', 'true');
 
-      // Local / Supabase Fallback
-      console.warn('Backend login failed, attempting direct Supabase Auth...');
-
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-
-      if (!authError && authData.user) {
-        localStorage.setItem('TRG_AUTH_TOKEN', 'supabase-session'); // Marker
-        localStorage.setItem('TRG_AUTH', 'true');
-
-        // Fetch therapist profile
+      // Busca perfil do terapeuta no Supabase
+      if (data.user) {
         const { data: therapist } = await supabase
           .from('therapists')
           .select('*')
-          .eq('email', email)
+          .eq('id', data.user.id)
           .single();
-
         if (therapist) {
           localStorage.setItem('therapist', JSON.stringify(therapist));
         }
-        return true;
       }
-
-      // Final Mock Fallback (if offline or wrong credentials)
-      await delay(1000);
-      if (email === 'admin@teranexus.com' && password.length > 0) {
-        localStorage.setItem('TRG_AUTH', 'true');
-        return true;
-      }
-      throw new Error('Credenciais inválidas e falha na conexão');
+      return true;
     },
     logout: async () => {
       await supabase.auth.signOut();
       localStorage.removeItem('TRG_AUTH_TOKEN');
       localStorage.removeItem('TRG_AUTH');
+      localStorage.removeItem('therapist');
     }
   },
 
   patients: {
     list: async (): Promise<Patient[]> => {
+      const therapistId = getTherapistId();
+      if (!therapistId) return MOCK_PATIENTS;
+
       try {
-        return await apiFetch('/api/patients');
-      } catch (e) { console.warn('Fetch patients failed, using Supabase direct'); }
-
-      // Supabase Direct Fallback
-      try {
-        const therapistId = getTherapistId();
-        if (therapistId) {
-          const { data, error } = await supabase
-            .from('patients')
-            .select('*')
-            .eq('therapist_id', therapistId)
-            .order('created_at', { ascending: false });
-
-          if (data && !error) return data as Patient[];
-        }
-      } catch (err) { console.warn('Supabase fetch failed', err); /* showNotification(`Erro: ${err.message}`, 'error'); */ }
-
-      await delay(600);
-      const local = localStorage.getItem('TRG_LOCAL_PATIENTS');
-      return local ? JSON.parse(local) : MOCK_PATIENTS;
+        const { data, error } = await supabase
+          .from('patients')
+          .select('*')
+          .eq('therapist_id', therapistId)
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data as Patient[]) ?? MOCK_PATIENTS;
+      } catch (err) {
+        console.warn('Supabase patients fetch failed', err);
+        return MOCK_PATIENTS;
+      }
     },
 
     create: async (patient: Partial<Patient>) => {
-      try {
-        return await apiFetch('/api/patients', { method: 'POST', body: JSON.stringify(patient) });
-      } catch (e) { console.warn('Create patient failed, using local'); }
-
-      const newPatient = { ...patient, id: Date.now().toString() } as Patient;
-      const current = await api.patients.list();
-      const updated = [newPatient, ...current];
-      localStorage.setItem('TRG_LOCAL_PATIENTS', JSON.stringify(updated));
-      return newPatient;
+      const therapistId = getTherapistId();
+      if (!therapistId) throw new Error('Not authenticated');
+      const { data, error } = await supabase
+        .from('patients')
+        .insert({ ...patient, therapist_id: therapistId })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
     },
 
     update: async (id: string, data: Partial<Patient>) => {
-      try {
-        return await apiFetch(`/api/patients?id=${id}`, { method: 'PUT', body: JSON.stringify(data) });
-      } catch (e) { console.warn('Update patient failed, using local'); }
-
-      const current = await api.patients.list();
-      const updated = current.map(p => p.id === id ? { ...p, ...data } : p);
-      localStorage.setItem('TRG_LOCAL_PATIENTS', JSON.stringify(updated));
-      return updated.find(p => p.id === id);
+      const { data: updated, error } = await supabase
+        .from('patients')
+        .update(data)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return updated;
     },
 
     delete: async (id: string) => {
-      try {
-        return await apiFetch(`/api/patients?id=${id}`, { method: 'DELETE' });
-      } catch (e) { console.warn('Delete patient failed, using local'); }
-
-      const current = await api.patients.list();
-      const updated = current.filter(p => p.id !== id);
-      localStorage.setItem('TRG_LOCAL_PATIENTS', JSON.stringify(updated));
+      const { error } = await supabase.from('patients').delete().eq('id', id);
+      if (error) throw error;
       return true;
     },
 
@@ -188,69 +141,46 @@ export const api = {
 
   appointments: {
     list: async () => {
+      const therapistId = getTherapistId();
+      if (!therapistId) return MOCK_APPOINTMENTS;
+
       try {
-        await delay(200);
-        const therapistId = getTherapistId();
-        const query = therapistId ? `?therapistId=${therapistId}` : '';
-        return await apiFetch(`/api/appointments${query}`);
-      } catch (e) { console.warn('Fetch appointments failed, using Supabase direct'); }
-
-      // Supabase Direct Fallback
-      try {
-        const therapistId = getTherapistId();
-        if (therapistId) {
-          const { data, error } = await supabase
-            .from('appointments')
-            .select('*, patients(name)')
-            .eq('therapist_id', therapistId);
-
-          if (data && !error) {
-            return data.map((apt: any) => ({
-              id: apt.id,
-              patientId: apt.patient_id,
-              patientName: apt.patients?.name || 'Desconhecido',
-              date: apt.date,
-              time: apt.time,
-              status: apt.status,
-              type: apt.type,
-              sessionData: apt.session_data
-            })) as Appointment[];
-          }
-        }
-      } catch (err) { console.warn('Supabase appointment fetch failed', err); }
-
-      await delay(500);
-      return MOCK_APPOINTMENTS;
+        const { data, error } = await supabase
+          .from('appointments')
+          .select('*')
+          .eq('therapist_id', therapistId)
+          .order('date', { ascending: true });
+        if (error) throw error;
+        return data ?? MOCK_APPOINTMENTS;
+      } catch (err) {
+        console.warn('Supabase appointments fetch failed', err);
+        return MOCK_APPOINTMENTS;
+      }
     },
     create: async (apt: Partial<Appointment>) => {
-      try {
-        return await apiFetch('/api/appointments', { method: 'POST', body: JSON.stringify(apt) });
-      } catch (e) { console.warn('Create appointment failed, using local'); }
-
-      const newApt = { id: Date.now().toString(), status: 'Agendado', type: 'Anamnese', ...apt } as Appointment;
-      const local = (await api.appointments.list()) as Appointment[];
-      const updated = [newApt, ...local];
-      localStorage.setItem('TRG_LOCAL_APPOINTMENTS', JSON.stringify(updated));
-      return newApt;
+      const therapistId = getTherapistId();
+      if (!therapistId) throw new Error('Not authenticated');
+      const { data, error } = await supabase
+        .from('appointments')
+        .insert({ ...apt, therapist_id: therapistId })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
     },
     update: async (id: string, data: Partial<Appointment>) => {
-      // try {
-      return await apiFetch(`/api/appointments?id=${id}`, { method: 'PUT', body: JSON.stringify(data) });
-      // } catch (e) { console.warn('Update appointment failed, using local'); }
-
-      const local = (await api.appointments.list()) as Appointment[];
-      const updated = local.map(a => a.id === id ? { ...a, ...data } : a);
-      localStorage.setItem('TRG_LOCAL_APPOINTMENTS', JSON.stringify(updated));
-      return updated.find(a => a.id === id);
+      const { data: updated, error } = await supabase
+        .from('appointments')
+        .update(data)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return updated;
     },
     delete: async (id: string) => {
-      try {
-        return await apiFetch(`/api/appointments?id=${id}`, { method: 'DELETE' });
-      } catch (e) { console.warn('Delete appointment failed, using local'); }
-
-      const local = (await api.appointments.list()) as Appointment[];
-      const updated = local.filter(a => a.id !== id);
-      localStorage.setItem('TRG_LOCAL_APPOINTMENTS', JSON.stringify(updated));
+      const { error } = await supabase.from('appointments').delete().eq('id', id);
+      if (error) throw error;
       return true;
     }
   },

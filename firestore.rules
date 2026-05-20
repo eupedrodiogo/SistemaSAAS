@@ -1,0 +1,46 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Auth helper
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    // Site Configs: Anyone can read, only owner can write
+    match /site_configs/{configId} {
+      allow read: if true;
+      allow write: if isSignedIn() && (
+        resource == null || resource.data.therapist_id == request.auth.uid || request.auth.uid == 'pedro-admin'
+      );
+    }
+    
+    // Appointments: Only therapist can access their data
+    match /appointments/{appointmentId} {
+      allow read, write: if isSignedIn() && (
+        resource == null || resource.data.therapist_id == request.auth.uid
+      );
+    }
+    
+    // Patients: Only therapist can access their data
+    match /patients/{patientId} {
+      allow read, write: if isSignedIn() && (
+        resource == null || resource.data.therapist_id == request.auth.uid
+      );
+    }
+    
+    // Leads: Public can create, therapist can read/update
+    match /leads/{leadId} {
+      allow create: if true;
+      allow read, update, delete: if isSignedIn();
+    }
+    
+    // Notifications: Only therapist can access
+    match /notifications/{notifId} {
+      allow read, write: if isSignedIn() && (
+        resource == null || resource.data.therapist_id == request.auth.uid
+      );
+    }
+  }
+}

@@ -1,0 +1,28 @@
+# INSTRUÇÕES PARA CONFIGURAÇÃO DE DOMÍNIO (teranexus.com.br)
+
+O Registro.br está em transição. Assim que o cronômetro de 2 horas terminar, siga estes passos:
+
+1. Acesse: https://registro.br/painel/dominios/
+2. Clique no domínio: teranexus.com.br
+3. Role até a seção "DNS" e clique em "Configurar zona DNS".
+4. Adicione estas duas entradas exatamente assim:
+
+---
+ENTRADA 1 (Onde o site mora):
+- Nome/Host: (deixe em branco ou coloque @)
+- Tipo: A
+- Dados: 199.36.158.100
+---
+ENTRADA 2 (Verificação do Google):
+- Nome/Host: (deixe em branco ou coloque @)
+- Tipo: TXT
+- Dados: hosting-site=saas-teranexus
+---
+
+5. Clique em "Salvar Alterações" no final da página.
+
+-----------------------------------------------------------
+LINKS ÚTEIS:
+Novo site (já funcionando): https://saas-teranexus.web.app
+Console Firebase: https://console.firebase.google.com/project/saas-teranexus/hosting/sites/saas-teranexus
+-----------------------------------------------------------

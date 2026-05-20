@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../../../lib/supabase';
 import { Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, Loader2, Users } from 'lucide-react';
 import { PartnerMatcher } from '../PartnerMatcher';
 
@@ -27,14 +28,55 @@ const ScheduleStep: React.FC<ScheduleStepProps> = ({ data, onUpdate, onNext, onB
             try {
                 // Format date as YYYY-MM-DD for the API
                 const dateStr = selectedDate.toISOString().split('T')[0];
-                const therapistQuery = data.therapistId ? `&therapistId=${data.therapistId}` : '';
-                const response = await fetch(`/api/availability?date=${dateStr}${therapistQuery}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    setAvailableSlots(data.slots);
-                } else {
-                    console.error('Failed to fetch availability');
+                
+                // Horários padrão de atendimento
+                const defaultTimes = [
+                    '08:00', '09:00', '10:00', '11:00', 
+                    '13:00', '14:00', '15:00', '16:00', '17:00'
+                ];
+
+                // Busca agendamentos deste terapeuta nesta data para bloquear horários
+                let bookedTimes: string[] = [];
+                
+                if (data.therapistId) {
+                    const { data: appointments, error } = await supabase
+                        .from('appointments')
+                        .select('time')
+                        .eq('date', dateStr)
+                        .eq('therapist_id', data.therapistId)
+                        .neq('status', 'cancelled');
+                        
+                    if (!error && appointments) {
+                        bookedTimes = appointments.map(a => a.time.substring(0, 5));
+                    }
                 }
+
+                // Gera os slots checando disponibilidade e horários passados se for hoje
+                const now = new Date();
+                const isToday = selectedDate.toDateString() === now.toDateString();
+                const currentHour = now.getHours();
+                const currentMinute = now.getMinutes();
+
+                const slots: TimeSlot[] = defaultTimes.map((time, index) => {
+                    const [hourStr, minStr] = time.split(':');
+                    const hour = parseInt(hourStr);
+                    const min = parseInt(minStr);
+                    
+                    let isPast = false;
+                    if (isToday) {
+                        if (hour < currentHour || (hour === currentHour && min <= currentMinute)) {
+                            isPast = true;
+                        }
+                    }
+
+                    return {
+                        id: String(index),
+                        time,
+                        available: !bookedTimes.includes(time) && !isPast
+                    };
+                });
+                
+                setAvailableSlots(slots);
             } catch (error) {
                 console.error('Error fetching availability:', error);
             } finally {

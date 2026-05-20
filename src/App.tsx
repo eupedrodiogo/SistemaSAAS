@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation, 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { Moon, Sun } from 'lucide-react';
-import { supabase } from './lib/supabase';
+// Auth Context is now Firebase only
 
 // Components
 import BookingWizard from './components/PatientBooking/BookingWizard';
@@ -67,26 +67,9 @@ function AppContent() {
   }
 
   useEffect(() => {
-
-    // 2. Listen for Supabase specific Password Recovery event (post-mount)
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        console.log('PASSWORD_RECOVERY event detected, redirecting to update-password');
-        navigate('/update-password');
-      }
-    });
-
-    // 3. Fallback check for raw hashes (errors or if event didn't fire yet)
-    // Check for recovery hash OR error hash from Supabase (defaults to root if redirect URL not whitelisted)
-    if (location.hash && (location.hash.includes('type=recovery') || location.hash.includes('error='))) {
-      console.log('Recovery or Error hash detected, redirecting to /update-password');
-      // Redirect to /update-password but PRESERVE the hash so Supabase can parse the token or error!
-      navigate(`/update-password${location.hash}`);
-    }
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
+    // Recovery logic for Firebase can be added later if needed.
+    // Supabase recovery logic removed as project is migrated.
+    return () => { };
   }, [location, navigate]);
 
   return (

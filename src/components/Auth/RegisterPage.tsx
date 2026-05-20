@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { BrainCircuit, Mail, User, ArrowRight, Loader2, ShieldCheck, FileText } from 'lucide-react';
+import { Mail, User, ArrowRight, Loader2 } from 'lucide-react';
 import LegalModal from '../Legal/LegalModal';
 
 const RegisterPage: React.FC = () => {
@@ -31,7 +31,6 @@ const RegisterPage: React.FC = () => {
         try {
             const plan = new URLSearchParams(window.location.search).get('plan') || 'trial';
 
-            // Basic validation
             if (!formData.phone || formData.phone.length < 10) {
                 throw new Error('Por favor, insira um número de WhatsApp válido.');
             }
@@ -39,50 +38,53 @@ const RegisterPage: React.FC = () => {
                 throw new Error('Sua senha deve ter pelo menos 6 caracteres.');
             }
 
-            console.log('Initiating Registration for:', formData.email);
-
-            // Call unified backend API
-            const response = await fetch('/api/auth/register-complete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    email: formData.email,
-                    name: formData.name,
-                    phone: formData.phone,
-                    password: formData.password,
-                    plan: plan
-                })
+            // 1. Criar usuário no Supabase Auth
+            const { data, error: signUpError } = await supabase.auth.signUp({
+                email: formData.email,
+                password: formData.password,
+                options: {
+                    data: {
+                        name: formData.name,
+                        phone: formData.phone,
+                        plan: plan,
+                        email_verified: true,
+                        has_set_password: true,
+                    },
+                    emailRedirectTo: `${window.location.origin}/login?registered=true`
+                }
             });
 
-            const result = await response.json();
+            if (signUpError) throw signUpError;
 
-            if (!response.ok) {
-                throw new Error(result.error || 'Erro ao realizar cadastro.');
-            }
+            const userId = data.user?.id;
+            if (!userId) throw new Error('Erro ao obter ID do usuário.');
 
-            // Auto-login attempt
-            try {
-                const { error: loginError } = await supabase.auth.signInWithPassword({
-                    email: formData.email,
-                    password: formData.password
-                });
+            // 2. Criar perfil do terapeuta no Supabase DB
+            // O trigger handle_new_user já faz isso, mas fazemos upsert para garantir dados extras
+            const { error: profileError } = await supabase.from('therapists').upsert({
+                id: userId,
+                name: formData.name,
+                email: formData.email,
+                phone: formData.phone,
+                plan: plan,
+                status: 'active',
+            });
 
-                if (!loginError) {
-                    // Redirect will be handled by AuthContext/App state or we can force it
-                    window.location.href = '/dashboard';
-                    return;
-                }
-                console.warn('Auto-login failed after registration:', loginError);
-                // Fallback to success screen if auto-login fails
-            } catch (autoLoginErr) {
-                console.warn('Auto-login exception:', autoLoginErr);
+            if (profileError && profileError.code !== '23505') {
+                // ignora duplicate key (23505) - trigger já criou
+                console.warn('Profile upsert warning:', profileError);
             }
 
             setSuccess(true);
 
         } catch (err: any) {
             console.error('Registration Error:', err);
-            setError(err.message || 'Erro ao realizar cadastro.');
+            const msg = err?.message || '';
+            if (msg.includes('already registered') || msg.includes('already been registered')) {
+                setError('Este e-mail já está cadastrado. Faça login ou recupere sua senha.');
+            } else {
+                setError(msg || 'Erro ao realizar cadastro.');
+            }
         } finally {
             setIsLoading(false);
         }
@@ -99,10 +101,9 @@ const RegisterPage: React.FC = () => {
                         Conta criada com sucesso!
                     </h2>
                     <p className="text-slate-600 dark:text-slate-400 mb-8 text-lg leading-relaxed">
-                        Sua conta foi ativada.<br />
-                        Tente fazer login com suas credenciais.
+                        Verifique seu e-mail para confirmar o cadastro,<br />
+                        depois faça login com suas credenciais.
                     </p>
-
                     <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-xl mb-8 border border-blue-100 dark:border-blue-800">
                         <a href="/login?registered=true" className="bg-primary-600 text-white p-3 rounded-lg font-bold block hover:bg-primary-700 transition">
                             Ir para Login
@@ -214,38 +215,21 @@ const RegisterPage: React.FC = () => {
 
                         {error && (
                             <div className="rounded-md bg-red-50 dark:bg-red-900/30 p-4">
-                                <div className="flex">
-                                    <div className="ml-3">
-                                        <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
-                                            Erro
-                                        </h3>
-                                        <div className="mt-2 text-sm text-red-700 dark:text-red-300">
-                                            {error}
-                                        </div>
-                                    </div>
-                                </div>
+                                <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Erro</h3>
+                                <div className="mt-2 text-sm text-red-700 dark:text-red-300">{error}</div>
                             </div>
                         )}
 
                         <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
                             <p className="text-xs text-slate-500 dark:text-slate-400 text-center leading-relaxed">
                                 Ao criar sua conta, você concorda com nossos{' '}
-                                <button
-                                    type="button"
-                                    onClick={() => openLegal('terms')}
-                                    className="text-primary-600 dark:text-primary-400 font-bold hover:underline"
-                                >
+                                <button type="button" onClick={() => openLegal('terms')} className="text-primary-600 dark:text-primary-400 font-bold hover:underline">
                                     Termos de Uso
                                 </button>
                                 {' '}e nossa{' '}
-                                <button
-                                    type="button"
-                                    onClick={() => openLegal('privacy')}
-                                    className="text-primary-600 dark:text-primary-400 font-bold hover:underline"
-                                >
+                                <button type="button" onClick={() => openLegal('privacy')} className="text-primary-600 dark:text-primary-400 font-bold hover:underline">
                                     Política de Privacidade
-                                </button>
-                                .
+                                </button>.
                             </p>
                         </div>
 

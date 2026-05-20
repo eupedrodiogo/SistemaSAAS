@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../../../lib/supabase';
 import { User, Search, Award, Star, MessageSquare, CheckCircle2, ChevronRight, X } from 'lucide-react';
 
 interface Therapist {
@@ -51,10 +52,13 @@ const TherapistSelectionStep: React.FC<TherapistSelectionStepProps> = ({ onSelec
     useEffect(() => {
         const fetchTherapists = async () => {
             try {
-                const response = await fetch('/api/public/therapists');
-                if (response.ok) {
-                    const data = await response.json();
-                    setTherapists(data.therapists);
+                const { data, error } = await supabase
+                    .from('therapists')
+                    .select('*');
+                
+                if (error) throw error;
+                if (data) {
+                    setTherapists(data);
                 }
             } catch (error) {
                 console.error('Error fetching therapists:', error);

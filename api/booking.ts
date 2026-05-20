@@ -14,7 +14,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const { name, email, phone, date, time, therapistId, status = 'scheduled', price, ...anamnesisData } = req.body || {};
+    const { name, email, phone, date, time, therapistId, status = 'scheduled', price, ...restData } = req.body || {};
+
+    // Ensure structure
+    const anamnesisData = {
+        ...restData,
+        transtornos: restData.transtornos || [],
+        doresFisicas: restData.doresFisicas || [],
+        temasFuturo: restData.temasFuturo || []
+    };
 
     if (!name || !email || !date || !time || !therapistId) {
         return res.status(400).json({ error: 'Missing required fields: name, email, date, time, or therapistId' });

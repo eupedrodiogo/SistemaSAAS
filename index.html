@@ -9,7 +9,9 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#020617">
   <link rel="icon" type="image/jpg" href="/logo-new.jpg" />
-  <title>TeraNexus - Gestão de Terapia</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -65,8 +67,6 @@
     }
   </script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
     body {
       font-family: 'Inter', sans-serif;
     }
@@ -98,13 +98,31 @@
       background: #475569;
     }
   </style>
-  <link rel="stylesheet" href="/src/index.css">
 
 </head>
 
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <!-- Inline Loader for instant feedback -->
+    <div id="app-loader"
+      style="position: fixed; inset: 0; background: #020617; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; font-family: sans-serif;">
+      <div
+        style="width: 60px; height: 60px; border: 3px solid rgba(14, 165, 233, 0.1); border-top-color: #0ea5e9; border-radius: 50%; animation: spin 1s linear infinite;">
+      </div>
+      <p style="color: #64748b; margin-top: 20px; font-weight: 500; letter-spacing: 0.05em; font-size: 14px;">TERANEXUS
+        CARREGANDO...</p>
+    </div>
+    <style>
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </div>
   <script type="module" src="/src/index.tsx"></script>
+  <!-- Tailwind is only needed if not pre-built, but script is moved to bottom to prevent blocking -->
+  <script src="https://cdn.tailwindcss.com" defer></script>
 </body>
 
 </html>

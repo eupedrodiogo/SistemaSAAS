@@ -56,6 +56,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (id) {
             const appointmentId = Array.isArray(id) ? id[0] : id;
 
+            if (req.method === 'GET') {
+                const { data, error } = await supabase
+                    .from('appointments')
+                    .select('*, patients(name, email, phone)')
+                    .eq('id', appointmentId)
+                    .eq('therapist_id', user.id)
+                    .single();
+
+                if (error || !data) {
+                    return res.status(404).json({ error: 'Appointment not found' });
+                }
+
+                const formatted = {
+                    id: data.id,
+                    patientId: data.patient_id,
+                    patientName: data.patients?.name || 'Desconhecido',
+                    date: data.date,
+                    time: data.time,
+                    status: data.status,
+                    type: data.type,
+                    notes: data.notes,
+                    sessionData: data.session_data || {}
+                };
+
+                return res.status(200).json(formatted);
+            }
+
             if (req.method === 'PUT') {
                 const { date, time, status, type, notes, sessionData } = req.body;
 
@@ -131,8 +158,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 if (error) throw error;
                 return res.status(200).json({ message: 'Deleted successfully' });
             }
+            else if (req.method === 'GET') {
+                const { data, error } = await supabase
+                    .from('appointments')
+                    .select('*, patients(name, email, phone)')
+                    .eq('id', appointmentId)
+                    .single();
+
+                if (error) throw error;
+                if (!data) return res.status(404).json({ error: 'Appointment not found' });
+
+                const formatted = {
+                    id: data.id.toString(),
+                    patientId: data.patient_id.toString(),
+                    patientName: data.patients?.name || 'Desconhecido',
+                    date: data.date,
+                    time: data.time,
+                    status: data.status,
+                    type: data.type,
+                    notes: data.notes,
+                    sessionData: data.session_data || {}
+                };
+
+                return res.status(200).json(formatted);
+            }
             else {
-                res.setHeader('Allow', ['PUT', 'DELETE']);
+                res.setHeader('Allow', ['GET', 'PUT', 'DELETE']);
                 return res.status(405).end(`Method ${req.method} Not Allowed`);
             }
         }

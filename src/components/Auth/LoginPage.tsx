@@ -2,34 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { BrainCircuit, Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
 
-    // Auto-redirect if already logged in
+    // Auto-redirect se já está logado
     useEffect(() => {
         if (user) {
-            console.log('LoginPage: User already authenticated, redirecting to dashboard...');
             navigate('/dashboard');
         }
     }, [user, navigate]);
 
-    const [formData, setFormData] = useState({
-        email: '',
-        password: ''
-    });
-    const [loginMode, setLoginMode] = useState<'password' | 'magic_link'>('password');
+    const [formData, setFormData] = useState({ email: '', password: '' });
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
 
     useEffect(() => {
-        // Check for registration success param
         const params = new URLSearchParams(window.location.search);
         if (params.get('registered') === 'true') {
-            setSuccessMessage('Conta criada com sucesso! Faça login para continuar.');
+            setSuccessMessage('Conta criada! Verifique seu e-mail e faça login.');
         }
     }, []);
 
@@ -40,59 +34,23 @@ const LoginPage: React.FC = () => {
         setIsLoading(true);
 
         try {
-            if (loginMode === 'password') {
-                const { error: authError, data } = await supabase.auth.signInWithPassword({
-                    email: formData.email,
-                    password: formData.password
-                });
+            const { error } = await supabase.auth.signInWithPassword({
+                email: formData.email,
+                password: formData.password,
+            });
 
-                if (authError) throw authError;
-                console.log('Login successful:', data);
+            if (error) throw error;
 
-                // Generate custom JWT for API authentication
-                try {
-                    const apiResponse = await fetch('/api/auth/login', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email: formData.email, password: formData.password })
-                    });
-                    if (apiResponse.ok) {
-                        const apiData = await apiResponse.json();
-                        localStorage.setItem('TRG_AUTH_TOKEN', apiData.token);
-                        if (apiData.therapist) {
-                            localStorage.setItem('therapist', JSON.stringify(apiData.therapist));
-                        }
-                    }
-                } catch (e) {
-                    console.warn('Custom API token generation failed, continuing with Supabase session', e);
-                }
-
-                // Force session refresh assurance
-                await supabase.auth.getSession();
-
-                // Wait a brief moment for AuthContext to update logic
-                setTimeout(() => {
-                    navigate('/dashboard');
-                }, 500);
-
-            } else {
-                // Magic Link Login
-                const { error: otpError } = await supabase.auth.signInWithOtp({
-                    email: formData.email,
-                    options: {
-                        emailRedirectTo: `${window.location.origin}/dashboard`
-                    }
-                });
-
-                if (otpError) throw otpError;
-
-                setSuccessMessage('Link de acesso enviado! Verifique seu email.');
-                setIsLoading(false);
-                return; // Stop execution, don't navigate yet
-            }
-
+            // AuthContext detecta a mudança via onAuthStateChange → redireciona
         } catch (err: any) {
-            setError(err.message === 'Invalid login credentials' ? 'Credenciais inválidas.' : err.message);
+            const msg = err?.message || '';
+            if (msg.includes('Invalid login credentials')) {
+                setError('E-mail ou senha incorretos.');
+            } else if (msg.includes('Email not confirmed')) {
+                setError('Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada.');
+            } else {
+                setError(msg || 'Falha no login. Tente novamente.');
+            }
         } finally {
             setIsLoading(false);
         }
@@ -119,9 +77,6 @@ const LoginPage: React.FC = () => {
 
             <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
                 <div className="bg-white dark:bg-slate-900 py-8 px-4 shadow-xl shadow-slate-200/50 dark:shadow-none sm:rounded-2xl sm:px-10 border border-slate-100 dark:border-slate-800">
-
-                    {/* Tab Switcher Removed for Strict Password Flow */}
-
                     <form className="space-y-6" onSubmit={handleSubmit}>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Email</label>
@@ -164,21 +119,13 @@ const LoginPage: React.FC = () => {
 
                         {error && (
                             <div className="rounded-md bg-red-50 dark:bg-red-900/30 p-4">
-                                <div className="flex">
-                                    <div className="ml-3">
-                                        <h3 className="text-sm font-medium text-red-800 dark:text-red-200">{error}</h3>
-                                    </div>
-                                </div>
+                                <h3 className="text-sm font-medium text-red-800 dark:text-red-200">{error}</h3>
                             </div>
                         )}
 
                         {successMessage && (
                             <div className="rounded-md bg-green-50 dark:bg-green-900/30 p-4">
-                                <div className="flex">
-                                    <div className="ml-3">
-                                        <h3 className="text-sm font-medium text-green-800 dark:text-green-200">{successMessage}</h3>
-                                    </div>
-                                </div>
+                                <h3 className="text-sm font-medium text-green-800 dark:text-green-200">{successMessage}</h3>
                             </div>
                         )}
 
@@ -202,7 +149,6 @@ const LoginPage: React.FC = () => {
                                 <span className="bg-white dark:bg-slate-900 px-2 text-slate-500">Não tem uma conta?</span>
                             </div>
                         </div>
-
                         <div className="mt-6 text-center">
                             <a href="/register" className="font-medium text-primary-600 hover:text-primary-500">
                                 Criar conta gratuitamente
@@ -210,8 +156,8 @@ const LoginPage: React.FC = () => {
                         </div>
                     </div>
                 </div>
-            </div >
-        </div >
+            </div>
+        </div>
     );
 };
 

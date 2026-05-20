@@ -139,8 +139,9 @@ const ClientsList: React.FC<PatientsListProps> = ({ highlightPatientId, onNaviga
     }
   };
 
-  // Edit Modal State
+  // Edit/Add Modal State
   const [editingClient, setEditingClient] = useState<Patient | null>(null);
+  const [isAddingClient, setIsAddingClient] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Patient>>({});
 
   // Document Generator State
@@ -222,7 +223,21 @@ const ClientsList: React.FC<PatientsListProps> = ({ highlightPatientId, onNaviga
   };
 
   const handleSaveEdit = async () => {
-    if (editingClient && editForm) {
+    if (isAddingClient && editForm.name) {
+      try {
+        const newClient = await api.patients.create({
+          ...editForm,
+          status: editForm.status || 'Ativo',
+        });
+        if (newClient) {
+          setPatients(prev => [newClient, ...prev]);
+          setIsAddingClient(false);
+        }
+      } catch (error) {
+        console.error('Error creating patient:', error);
+        alert('Erro ao criar cliente.');
+      }
+    } else if (editingClient && editForm) {
       try {
         const updated = await api.patients.update(editingClient.id, editForm);
         if (updated) {
@@ -234,6 +249,11 @@ const ClientsList: React.FC<PatientsListProps> = ({ highlightPatientId, onNaviga
         alert('Erro ao atualizar cliente.');
       }
     }
+  };
+
+  const handleAddNewClient = () => {
+    setEditForm({ name: '', email: '', phone: '', status: 'Ativo' });
+    setIsAddingClient(true);
   };
 
   const handleViewRecord = (id: string) => {
@@ -328,7 +348,10 @@ const ClientsList: React.FC<PatientsListProps> = ({ highlightPatientId, onNaviga
           <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Gestão de Clientes</h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm">Base de contatos, histórico clínico e financeiro.</p>
         </div>
-        <button className="w-full sm:w-auto bg-primary-600 dark:bg-secondary-600 hover:bg-primary-700 dark:hover:bg-secondary-700 text-white px-4 py-2.5 rounded-xl shadow-lg shadow-primary-500/20 dark:shadow-secondary-600/20 transition-all flex items-center justify-center gap-2 active:scale-95">
+        <button 
+          onClick={handleAddNewClient}
+          className="w-full sm:w-auto bg-primary-600 dark:bg-secondary-600 hover:bg-primary-700 dark:hover:bg-secondary-700 text-white px-4 py-2.5 rounded-xl shadow-lg shadow-primary-500/20 dark:shadow-secondary-600/20 transition-all flex items-center justify-center gap-2 active:scale-95"
+        >
           <Plus size={20} />
           <span className="font-medium">Novo Cliente</span>
         </button>
@@ -511,19 +534,20 @@ const ClientsList: React.FC<PatientsListProps> = ({ highlightPatientId, onNaviga
         </div>
       )}
 
-      {/* Edit Client Modal */}
-      {editingClient && (
+      {/* Edit/Add Client Modal */}
+      {(editingClient || isAddingClient) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
-            onClick={() => setEditingClient(null)}
+            onClick={() => { setEditingClient(null); setIsAddingClient(false); }}
           />
           <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl animate-slide-up overflow-hidden ring-1 ring-slate-200 dark:ring-slate-800 flex flex-col max-h-[90vh]">
             <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950">
               <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                <Edit2 size={18} /> Editar Cliente
+                {isAddingClient ? <Plus size={18} /> : <Edit2 size={18} />} 
+                {isAddingClient ? 'Novo Cliente' : 'Editar Cliente'}
               </h3>
-              <button onClick={() => setEditingClient(null)}><X size={20} className="text-slate-400" /></button>
+              <button onClick={() => { setEditingClient(null); setIsAddingClient(false); }}><X size={20} className="text-slate-400" /></button>
             </div>
 
             <div className="p-6 space-y-4 overflow-y-auto">

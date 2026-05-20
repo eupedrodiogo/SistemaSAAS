@@ -17,6 +17,9 @@ export default defineConfig(({ mode }) => {
         srcDir: 'src',
         filename: 'sw.ts',
         registerType: 'autoUpdate',
+        injectManifest: {
+          maximumFileSizeToCacheInBytes: 5000000,
+        },
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
         manifest: {
           name: 'TeraNexus',

@@ -9,7 +9,8 @@ import {
   TrendingUp,
   Clock,
   Activity,
-  Loader2
+  Loader2,
+  Link
 } from 'lucide-react';
 import {
   LineChart,
@@ -228,6 +229,20 @@ const MainDashboardView: React.FC<MainDashboardViewProps> = ({ onChangeView, the
 
           <PushNotificationManager />
           <NotificationBell role="therapist" />
+          
+          <button
+            onClick={() => {
+              const url = `${window.location.origin}/agendar/u/${therapist?.id}`;
+              navigator.clipboard.writeText(url);
+              alert('Link de agendamento copiado para a área de transferência!\n' + url);
+            }}
+            className="bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 dark:hover:bg-indigo-800 text-indigo-700 dark:text-indigo-300 px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 border border-indigo-200 dark:border-indigo-700"
+            title="Link direto para pacientes agendarem com você"
+          >
+            <Link size={16} />
+            <span className="hidden sm:inline">Copiar Meu Link</span>
+          </button>
+
           <button
             onClick={() => onChangeView(AppView.AGENDA)}
             className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"

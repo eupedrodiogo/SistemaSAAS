@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
 import { BrainCircuit, Check } from 'lucide-react';
 import RegisterStep from './steps/RegisterStep';
 import AnamnesisStep from './steps/AnamnesisStep';
@@ -29,7 +30,10 @@ const BookingWizard: React.FC = () => {
         time: '',
         therapistId: '',
         price: 0,
-        therapistName: ''
+        therapistName: '',
+        transtornos: [],
+        doresFisicas: [],
+        temasFuturo: []
     });
     const [isCompleted, setIsCompleted] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -45,17 +49,20 @@ const BookingWizard: React.FC = () => {
             if (!formData.therapistId) return;
 
             try {
-                const res = await fetch(`/api/public/therapists?id=${formData.therapistId}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.therapists && data.therapists.length > 0) {
-                        const therapist = data.therapists[0];
-                        setFormData(prev => ({
-                            ...prev,
-                            price: therapist.price || 100, // Default to 100 if not set
-                            therapistName: therapist.name
-                        }));
-                    }
+                const { data: therapist, error } = await supabase
+                    .from('therapists')
+                    .select('*')
+                    .eq('id', formData.therapistId)
+                    .single();
+
+                if (error) throw error;
+                
+                if (therapist) {
+                    setFormData(prev => ({
+                        ...prev,
+                        price: therapist.price || 100, // Default to 100 if not set
+                        therapistName: therapist.name
+                    }));
                 }
             } catch (error) {
                 console.error("Failed to fetch therapist details", error);

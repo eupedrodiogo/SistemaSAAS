@@ -222,12 +222,29 @@ const SessionView: React.FC = () => {
               // Mock intake data for demo if not found
 
               // Attempt to load intake data from appointment notes (where it acts as anamnesis storage)
+              // Attempt to load intake data from appointment notes (where it acts as anamnesis storage)
               if (appointment.notes) {
                 try {
-                  const parsedNotes = JSON.parse(appointment.notes);
+                  let parsedNotes = appointment.notes;
+                  if (typeof parsedNotes === 'string') {
+                    // Only parse if it looks like a JSON object/array
+                    if (parsedNotes.trim().startsWith('{') || parsedNotes.trim().startsWith('[')) {
+                      parsedNotes = JSON.parse(parsedNotes);
+                    }
+                  }
+
                   // Basic validation to see if it's anamnesis data (has at least one expected key or is object)
                   if (typeof parsedNotes === 'object' && parsedNotes !== null) {
-                    setIntakeData(parsedNotes as ClientIntakeData);
+                    setIntakeData({
+                      ...parsedNotes,
+                      // Ensure arrays exist even if empty in JSON
+                      transtornos: parsedNotes.transtornos || [],
+                      doresFisicas: parsedNotes.doresFisicas || [],
+                      temasFuturo: parsedNotes.temasFuturo || []
+                    } as ClientIntakeData);
+                  } else {
+                    // String legacy note case
+                    throw new Error("Legacy string note");
                   }
                 } catch (e) {
                   // Not JSON, assume simple string notes or legacy data
@@ -236,8 +253,10 @@ const SessionView: React.FC = () => {
                     setIntakeData({
                       nome: appointment.patientName,
                       email: 'cliente@exemplo.com',
-                      complaint: appointment.notes, // Treat simple string as complaint
-                      // ... other fields empty
+                      complaint: typeof appointment.notes === 'string' ? appointment.notes : "Notas legadas",
+                      transtornos: [],
+                      doresFisicas: [],
+                      temasFuturo: []
                     } as ClientIntakeData);
                   }
                 }
