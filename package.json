@@ -7,7 +7,7 @@
     "dev": "vite",
     "dev:api": "vercel dev",
     "build": "vite build && npm run build:api",
-    "build:api": "esbuild api/index.ts --bundle --platform=node --format=cjs --outfile=api/handler.cjs --external:@vercel/node",
+    "build:api": "esbuild api/index.ts --bundle --platform=node --format=esm --packages=external --outfile=api/handler.mjs",
     "preview": "vite preview"
   },
   "engines": {
