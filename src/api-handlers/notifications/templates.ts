@@ -79,3 +79,5 @@ export const WHATSAPP_TEMPLATES = {
         ]
     })
 };
+
+export default WHATSAPP_TEMPLATES;

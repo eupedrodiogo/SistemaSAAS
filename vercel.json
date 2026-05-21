@@ -8,7 +8,7 @@
     },
     {
       "source": "/api/(.*)",
-      "destination": "/api/index.ts"
+      "destination": "/api/_bundle.js"
     },
     {
       "source": "/((?!assets|api).*)",

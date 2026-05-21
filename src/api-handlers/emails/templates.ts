@@ -150,3 +150,5 @@ export const getEmailTemplate = (plan: string, name: string, magicLink?: string)
         `
     };
 };
+
+export default { getEmailTemplate };

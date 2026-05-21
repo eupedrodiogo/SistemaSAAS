@@ -1,7 +1,12 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import webpush from 'web-push';
-import { supabase } from '../../lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import { verifyAuth } from '../utils/auth';
+
+const supabase = createClient(
+    process.env.VITE_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 // Configure VAPID keys
 // In production, these should be environment variables
