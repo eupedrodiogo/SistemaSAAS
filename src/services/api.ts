@@ -1,4 +1,4 @@
-import { Patient, Appointment, NotificationItem } from '../types';
+import { Patient, Appointment, NotificationItem } from '../../types';
 import { MOCK_PATIENTS, MOCK_APPOINTMENTS, MOCK_STATS } from '../constants';
 import { supabase } from '../lib/supabase';
 

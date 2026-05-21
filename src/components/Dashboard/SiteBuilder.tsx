@@ -19,7 +19,6 @@ import { SiteConfig } from '../PatientBooking/TherapistPersonalPage';
 import { supabase } from '../../lib/supabase';
 
 const SiteBuilder: React.FC = () => {
-    const { theme } = useTheme();
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState<'content' | 'design' | 'domain'>('design');
     const [saving, setSaving] = useState(false);
@@ -34,7 +33,7 @@ const SiteBuilder: React.FC = () => {
         },
         profile: {
             id: user?.id || 'demo',
-            name: user?.name || 'Dr. Ricardo Silva',
+            name: (user as any)?.user_metadata?.name || (user as any)?.name || 'Dr. Ricardo Silva',
             title: 'Psicoterapeuta Especialista em TRG',
             crp: '06/84239',
             location: 'São Paulo, SP (Online)',

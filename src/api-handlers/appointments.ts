@@ -1,7 +1,7 @@
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
-import { Appointment } from '../types';
+import { Appointment } from '../../types';
 import * as jwt from 'jsonwebtoken';
 
 // Inlined auth utilities

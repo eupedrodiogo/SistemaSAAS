@@ -1,6 +1,6 @@
 import { put } from '@vercel/blob';
 import { sql } from '@vercel/postgres';
-import { verifyAuth } from '../utils/auth';
+import { verifyAuth } from './utils/auth';
 
 export const config = {
     api: {

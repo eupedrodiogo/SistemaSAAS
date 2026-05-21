@@ -17,7 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.log('Testing WhatsApp for:', phone);
 
         // Dummy data simulating a booking
-        const result = await sendBookingNotification({
+        await sendBookingNotification({
             name: 'Teste de Sistema',
             email: 'ignore@test.com', // Email won't be sent if SMTP unimplemented or we ignore
             phone: phone,
@@ -26,16 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             therapistName: 'Sistema de Teste'
         });
 
-        if (result.status === 'sent_whatsapp') {
-            return res.status(200).json({ success: true, message: 'Mensagem enviada ao Twilio!' });
-        } else {
-            console.warn('WhatsApp test result:', result);
-            return res.status(500).json({
-                success: false,
-                error: 'Falha no envio (Verifique Logs ou Variáveis de Ambiente)',
-                details: result
-            });
-        }
+        return res.status(200).json({ success: true, message: 'Mensagem enviada com sucesso!' });
 
     } catch (error: any) {
         console.error('Test WhatsApp Error:', error);

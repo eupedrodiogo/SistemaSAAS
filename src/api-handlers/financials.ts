@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import pg from 'pg';
-import { verifyAuth } from '../utils/auth';
+import { verifyAuth } from './utils/auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 1. Verify Auth First

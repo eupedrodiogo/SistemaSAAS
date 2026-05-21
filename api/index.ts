@@ -1,70 +1,70 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Root level
-import appointments from './_endpoints/appointments';
-import availability from './_endpoints/availability';
-import blockedSlots from './_endpoints/blocked-slots';
-import booking from './_endpoints/booking';
-import clientPortal from './_endpoints/client-portal';
-import dashboard from './_endpoints/dashboard';
-import feedback from './_endpoints/feedback';
-import financials from './_endpoints/financials';
-import fixBooking from './_endpoints/fix-booking';
-import manualConfirm from './_endpoints/manual-confirm';
-import notifications from './_endpoints/notifications';
-import patientDetails from './_endpoints/patient-details';
-import patients from './_endpoints/patients';
-import payments from './_endpoints/payments';
-import recordings from './_endpoints/recordings';
-import reports from './_endpoints/reports';
-import setupSud from './_endpoints/setup_sud';
-import sud from './_endpoints/sud';
-import testWhatsapp from './_endpoints/test-whatsapp';
-import webhook from './_endpoints/webhook';
+import appointments from '../src/api-handlers/appointments';
+import availability from '../src/api-handlers/availability';
+import blockedSlots from '../src/api-handlers/blocked-slots';
+import booking from '../src/api-handlers/booking';
+import clientPortal from '../src/api-handlers/client-portal';
+import dashboard from '../src/api-handlers/dashboard';
+import feedback from '../src/api-handlers/feedback';
+import financials from '../src/api-handlers/financials';
+import fixBooking from '../src/api-handlers/fix-booking';
+import manualConfirm from '../src/api-handlers/manual-confirm';
+import notifications from '../src/api-handlers/notifications';
+import patientDetails from '../src/api-handlers/patient-details';
+import patients from '../src/api-handlers/patients';
+import payments from '../src/api-handlers/payments';
+import recordings from '../src/api-handlers/recordings';
+import reports from '../src/api-handlers/reports';
+import setupSud from '../src/api-handlers/setup_sud';
+import sud from '../src/api-handlers/sud';
+import testWhatsapp from '../src/api-handlers/test-whatsapp';
+import webhook from '../src/api-handlers/webhook';
 
 // ai
-import aiChat from './_endpoints/ai/chat';
-import aiOptimize from './_endpoints/ai/optimize';
-import aiReport from './_endpoints/ai/report';
+import aiChat from '../src/api-handlers/ai/chat';
+import aiOptimize from '../src/api-handlers/ai/optimize';
+import aiReport from '../src/api-handlers/ai/report';
 
 // auth
-import authLogin from './_endpoints/auth/login';
-import authRegisterComplete from './_endpoints/auth/register-complete';
-import authRequestPasswordReset from './_endpoints/auth/request-password-reset';
+import authLogin from '../src/api-handlers/auth/login';
+import authRegisterComplete from '../src/api-handlers/auth/register-complete';
+import authRequestPasswordReset from '../src/api-handlers/auth/request-password-reset';
 
 // client-auth
-import clientAuthRegister from './_endpoints/client-auth/register';
+import clientAuthRegister from '../src/api-handlers/client-auth/register';
 
 // cron
-import cronKeepAlive from './_endpoints/cron/keep-alive';
-import cronReminders from './_endpoints/cron/reminders';
+import cronKeepAlive from '../src/api-handlers/cron/keep-alive';
+import cronReminders from '../src/api-handlers/cron/reminders';
 
 // debug
-import debugCheckMeta from './_endpoints/debug/check-meta';
+import debugCheckMeta from '../src/api-handlers/debug/check-meta';
 
 // emails
-import emailsTemplates from './_endpoints/emails/templates';
-import emailsWelcome from './_endpoints/emails/welcome';
+import emailsTemplates from '../src/api-handlers/emails/templates';
+import emailsWelcome from '../src/api-handlers/emails/welcome';
 
 // network
-import networkMatch from './_endpoints/network/match';
-import networkReferral from './_endpoints/network/referral';
+import networkMatch from '../src/api-handlers/network/match';
+import networkReferral from '../src/api-handlers/network/referral';
 
 // notifications
-import notificationsManual from './_endpoints/notifications/manual';
-import notificationsRegisterWelcome from './_endpoints/notifications/register-welcome';
-import notificationsSubscribe from './_endpoints/notifications/subscribe';
-import notificationsTemplates from './_endpoints/notifications/templates';
-import notificationsTestPush from './_endpoints/notifications/test-push';
+import notificationsManual from '../src/api-handlers/notifications/manual';
+import notificationsRegisterWelcome from '../src/api-handlers/notifications/register-welcome';
+import notificationsSubscribe from '../src/api-handlers/notifications/subscribe';
+import notificationsTemplates from '../src/api-handlers/notifications/templates';
+import notificationsTestPush from '../src/api-handlers/notifications/test-push';
 
 // public
-import publicTherapists from './_endpoints/public/therapists';
+import publicTherapists from '../src/api-handlers/public/therapists';
 
 // system
-import systemAddSessionDataColumn from './_endpoints/system/add_session_data_column';
-import systemMigrateReminders from './_endpoints/system/migrate-reminders';
-import systemSimpleTest from './_endpoints/system/simple-test';
-import systemTestWhatsapp from './_endpoints/system/test-whatsapp';
+import systemAddSessionDataColumn from '../src/api-handlers/system/add_session_data_column';
+import systemMigrateReminders from '../src/api-handlers/system/migrate-reminders';
+import systemSimpleTest from '../src/api-handlers/system/simple-test';
+import systemTestWhatsapp from '../src/api-handlers/system/test-whatsapp';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     const url = req.url || '';

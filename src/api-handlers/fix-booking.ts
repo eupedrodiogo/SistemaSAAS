@@ -84,9 +84,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             phone: patient.phone,
             date: appointment.date,
             time: appointment.time,
-            therapistName: appointment.therapists?.name || 'Terapeuta TRG',
-            therapistEmail: appointment.therapists?.email,
-            therapistPhone: appointment.therapists?.phone
+            therapistName: (appointment.therapists as any)?.name || 'Terapeuta TRG',
+            therapistEmail: (appointment.therapists as any)?.email,
+            therapistPhone: (appointment.therapists as any)?.phone
         });
 
         return res.json({

@@ -83,7 +83,7 @@ function AppContent() {
         {/* Pass global theme context down to LandingPage if needed, or update LandingPage to use context too. For now passing props to maintain compatibility. */}
         {/* Using Beta Landing Page for Launch */}
         <Route path="/" element={<BetaLandingPage onLoginClick={() => window.location.href = '/login'} isDarkMode={isDarkMode} toggleTheme={toggleTheme} />} />
-        <Route path="/beta-v2" element={<BetaLandingPageV2 onLoginClick={() => window.location.href = '/login'} />} />
+        <Route path="/beta-v2" element={<BetaLandingPageV2 />} />
         <Route path="/success" element={<PaymentSuccess />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />

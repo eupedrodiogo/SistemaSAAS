@@ -94,6 +94,7 @@ const TherapistDashboard: React.FC = () => {
                 [AppView.MARKETING]: 'Marketing & CRM',
                 [AppView.REPORTS]: 'Relatórios',
                 [AppView.SETTINGS]: 'Configurações',
+                [AppView.SITE_BUILDER]: 'Construtor de Site',
             };
             setUpgradeModal({ isOpen: true, featureName: viewLabels[currentView] });
             setCurrentView(AppView.DASHBOARD); // Redirect to allowed view

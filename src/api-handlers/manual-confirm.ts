@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
-import { sendBookingNotification } from '../utils/notifications.js';
+import { sendBookingNotification } from './utils/notifications.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
     apiVersion: '2024-12-18.acacia' as any,
@@ -68,17 +68,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .single();
 
         if (appt && appt.patients && appt.therapists) {
-            console.log(`[Manual Confirm] Sending WhatsApp to ${appt.patients.name}`);
+            const patient = appt.patients as any;
+            const therapist = appt.therapists as any;
+            console.log(`[Manual Confirm] Sending WhatsApp to ${patient.name}`);
 
             await sendBookingNotification({
-                name: appt.patients.name,
-                email: appt.patients.email,
-                phone: appt.patients.phone,
+                name: patient.name,
+                email: patient.email,
+                phone: patient.phone,
                 date: appt.date,
                 time: appt.time,
-                therapistName: appt.therapists.name,
-                therapistEmail: appt.therapists.email,
-                therapistPhone: appt.therapists.phone
+                therapistName: therapist.name,
+                therapistEmail: therapist.email,
+                therapistPhone: therapist.phone
             });
 
             return res.status(200).json({
