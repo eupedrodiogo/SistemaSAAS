@@ -16,27 +16,17 @@ const ForgotPasswordPage: React.FC = () => {
         setIsLoading(true);
 
         try {
-            // New Custom API call (Bypassing Supabase default emailer)
-            const response = await fetch('/api/auth/request-password-reset', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    email,
-                    redirectUrl: `${window.location.origin}/update-password`
-                })
+            const { error: supabaseError } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: `${window.location.origin}/update-password`,
             });
 
-            const data = await response.json();
+            if (supabaseError) throw supabaseError;
 
-            if (!response.ok) {
-                throw new Error(data.error || 'Erro ao solicitar recuperação.');
-            }
-
-            setSuccessMessage('Se este e-mail estiver cadastrado, você receberá um link de recuperação em instantes (Verifique o SPAM).');
+            setSuccessMessage('Se este e-mail estiver cadastrado, você receberá um link de recuperação em instantes. Verifique também o SPAM.');
             setEmail('');
 
         } catch (err: any) {
-            setError(err.message);
+            setError(err.message || 'Erro ao solicitar recuperação. Tente novamente.');
         } finally {
             setIsLoading(false);
         }
