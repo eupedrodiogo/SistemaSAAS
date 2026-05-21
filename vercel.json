@@ -8,7 +8,7 @@
     },
     {
       "source": "/api/(.*)",
-      "destination": "/api/handler.cjs"
+      "destination": "/api/handler"
     },
     {
       "source": "/((?!assets|api).*)",
