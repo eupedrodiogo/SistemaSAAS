@@ -1,5 +1,12 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import Peer from 'peerjs';
+
+export interface ChatMessage {
+    id: string;
+    sender: 'me' | 'remote';
+    text: string;
+    timestamp: number;
+}
 
 interface UseVideoCallProps {
     myId: string;
@@ -8,158 +15,253 @@ interface UseVideoCallProps {
     localStream: MediaStream | null;
 }
 
+const ICE_SERVERS = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+    { urls: 'stun:openrelay.metered.ca:80' },
+    {
+        urls: 'turn:openrelay.metered.ca:80',
+        username: 'openrelay',
+        credential: 'openrelay'
+    },
+    {
+        urls: 'turn:openrelay.metered.ca:443',
+        username: 'openrelay',
+        credential: 'openrelay'
+    },
+    {
+        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+        username: 'openrelay',
+        credential: 'openrelay'
+    }
+];
+
 export const useVideoCall = ({ myId, targetId, isInitiator, localStream }: UseVideoCallProps) => {
     const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
     const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
+
     const peerRef = useRef<Peer | null>(null);
     const callRef = useRef<any>(null);
+    const dataConnectionRef = useRef<any>(null);
+    const localStreamRef = useRef<MediaStream | null>(null);
+    const remoteStreamRef = useRef<MediaStream | null>(null);
+    const connectionStatusRef = useRef<string>('disconnected');
+    const isUnmountedRef = useRef(false);
+    const retryIntervalRef = useRef<any>(null);
 
-    // 1. Initialize Peer (Only depends on myId)
-    useEffect(() => {
-        if (!myId) return;
+    // Keep refs in sync
+    useEffect(() => { localStreamRef.current = localStream; }, [localStream]);
+    useEffect(() => { remoteStreamRef.current = remoteStream; }, [remoteStream]);
+    useEffect(() => { connectionStatusRef.current = connectionStatus; }, [connectionStatus]);
 
-        console.log(`Initializing Peer with ID: ${myId}`);
-        const peer = new Peer(myId, {
-            debug: 2
-        });
-
-        peer.on('open', (id) => {
-            console.log('My peer ID is: ' + id);
-            if (!isInitiator) {
-                setConnectionStatus('connecting'); // Client is ready and waiting
-            }
-        });
-
-        peer.on('error', (err) => {
-            console.error('PeerJS error:', err);
-            setConnectionStatus('disconnected');
-        });
-
-        peerRef.current = peer;
-
-        return () => {
-            peer.destroy();
-            peerRef.current = null;
-        };
-    }, [myId]);
-
-    // 2. Handle Incoming Calls (Receiver / Client)
-    useEffect(() => {
-        const peer = peerRef.current;
-        if (!peer || isInitiator) return;
-
-        const handleCall = (call: any) => {
-            console.log('Receiving call from:', call.peer);
-            setConnectionStatus('connecting');
-
-            // Answer the call
-            // If localStream is available, send it. Otherwise, answer without stream (receive only)
-            // Note: PeerJS allows answering without stream, but usually we want 2-way.
-            // If localStream comes later, we might need to renegotiate or replace tracks (complex).
-            // For now, we assume localStream is ready because ClientSessionView forces startCamera.
-            call.answer(localStream || undefined);
-
-            call.on('stream', (remoteStream: MediaStream) => {
-                console.log('Received remote stream (Receiver)');
-                setRemoteStream(remoteStream);
-                setConnectionStatus('connected');
-            });
-
-            call.on('close', () => {
-                console.log('Call closed');
-                setConnectionStatus('disconnected');
-                setRemoteStream(null);
-            });
-
-            call.on('error', (e: any) => console.error('Call error:', e));
-
-            callRef.current = call;
-        };
-
-        peer.on('call', handleCall);
-
-        return () => {
-            peer.off('call', handleCall);
-        };
-    }, [isInitiator, localStream]); // Re-bind if localStream changes? Ideally not, but we need the latest stream to answer.
-
-    // 3. Initiate Call (Therapist)
-    useEffect(() => {
-        const peer = peerRef.current;
-        if (!peer || !isInitiator || !targetId || !localStream) return;
-
-        // Only call if we are connected to PeerServer
-        if (peer.disconnected) {
-            peer.reconnect();
+    const sendMessage = useCallback((text: string) => {
+        if (!dataConnectionRef.current?.open) {
+            console.warn('Cannot send message: data connection not open');
+            return;
         }
+        dataConnectionRef.current.send({ type: 'chat', text });
+        setMessages(prev => [...prev, { id: Date.now().toString(), sender: 'me', text, timestamp: Date.now() }]);
+    }, []);
 
-        // Simple debounce or check if already calling?
-        // For now, we'll rely on the user manually triggering "Start Camera" which sets localStream
-
-        console.log(`Initiating call to ${targetId}...`);
-        setConnectionStatus('connecting');
-
-        const call = peer.call(targetId, localStream);
-
-        call.on('stream', (remoteStream: MediaStream) => {
-            console.log('Received remote stream (Initiator)');
-            setRemoteStream(remoteStream);
-            setConnectionStatus('connected');
-        });
-
-        call.on('close', () => {
-            setConnectionStatus('disconnected');
-            setRemoteStream(null);
-        });
-
-        call.on('error', (err: any) => {
-            console.error('Call initiation error:', err);
-            setConnectionStatus('disconnected');
-        });
-
-        callRef.current = call;
-
-        return () => {
-            if (callRef.current) {
-                callRef.current.close();
-            }
-        };
-    }, [isInitiator, targetId, localStream]); // If stream changes, we might re-call. This is acceptable for now.
-
-    const connect = () => {
+    // ─── Initiator (Therapist): make & retry calls ───────────────────────────
+    const makeCall = useCallback(() => {
         const peer = peerRef.current;
-        if (!peer || !targetId || !localStream) {
-            console.warn('Cannot connect: Missing peer, targetId, or localStream');
+        if (!peer || peer.destroyed || !targetId) return;
+        if (!localStreamRef.current) {
+            console.log('[Initiator] Local stream not ready, skipping makeCall');
             return;
         }
 
-        if (peer.disconnected) {
-            peer.reconnect();
+        // Already fully connected — skip
+        if (connectionStatusRef.current === 'connected' && remoteStreamRef.current) return;
+
+        // Ensure data channel
+        if (!dataConnectionRef.current?.open) {
+            const conn = peer.connect(targetId, { reliable: true });
+            dataConnectionRef.current = conn;
+            conn.on('data', (data: any) => {
+                if (data.type === 'chat') {
+                    setMessages(prev => [...prev, { id: Date.now().toString(), sender: 'remote', text: data.text, timestamp: Date.now() }]);
+                }
+            });
+            conn.on('close', () => { dataConnectionRef.current = null; });
         }
 
-        console.log(`Manually initiating call to ${targetId}...`);
+        // Close stale call
+        if (callRef.current) {
+            try { callRef.current.close(); } catch (_) {}
+            callRef.current = null;
+        }
+
+        console.log(`[Initiator] Calling ${targetId}…`);
         setConnectionStatus('connecting');
 
-        const call = peer.call(targetId, localStream);
+        const call = peer.call(targetId, localStreamRef.current!);
+        callRef.current = call;
 
-        call.on('stream', (remoteStream: MediaStream) => {
-            console.log('Received remote stream (Manual)');
-            setRemoteStream(remoteStream);
+        call.on('stream', (rStream: MediaStream) => {
+            if (isUnmountedRef.current) return;
+            console.log('[Initiator] Remote stream received');
+            setRemoteStream(rStream);
             setConnectionStatus('connected');
         });
 
         call.on('close', () => {
+            if (isUnmountedRef.current) return;
             setConnectionStatus('disconnected');
             setRemoteStream(null);
+            callRef.current = null;
         });
 
         call.on('error', (err: any) => {
-            console.error('Manual call error:', err);
-            setConnectionStatus('disconnected');
+            console.error('[Initiator] Call error:', err);
+            if (!isUnmountedRef.current) setConnectionStatus('disconnected');
+            callRef.current = null;
         });
+    }, [targetId]);
 
-        callRef.current = call;
-    };
+    // ─── Single unified Peer lifecycle ───────────────────────────────────────
+    useEffect(() => {
+        if (!myId) return;
+        isUnmountedRef.current = false;
 
-    return { remoteStream, connectionStatus, connect };
+        let peer: Peer;
+        let retryAvailableId: ReturnType<typeof setTimeout> | null = null;
+
+        const initPeer = () => {
+            if (isUnmountedRef.current) return;
+
+            console.log(`[PeerJS] Initializing as ${myId} (initiator=${isInitiator})`);
+
+            peer = new Peer(myId, {
+                debug: 2,
+                config: { iceServers: ICE_SERVERS }
+            });
+            peerRef.current = peer;
+
+            peer.on('open', (id) => {
+                if (isUnmountedRef.current) return;
+                console.log(`[PeerJS] Open: ${id}`);
+
+                if (!isInitiator) {
+                    // Receiver (Client): ready and waiting for incoming call
+                    setConnectionStatus('connecting');
+                } else {
+                    // Initiator (Therapist): start calling immediately then retry every 3s
+                    makeCall();
+                    retryIntervalRef.current = setInterval(() => {
+                        if (connectionStatusRef.current !== 'connected' || !remoteStreamRef.current) {
+                            makeCall();
+                        }
+                    }, 3000);
+                }
+            });
+
+            peer.on('call', (call) => {
+                // Receiver (Client) answers incoming call
+                if (isUnmountedRef.current || isInitiator) return;
+
+                const stream = localStreamRef.current;
+                if (!stream) {
+                    console.warn('[Receiver] Got call but local stream not ready — ignoring, therapist will retry');
+                    return;
+                }
+
+                console.log('[Receiver] Answering call from:', call.peer);
+                setConnectionStatus('connecting');
+                call.answer(stream);
+                callRef.current = call;
+
+                call.on('stream', (rStream: MediaStream) => {
+                    if (isUnmountedRef.current) return;
+                    console.log('[Receiver] Remote stream received');
+                    setRemoteStream(rStream);
+                    setConnectionStatus('connected');
+                });
+
+                call.on('close', () => {
+                    if (isUnmountedRef.current) return;
+                    setConnectionStatus('disconnected');
+                    setRemoteStream(null);
+                    callRef.current = null;
+                });
+
+                call.on('error', (e: any) => {
+                    console.error('[Receiver] Call error:', e);
+                    if (!isUnmountedRef.current) setConnectionStatus('disconnected');
+                    callRef.current = null;
+                });
+            });
+
+            // Data channel (receiver side)
+            peer.on('connection', (conn) => {
+                if (isUnmountedRef.current) return;
+                dataConnectionRef.current = conn;
+                conn.on('data', (data: any) => {
+                    if (data.type === 'chat') {
+                        setMessages(prev => [...prev, { id: Date.now().toString(), sender: 'remote', text: data.text, timestamp: Date.now() }]);
+                    }
+                });
+                conn.on('close', () => { dataConnectionRef.current = null; });
+            });
+
+            peer.on('disconnected', () => {
+                if (isUnmountedRef.current) return;
+                console.warn('[PeerJS] Disconnected from signaling server. Reconnecting…');
+                if (!peer.destroyed) {
+                    try { peer.reconnect(); } catch (e) { console.error(e); }
+                }
+            });
+
+            peer.on('error', (err: any) => {
+                console.error('[PeerJS] Error:', err.type, err);
+                if (err.type === 'unavailable-id') {
+                    console.warn(`[PeerJS] ID "${myId}" is taken. Retrying in 3s…`);
+                    try { peer.destroy(); } catch (_) {}
+                    retryAvailableId = setTimeout(() => {
+                        if (!isUnmountedRef.current) initPeer();
+                    }, 3000);
+                } else {
+                    if (!isUnmountedRef.current) setConnectionStatus('disconnected');
+                }
+            });
+        };
+
+        initPeer();
+
+        return () => {
+            isUnmountedRef.current = true;
+            if (retryIntervalRef.current) clearInterval(retryIntervalRef.current);
+            if (retryAvailableId) clearTimeout(retryAvailableId);
+            if (callRef.current) { try { callRef.current.close(); } catch (_) {} callRef.current = null; }
+            if (peer) { try { peer.destroy(); } catch (_) {} }
+            peerRef.current = null;
+        };
+    }, [myId, isInitiator, makeCall]);
+
+    // ─── Re-trigger calls when localStream becomes available (Initiator only) ─
+    // If the peer is already open but localStream just became available, retry.
+    useEffect(() => {
+        if (!isInitiator || !localStream || !peerRef.current) return;
+        const peer = peerRef.current;
+        if (peer.destroyed || peer.disconnected) return;
+        if (connectionStatusRef.current !== 'connected') {
+            console.log('[Initiator] localStream now available, attempting call…');
+            makeCall();
+        }
+    }, [localStream, isInitiator, makeCall]);
+
+    const connect = useCallback(() => {
+        if (!peerRef.current || !targetId || !localStreamRef.current) {
+            console.warn('Cannot connect: missing peer, targetId or localStream');
+            return;
+        }
+        makeCall();
+    }, [targetId, makeCall]);
+
+    return { remoteStream, connectionStatus, connect, messages, sendMessage };
 };

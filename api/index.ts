@@ -62,6 +62,7 @@ import publicTherapists from '../src/api-handlers/public/therapists';
 
 // system
 import systemAddSessionDataColumn from '../src/api-handlers/system/add_session_data_column';
+import systemAddPasswordHash from '../src/api-handlers/system/add_password_hash';
 import systemMigrateReminders from '../src/api-handlers/system/migrate-reminders';
 import systemSimpleTest from '../src/api-handlers/system/simple-test';
 import systemTestWhatsapp from '../src/api-handlers/system/test-whatsapp';
@@ -124,6 +125,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         case 'public/therapists': return publicTherapists(req, res);
 
         case 'system/add_session_data_column': return systemAddSessionDataColumn(req, res);
+        case 'system/add_password_hash': return systemAddPasswordHash(req, res);
         case 'system/migrate-reminders': return systemMigrateReminders(req, res);
         case 'system/simple-test': return systemSimpleTest(req, res);
         case 'system/test-whatsapp': return systemTestWhatsapp(req, res);

@@ -61,16 +61,25 @@ const Sidebar: React.FC<SidebarProps> = ({
   // const { hasAccess, plan } = usePlanAccess(); // Removed to avoid circular dependency
 
   const navItems: NavItem[] = [
-    { id: AppView.DASHBOARD, label: 'Painel Geral', icon: LayoutDashboard },
-    { id: AppView.AGENDA, label: 'Agenda', icon: Calendar },
-    { id: AppView.PATIENTS, label: 'Clientes', icon: Users },
-    { id: AppView.THERAPY, label: 'Sessão TeraNexus', icon: BrainCircuit },
-    { id: AppView.FINANCIAL, label: 'Financeiro', icon: Wallet },
-    { id: AppView.MARKETING, label: 'Marketing & CRM', icon: Megaphone },
+    { id: AppView.DASHBOARD, label: 'Painel Geral',        icon: LayoutDashboard },
+    { id: AppView.AGENDA,    label: 'Agenda',              icon: Calendar },
+    { id: AppView.PATIENTS,  label: 'Clientes',            icon: Users },
+    { id: AppView.THERAPY,   label: 'Sessão TeraNexus',    icon: BrainCircuit },
+    { id: AppView.FINANCIAL, label: 'Financeiro',          icon: Wallet },
+    { id: AppView.MARKETING, label: 'Marketing & CRM',     icon: Megaphone },
     { id: AppView.SITE_BUILDER, label: 'Site Profissional', icon: Globe },
-    { id: AppView.REPORTS, label: 'Relatórios', icon: BarChart2 },
-    { id: AppView.SETTINGS, label: 'Configurações', icon: Settings },
+    { id: AppView.REPORTS,   label: 'Relatórios',          icon: BarChart2 },
+    { id: AppView.SETTINGS,  label: 'Configurações',       icon: Settings },
   ];
+
+  // Mapeia AppView → ID de tour (para o InteractiveTour destacar o item correto)
+  const TOUR_IDS: Partial<Record<AppView, string>> = {
+    [AppView.DASHBOARD]: 'tour-sidebar-dashboard',
+    [AppView.AGENDA]:    'tour-sidebar-agenda',
+    [AppView.PATIENTS]:  'tour-sidebar-patients',
+    [AppView.THERAPY]:   'tour-sidebar-therapy',
+    [AppView.FINANCIAL]: 'tour-sidebar-financial',
+  };
 
   // Determine width classes based on state
   const desktopWidthClass = isDesktopCollapsed ? 'md:w-20' : 'md:w-72';
@@ -150,6 +159,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             return (
               <button
                 key={item.id}
+                id={TOUR_IDS[item.id]}
                 onClick={handleClick}
                 className={`
                   w-full flex items-center gap-4 px-3 py-3.5 md:py-3 rounded-xl transition-all duration-200 group

@@ -4,7 +4,6 @@ import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { useTheme } from '../../../contexts/ThemeContext';
 
-// Initialize Stripe outside component to avoid reloading
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 interface PaymentStepProps {

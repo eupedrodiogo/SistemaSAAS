@@ -15,11 +15,14 @@ import {
     Download,
     Film,
     Maximize2,
-    Minimize2
+    Minimize2,
+    Send,
+    X
 } from 'lucide-react';
 import { useClientData } from '../ClientPortal/ClientContext';
 import ClientLayout from '../ClientPortal/ClientLayout';
 import { useVideoCall } from '../../hooks/useVideoCall';
+import { useAdaptiveVideo } from '../../hooks/useAdaptiveVideo';
 
 const ClientSessionView: React.FC = () => {
     const { patient, appointments: rawAppointments } = useClientData();
@@ -51,14 +54,47 @@ const ClientSessionView: React.FC = () => {
 
     // PeerJS Integration
     // Standardized IDs:
-    // My: client-{appointmentId}
-    // Target: therapist-{appointmentId}
-    const { remoteStream, connectionStatus } = useVideoCall({
-        myId: appointmentId ? `client-${appointmentId}` : '',
-        targetId: appointmentId ? `therapist-${appointmentId}` : '',
+    // My: client-{roomKey}
+    // Target: therapist-{roomKey}
+    const roomKey = appointmentId || patient?.id || localStorage.getItem('client_portal_id') || '';
+    const videoContainerRef = useRef<HTMLDivElement>(null);
+    const [isFullScreen, setIsFullScreen] = useState(false);
+
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsFullScreen(!!document.fullscreenElement);
+        };
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, []);
+
+    const toggleFullScreen = () => {
+        if (!document.fullscreenElement) {
+            videoContainerRef.current?.requestFullscreen?.().catch(console.error);
+        } else {
+            document.exitFullscreen?.();
+        }
+    };
+
+    const { remoteStream, connectionStatus, messages, sendMessage } = useVideoCall({
+        myId: roomKey ? `client-${roomKey}` : '',
+        targetId: roomKey ? `therapist-${roomKey}` : '',
         isInitiator: false,
         localStream: stream
     });
+
+    const [isChatOpen, setIsChatOpen] = useState(false);
+    const [chatText, setChatText] = useState('');
+    const chatContainerRef = useRef<HTMLDivElement>(null);
+
+    // Adaptive video: detects therapist aspect ratio and adjusts layout automatically
+    const adaptiveRemote = useAdaptiveVideo(remoteVideoRef as React.RefObject<HTMLVideoElement | null>, remoteStream);
+
+    useEffect(() => {
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
+    }, [messages, isChatOpen]);
 
     useEffect(() => {
         // Extract appointmentId from URL
@@ -75,9 +111,11 @@ const ClientSessionView: React.FC = () => {
     }, [currentAppointment]);
 
     useEffect(() => {
-        if (isVideoActive && stream && videoRef.current) {
-            videoRef.current.srcObject = stream;
-            videoRef.current.play().catch(e => {
+        const el = videoRef.current;
+        if (!el || !isVideoActive || !stream) return;
+        if (el.srcObject !== stream) {
+            el.srcObject = stream;
+            el.play().catch(e => {
                 console.error(e);
                 setCameraError("Erro ao acessar câmera. Verifique as permissões.");
             });
@@ -85,9 +123,11 @@ const ClientSessionView: React.FC = () => {
     }, [isVideoActive, stream]);
 
     useEffect(() => {
-        if (remoteStream && remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = remoteStream;
-            remoteVideoRef.current.play().catch(console.error);
+        const el = remoteVideoRef.current;
+        if (!el || !remoteStream) return;
+        if (el.srcObject !== remoteStream) {
+            el.srcObject = remoteStream;
+            el.play().catch(console.error);
         }
     }, [remoteStream]);
 
@@ -118,7 +158,13 @@ const ClientSessionView: React.FC = () => {
         setCameraError(null);
         try {
             if (navigator.mediaDevices) {
-                const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: true });
+                const isMobile = window.innerWidth < 768;
+                const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: isMobile 
+                        ? { aspectRatio: 9 / 16, facingMode: "user" } 
+                        : { aspectRatio: 16 / 9, facingMode: "user" }, 
+                    audio: true 
+                });
                 setStream(mediaStream);
                 setIsVideoActive(true);
             } else {
@@ -368,20 +414,43 @@ const ClientSessionView: React.FC = () => {
                 <main className={`flex-1 flex flex-col gap-6 w-full mx-auto transition-all duration-300 ${isImmersiveMode ? 'p-0 max-w-full' : 'p-4 md:p-6 max-w-6xl'}`}>
 
                     {/* Video Area */}
-                    <div className="relative aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-slate-800 flex-1 min-h-[400px]">
+                    <div 
+                        ref={videoContainerRef}
+                        className={`bg-slate-900 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-slate-800 flex flex-col group/container ${
+                            isFullScreen 
+                                ? 'fixed inset-0 z-[100] w-screen h-screen rounded-none ring-0' 
+                                : 'relative w-full aspect-video md:aspect-auto md:flex-1 md:min-h-[400px]'
+                        }`}
+                    >
 
-                        {/* Therapist Placeholder (Main View) */}
-                        <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 bg-slate-900">
+                        {/* Therapist Video (Main View) — position absolute garante contain sem interferência do flex */}
+                        <div
+                            className="absolute inset-0 z-0"
+                            style={{ backgroundColor: '#020617' }}
+                        >
                             {remoteStream ? (
                                 <video
-                                    ref={remoteVideoRef}
+                                    ref={(el) => {
+                                        if (el && remoteStream && el.srcObject !== remoteStream) {
+                                            el.srcObject = remoteStream;
+                                            el.play().catch(() => {});
+                                        }
+                                        remoteVideoRef.current = el;
+                                    }}
                                     autoPlay
                                     playsInline
-                                    className="w-full h-full object-cover"
+                                    style={{
+                                        position: 'absolute',
+                                        inset: 0,
+                                        width: '100%',
+                                        height: '100%',
+                                        objectFit: 'contain',
+                                        display: 'block',
+                                    }}
                                 />
                             ) : (
-                                <>
-                                    <div className="w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center mb-4 animate-pulse border-4 border-slate-800 shadow-xl">
+                                <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500">
+                                    <div className="w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center mb-4 border-4 border-slate-700/50 shadow-xl transition-all">
                                         <span className="text-3xl font-bold text-slate-600">
                                             {patient?.therapist_name?.charAt(0) || <ShieldCheck size={40} />}
                                         </span>
@@ -390,35 +459,107 @@ const ClientSessionView: React.FC = () => {
                                         {patient?.therapist_name ? `Aguardando ${patient.therapist_name}...` : 'Aguardando seu Terapeuta...'}
                                     </h3>
                                     <p className="text-slate-500 text-sm flex items-center gap-2">
-                                        <span className={`w-2 h-2 rounded-full ${connectionStatus === 'connecting' ? 'bg-amber-500 animate-bounce' : 'bg-slate-600'}`}></span>
+                                        <span className={`w-2 h-2 rounded-full ${connectionStatus === 'connecting' ? 'bg-amber-500 animate-pulse' : 'bg-slate-600'}`}></span>
                                         {connectionStatus === 'connecting' ? 'Conectando...' : 'Sua sessão começará em breve.'}
                                     </p>
-                                </>
+                                </div>
                             )}
+                            {/* Therapist Name Tag */}
+                            <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 shadow-lg flex items-center gap-2 z-10 transition-opacity">
+                                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                                <span className="text-xs font-bold text-white tracking-wide">{patient?.therapist_name || "Terapeuta"}</span>
+                                {remoteStream && adaptiveRemote.orientation !== 'unknown' && (
+                                    <span className="ml-1 text-[9px] font-mono text-slate-400 uppercase opacity-60">
+                                        {adaptiveRemote.orientation === 'portrait' ? '📱' : adaptiveRemote.orientation === 'landscape' ? '🖥️' : ''}
+                                    </span>
+                                )}
+                            </div>
                         </div>
 
+                        {/* Chat Drawer Overlay */}
+                        {isChatOpen && (
+                            <div className="fixed inset-x-0 bottom-0 z-50 h-[75vh] flex flex-col bg-slate-900/85 backdrop-blur-2xl border-t border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.3)] rounded-t-3xl transition-transform animate-slide-up
+                                            md:absolute md:inset-auto md:bottom-24 md:left-1/2 md:-translate-x-1/2 md:w-[380px] md:h-[450px] md:rounded-3xl md:border md:shadow-2xl">
+                                {/* Barra de puxar no Mobile */}
+                                <div className="md:hidden w-full flex justify-center pt-4 pb-2">
+                                    <div className="w-12 h-1.5 bg-slate-600/50 rounded-full"></div>
+                                </div>
+                                <div className="p-4 border-b border-white/5 flex justify-between items-center bg-transparent">
+                                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                                        <MessageSquare size={18} className="text-indigo-400" /> Chat com Terapeuta
+                                    </h4>
+                                    <button onClick={() => setIsChatOpen(false)} className="text-slate-400 hover:text-white p-2 bg-white/5 rounded-full hover:bg-white/10 transition-colors">
+                                        <X size={16} />
+                                    </button>
+                                </div>
+                                <div className="flex-1 p-4 overflow-y-auto custom-scrollbar flex flex-col gap-3" ref={chatContainerRef}>
+                                    {messages.length === 0 ? (
+                                        <div className="flex-1 flex flex-col items-center justify-center text-slate-500 opacity-70">
+                                            <MessageSquare size={40} className="mb-2" />
+                                            <p className="text-xs italic text-center">Nenhuma mensagem ainda.<br/>Suas conversas aparecem aqui.</p>
+                                        </div>
+                                    ) : (
+                                        messages.map(m => (
+                                            <div key={m.id} className={`flex flex-col max-w-[85%] ${m.sender === 'me' ? 'self-end items-end' : 'self-start items-start'}`}>
+                                                <div className={`px-4 py-2.5 rounded-2xl text-sm shadow-md ${m.sender === 'me' ? 'bg-indigo-600 text-white rounded-br-sm' : 'bg-slate-800 text-slate-200 rounded-bl-sm border border-slate-700/50'}`}>
+                                                    {m.text}
+                                                </div>
+                                                <span className="text-[10px] text-slate-500 mt-1 px-1 font-medium">
+                                                    {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                                <div className="p-4 bg-slate-900/50 border-t border-white/5 rounded-b-3xl">
+                                    <form 
+                                        onSubmit={(e) => { 
+                                            e.preventDefault(); 
+                                            if(chatText.trim()) { 
+                                                sendMessage(chatText.trim()); 
+                                                setChatText(''); 
+                                            }
+                                        }} 
+                                        className="flex gap-2"
+                                    >
+                                        <input 
+                                            type="text" 
+                                            value={chatText}
+                                            onChange={e => setChatText(e.target.value)}
+                                            placeholder="Mensagem..." 
+                                            className="flex-1 bg-slate-950/50 backdrop-blur-sm border border-slate-700/50 rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-500 outline-none focus:border-indigo-500 focus:bg-slate-900 shadow-inner transition-all"
+                                        />
+                                        <button type="submit" disabled={!chatText.trim()} className="p-3 bg-indigo-600 disabled:bg-slate-700 disabled:opacity-50 text-white rounded-xl shadow-lg hover:shadow-indigo-500/25 transition-all">
+                                            <Send size={18} />
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Client Self-View (Picture-in-Picture) */}
-                        <div className="absolute top-4 right-4 md:top-auto md:bottom-4 md:right-4 w-28 md:w-48 aspect-video bg-black rounded-xl overflow-hidden shadow-lg border border-slate-700 z-20 group transition-all">
+                        <div className={`absolute bottom-24 right-4 md:bottom-6 md:right-6 aspect-video bg-black rounded-xl overflow-hidden shadow-2xl border border-slate-700/50 z-10 transition-transform duration-300 hover:scale-105 hover:shadow-black/50 ${isFullScreen ? 'w-40 md:w-64' : 'w-28 md:w-48'}`}>
                             {isVideoActive ? (
                                 <video
                                     ref={videoRef}
                                     autoPlay
                                     playsInline
                                     muted
-                                    className={`w-full h-full object-cover transform scale-x-[-1] ${isVideoMuted ? 'opacity-0' : 'opacity-100'}`}
+                                    className={`w-full h-full object-cover transform scale-x-[-1] transition-opacity duration-300 ${isVideoMuted ? 'opacity-0' : 'opacity-100'}`}
                                 />
                             ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-slate-800 text-slate-500 text-xs">
-                                    Câmera Off
+                                <div className="w-full h-full flex items-center justify-center bg-slate-900 text-slate-500 text-xs">
+                                    <VideoOff size={24} />
                                 </div>
                             )}
-                            {isVideoMuted && <div className="absolute inset-0 flex items-center justify-center text-white/50"><VideoOff size={24} /></div>}
-                            <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-0.5 rounded text-[10px] font-bold text-white backdrop-blur-sm">Você</div>
-                            {/* Debug Info */}
-                            <div className="absolute top-2 left-2 bg-black/50 text-[10px] text-white p-1 rounded font-mono opacity-50 hover:opacity-100">
-                                My: client-{appointmentId?.slice(0, 8)}...<br />
-                                Target: therapist-{appointmentId?.slice(0, 8)}...
-                            </div>
+                            {isVideoMuted && <div className="absolute inset-0 flex items-center justify-center text-slate-500 bg-slate-900"><VideoOff size={24} /></div>}
+                            <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-0.5 rounded text-[10px] font-bold text-white backdrop-blur-sm pointer-events-none">Você</div>
+                        </div>
+                        
+                        {/* Debug Info (Hover only) */}
+                        <div className="absolute top-4 right-4 bg-black/60 text-[10px] text-slate-300 p-2 rounded-lg font-mono opacity-0 group-hover:opacity-100 transition-opacity duration-300 border border-white/10 backdrop-blur-md z-30 pointer-events-none text-right shadow-xl">
+                            My: client-{appointmentId?.slice(0, 8)}...<br />
+                            Target: therapist-{appointmentId?.slice(0, 8)}...
                         </div>
 
                         {/* Controls Overlay */}
@@ -437,6 +578,21 @@ const ClientSessionView: React.FC = () => {
                                 title={isVideoMuted ? "Ativar Câmera" : "Desativar Câmera"}
                             >
                                 {isVideoMuted ? <VideoOff size={20} className="md:w-6 md:h-6" /> : <VideoIcon size={20} className="md:w-6 md:h-6" />}
+                            </button>
+
+                            <div className="w-px h-6 md:h-8 bg-white/10 mx-1 md:mx-2"></div>
+
+                            <button onClick={() => setIsChatOpen(!isChatOpen)} className={`p-3 md:p-4 rounded-xl transition-all duration-200 relative ${isChatOpen ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-white hover:bg-slate-700'}`} title="Chat">
+                                <MessageSquare size={20} className="md:w-6 md:h-6" />
+                                {messages.length > 0 && !isChatOpen && (
+                                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse border-2 border-slate-900"></span>
+                                )}
+                            </button>
+
+                            <div className="w-px h-6 md:h-8 bg-white/10 mx-1 md:mx-2"></div>
+
+                            <button onClick={toggleFullScreen} className={`p-3 md:p-4 rounded-xl transition-all duration-200 bg-slate-800 text-white hover:bg-slate-700`} title="Tela Cheia">
+                                {isFullScreen ? <Minimize2 size={20} className="md:w-6 md:h-6" /> : <Maximize2 size={20} className="md:w-6 md:h-6" />}
                             </button>
 
                             <div className="w-px h-6 md:h-8 bg-white/10 mx-1 md:mx-2"></div>

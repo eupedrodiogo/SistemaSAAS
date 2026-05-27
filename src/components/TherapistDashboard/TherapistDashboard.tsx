@@ -19,6 +19,8 @@ import { Loader2 } from 'lucide-react';
 import PasswordSetupModal from '../Auth/PasswordSetupModal';
 import AiAssistant from '../AiAssistant';
 import SiteBuilder from '../Dashboard/SiteBuilder';
+import InteractiveTour from '../Shared/InteractiveTour';
+import { useTour } from '../../hooks/useTour';
 
 
 import { useTheme } from '../../contexts/ThemeContext';
@@ -112,6 +114,17 @@ const TherapistDashboard: React.FC = () => {
     const [showPasswordSetup, setShowPasswordSetup] = useState(false);
     const [upgradeModal, setUpgradeModal] = useState<{ isOpen: boolean; featureName?: string }>({ isOpen: false });
 
+    // ── Tour de Onboarding ───────────────────────────────────────
+    const {
+        isTourActive,
+        activeStepIndex,
+        steps: tourSteps,
+        handleNext,
+        handlePrev,
+        handleSkip,
+        handleFinish,
+    } = useTour();
+
     // Load therapist data and theme
     const { user } = useAuth();
 
@@ -136,13 +149,30 @@ const TherapistDashboard: React.FC = () => {
                     setTherapist(profile);
                     localStorage.setItem('therapist', JSON.stringify(profile));
                 } else {
-                    // Fallback using Auth Metadata (Rich Data)
-                    setTherapist({
+                    // Fallback: create minimal profile from auth data
+                    // CRITICAL: always save the user.id so api.patients.list() can query correctly
+                    const fallbackProfile = {
+                        id: user.id,
                         name: user.user_metadata?.name || user.email?.split('@')[0] || 'Terapeuta',
                         email: user.email,
                         phone: user.user_metadata?.phone || '',
-                        subscription_status: 'active' // Default or fetch from DB
-                    });
+                        subscription_status: 'active',
+                        plan: 'trial'
+                    };
+                    setTherapist(fallbackProfile);
+                    localStorage.setItem('therapist', JSON.stringify(fallbackProfile));
+
+                    // Try to create the therapist profile if it doesn't exist
+                    try {
+                        await supabase.from('therapists').upsert({
+                            id: user.id,
+                            email: user.email,
+                            name: user.user_metadata?.name || user.email?.split('@')[0] || 'Terapeuta',
+                            plan: 'trial'
+                        }, { onConflict: 'id' });
+                    } catch (upsertErr) {
+                        console.warn('Could not upsert therapist profile:', upsertErr);
+                    }
                 }
 
             } catch (err) {
@@ -247,7 +277,7 @@ const TherapistDashboard: React.FC = () => {
                 hasAccess={hasAccess}
             />
 
-            <main className={`flex-1 transition-all duration-300 ease-in-out ${isDesktopCollapsed ? 'md:ml-20' : 'md:ml-64'} overflow-x-hidden`}>
+            <main className="flex-1 transition-all duration-300 ease-in-out overflow-x-hidden">
                 {/* Mobile Header Spacer */}
                 <div className="md:hidden h-16" />
 
@@ -265,7 +295,7 @@ const TherapistDashboard: React.FC = () => {
                     <div className="w-8" />
                 </header>
 
-                <div className="p-4 md:p-8 max-w-[1600px] mx-auto">
+                <div className={currentView === AppView.THERAPY ? "w-full h-full md:h-screen" : "p-4 md:p-8 max-w-[1600px] mx-auto"}>
                     {renderView()}
                 </div>
             </main>
@@ -290,6 +320,18 @@ const TherapistDashboard: React.FC = () => {
                 onClose={() => setUpgradeModal({ isOpen: false })}
                 featureName={upgradeModal.featureName}
             />
+
+            {/* ── Tour de Onboarding (primeiro login) ── */}
+            {isTourActive && (
+                <InteractiveTour
+                    steps={tourSteps}
+                    activeStepIndex={activeStepIndex}
+                    onNext={handleNext}
+                    onPrev={handlePrev}
+                    onSkip={handleSkip}
+                    onFinish={handleFinish}
+                />
+            )}
         </div>
     );
 };

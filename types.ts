@@ -9,7 +9,11 @@ export interface Patient {
   nextSession?: string;
   lastSession?: string;
   notes?: string;
+  /** @deprecated Campo estático legado — use total_invested via patient_financial_summary */
   totalInvested?: number;
+  /** SSoT: calculado dinamicamente via View patient_financial_summary */
+  total_invested?: number;
+  pending_amount?: number;
 }
 
 export interface SessionStats {

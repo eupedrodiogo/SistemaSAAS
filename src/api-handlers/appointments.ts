@@ -169,9 +169,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 if (!data) return res.status(404).json({ error: 'Appointment not found' });
 
                 const formatted = {
-                    id: data.id.toString(),
-                    patientId: data.patient_id.toString(),
-                    patientName: data.patients?.name || 'Desconhecido',
+                    id: data.id ? data.id.toString() : '',
+                    patientId: data.patient_id ? data.patient_id.toString() : 'unregistered',
+                    patientName: data.patients?.name || data.patientName || 'Desconhecido',
                     date: data.date,
                     time: data.time,
                     status: data.status,
@@ -204,9 +204,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     let dateStr = row.date; // already YYYY-MM-DD string in Supabase
 
                     return {
-                        id: row.id.toString(),
-                        patientId: row.patient_id.toString(),
-                        patientName: row.patients?.name || 'Desconhecido',
+                        id: row.id ? row.id.toString() : '',
+                        patientId: row.patient_id ? row.patient_id.toString() : 'unregistered',
+                        patientName: row.patients?.name || row.patientName || 'Desconhecido',
                         date: dateStr,
                         time: row.time,
                         status: row.status,

@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { api } from '../services/api';
 import {
   TrendingUp,
   TrendingDown,
@@ -112,21 +113,45 @@ const FinancialView: React.FC = () => {
     pendingAmount: 0
   });
 
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
   useEffect(() => {
     const fetchFinancials = async () => {
       try {
-        const therapistStr = localStorage.getItem('therapist');
-        if (!therapistStr) return;
-        const therapist = JSON.parse(therapistStr);
-        const response = await fetch(`/api/financials?therapistId=${therapist.id}`);
-        if (response.ok) {
-          const data = await response.json();
-          setTransactions(data.transactions);
-          setMonthlyData(data.monthlyData);
-          if (data.summary) {
-            setFinancials(data.summary);
-          }
-        }
+        setLoading(true);
+        const currentYear = new Date().getFullYear();
+
+        // SSoT: busca transações reais + resumo anual em paralelo
+        const [txList, annualSummary] = await Promise.all([
+          api.transactions.list({ year: selectedYear }),
+          api.transactions.summary(selectedYear),
+        ]);
+
+        setTransactions(txList);
+
+        // Monta dados do gráfico: 12 meses do ano selecionado
+        const monthNames = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+        const chartMap = new Map(annualSummary.map((s: any) => [s.period_month, s]));
+        const chartData = monthNames.map((name, i) => {
+          const row = chartMap.get(i + 1);
+          return {
+            name,
+            receita: Number(row?.total_revenue ?? 0),
+            despesas: Number(row?.total_expenses ?? 0),
+          };
+        });
+        setMonthlyData(chartData);
+
+        // KPIs: soma de todos os meses do ano
+        const totalRevenue  = annualSummary.reduce((s: number, r: any) => s + Number(r.total_revenue),  0);
+        const totalExpenses = annualSummary.reduce((s: number, r: any) => s + Number(r.total_expenses), 0);
+        const pendingAmount = annualSummary.reduce((s: number, r: any) => s + Number(r.pending_amount), 0);
+        setFinancials({
+          balance:       totalRevenue - totalExpenses,
+          totalRevenue,
+          totalExpenses,
+          pendingAmount,
+        });
       } catch (error) {
         console.error('Error fetching financials:', error);
       } finally {
@@ -134,7 +159,7 @@ const FinancialView: React.FC = () => {
       }
     };
     fetchFinancials();
-  }, []);
+  }, [selectedYear]);
 
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [newTransaction, setNewTransaction] = useState({
@@ -163,32 +188,93 @@ const FinancialView: React.FC = () => {
 
   // --- Handlers ---
 
-  const handleSaveTransaction = () => {
+  const handleSaveTransaction = async () => {
     if (!newTransaction.description || !newTransaction.amount) {
-      showNotification("Preencha a descrição e o valor.", "error");
+      showNotification('Preencha a descrição e o valor.', 'error');
       return;
     }
 
-    const transaction = {
-      id: Date.now(),
-      type: newTransaction.type,
-      description: newTransaction.description,
-      category: newTransaction.category,
-      date: newTransaction.date,
-      amount: parseFloat(newTransaction.amount),
-      status: newTransaction.status
-    };
+    try {
+      const created = await api.transactions.create({
+        type:        newTransaction.type as 'income' | 'expense',
+        description: newTransaction.description,
+        category:    newTransaction.category,
+        amount:      parseFloat(newTransaction.amount),
+        status:      newTransaction.status === 'Pago' ? 'paid' : 'pending',
+        date:        newTransaction.date,
+      });
 
-    setTransactions([transaction, ...transactions]);
-    setIsTransactionModalOpen(false);
-    showNotification("Lançamento adicionado com sucesso!", "success");
-    setNewTransaction({ type: 'income', description: '', category: 'Sessão TRG', amount: '', date: new Date().toISOString().split('T')[0], status: 'Pago' });
+      if (created) {
+        // Atualização imediata do estado local com dado real do banco
+        setTransactions(prev => [created, ...prev]);
+
+        // Recalcula KPIs localmente sem precisar de nova fetch
+        const amount = created.amount;
+        setFinancials(prev => {
+          if (created.type === 'income') {
+            const addRevenue  = created.status === 'paid'    ? amount : 0;
+            const addPending  = created.status === 'pending' ? amount : 0;
+            return {
+              ...prev,
+              totalRevenue:  prev.totalRevenue  + addRevenue,
+              pendingAmount: prev.pendingAmount  + addPending,
+              balance:       prev.balance        + addRevenue,
+            };
+          } else {
+            const addExpense = created.status === 'paid' ? amount : 0;
+            return {
+              ...prev,
+              totalExpenses: prev.totalExpenses + addExpense,
+              balance:       prev.balance       - addExpense,
+            };
+          }
+        });
+      }
+
+      setIsTransactionModalOpen(false);
+      showNotification('Lançamento salvo com sucesso!', 'success');
+      setNewTransaction({
+        type: 'income', description: '', category: 'Sessão TRG',
+        amount: '', date: new Date().toISOString().split('T')[0], status: 'Pago'
+      });
+    } catch (err: any) {
+      console.error('Error saving transaction:', err);
+      showNotification('Erro ao salvar lançamento: ' + (err.message ?? 'Tente novamente.'), 'error');
+    }
   };
 
-  const handleDeleteTransaction = (id: number) => {
-    if (window.confirm("Excluir este lançamento?")) {
-      setTransactions(transactions.filter(t => t.id !== id));
-      showNotification("Lançamento removido.", "info");
+  const handleDeleteTransaction = async (id: string) => {
+    if (!window.confirm('Excluir este lançamento?')) return;
+    try {
+      await api.transactions.delete(id);
+      const removed = transactions.find(t => t.id === id);
+      setTransactions(prev => prev.filter(t => t.id !== id));
+      // Recalcula KPIs localmente
+      if (removed) {
+        const amount = Number(removed.amount);
+        setFinancials(prev => {
+          if (removed.type === 'income') {
+            const subRevenue  = removed.status === 'paid'    ? amount : 0;
+            const subPending  = removed.status === 'pending' ? amount : 0;
+            return {
+              ...prev,
+              totalRevenue:  prev.totalRevenue  - subRevenue,
+              pendingAmount: prev.pendingAmount  - subPending,
+              balance:       prev.balance        - subRevenue,
+            };
+          } else {
+            const subExpense = removed.status === 'paid' ? amount : 0;
+            return {
+              ...prev,
+              totalExpenses: prev.totalExpenses - subExpense,
+              balance:       prev.balance       + subExpense,
+            };
+          }
+        });
+      }
+      showNotification('Lançamento removido.', 'info');
+    } catch (err: any) {
+      showNotification('Erro ao remover: ' + (err.message ?? ''), 'error');
     }
   };
 
@@ -306,9 +392,14 @@ const FinancialView: React.FC = () => {
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">Comparativo Receitas vs Despesas</p>
           </div>
-          <select className="bg-slate-50 dark:bg-slate-800 border-none text-xs font-bold text-slate-600 dark:text-slate-300 rounded-lg p-2 cursor-pointer focus:ring-0">
-            <option>2023</option>
-            <option>2022</option>
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(Number(e.target.value))}
+            className="bg-slate-50 dark:bg-slate-800 border-none text-xs font-bold text-slate-600 dark:text-slate-300 rounded-lg p-2 cursor-pointer focus:ring-0"
+          >
+            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(y => (
+              <option key={y} value={y}>{y}</option>
+            ))}
           </select>
         </div>
 

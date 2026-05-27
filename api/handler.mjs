@@ -484,9 +484,9 @@ async function handler(req, res) {
         if (error) throw error;
         if (!data) return res.status(404).json({ error: "Appointment not found" });
         const formatted = {
-          id: data.id.toString(),
-          patientId: data.patient_id.toString(),
-          patientName: data.patients?.name || "Desconhecido",
+          id: data.id ? data.id.toString() : "",
+          patientId: data.patient_id ? data.patient_id.toString() : "unregistered",
+          patientName: data.patients?.name || data.patientName || "Desconhecido",
           date: data.date,
           time: data.time,
           status: data.status,
@@ -506,9 +506,9 @@ async function handler(req, res) {
         const formatted = (data || []).map((row) => {
           let dateStr = row.date;
           return {
-            id: row.id.toString(),
-            patientId: row.patient_id.toString(),
-            patientName: row.patients?.name || "Desconhecido",
+            id: row.id ? row.id.toString() : "",
+            patientId: row.patient_id ? row.patient_id.toString() : "unregistered",
+            patientName: row.patients?.name || row.patientName || "Desconhecido",
             date: dateStr,
             time: row.time,
             status: row.status,
@@ -626,12 +626,12 @@ async function handler3(req, res) {
   if (!connectionString4) {
     return res.status(500).json({ error: "Database configuration missing" });
   }
-  const pool5 = new Pool7({
+  const pool4 = new Pool7({
     connectionString: connectionString4,
     ssl: { rejectUnauthorized: false },
     connectionTimeoutMillis: 5e3
   });
-  const client = await pool5.connect();
+  const client = await pool4.connect();
   try {
     if (req.method === "GET") {
       const { rows } = await client.query(
@@ -668,7 +668,7 @@ async function handler3(req, res) {
     res.status(500).json({ error: error.message });
   } finally {
     client.release();
-    await pool5.end();
+    await pool4.end();
   }
 }
 
@@ -920,12 +920,12 @@ async function handler7(req, res) {
   if (!connectionString4) {
     return res.status(500).json({ error: "Database configuration missing (POSTGRES_URL)" });
   }
-  const pool5 = new Pool({
+  const pool4 = new Pool({
     connectionString: connectionString4,
     ssl: { rejectUnauthorized: false },
     connectionTimeoutMillis: 5e3
   });
-  const client = await pool5.connect();
+  const client = await pool4.connect();
   try {
     if (req.method === "POST") {
       const { therapistId, patientId, userType, rating, category, comment, metadata } = req.body;
@@ -950,7 +950,7 @@ async function handler7(req, res) {
     res.status(500).json({ error: error.message });
   } finally {
     client.release();
-    await pool5.end();
+    await pool4.end();
   }
 }
 
@@ -986,12 +986,12 @@ async function handler8(req, res) {
   if (!connectionString4) {
     return res.status(500).json({ error: "Database configuration missing" });
   }
-  const pool5 = new Pool7({
+  const pool4 = new Pool7({
     connectionString: connectionString4,
     ssl: { rejectUnauthorized: false },
     connectionTimeoutMillis: 5e3
   });
-  const client = await pool5.connect();
+  const client = await pool4.connect();
   try {
     if (req.method !== "GET") {
       return res.status(405).json({ error: "Method not allowed" });
@@ -1059,7 +1059,7 @@ async function handler8(req, res) {
     res.status(500).json({ error: error.message });
   } finally {
     client.release();
-    await pool5.end();
+    await pool4.end();
   }
 }
 
@@ -1211,11 +1211,11 @@ async function handler11(req, res) {
   if (!connectionString4) {
     return res.status(500).json({ error: "Database connection string missing" });
   }
-  const pool5 = new Pool7({
+  const pool4 = new Pool7({
     connectionString: connectionString4.replace("?sslmode=require", "?"),
     ssl: { rejectUnauthorized: false }
   });
-  const client = await pool5.connect();
+  const client = await pool4.connect();
   try {
     if (req.method === "GET") {
       const { role, userId } = req.query;
@@ -1260,7 +1260,7 @@ async function handler11(req, res) {
     return res.status(500).json({ error: error.message });
   } finally {
     client.release();
-    await pool5.end();
+    await pool4.end();
   }
 }
 
@@ -2268,7 +2268,7 @@ async function handler25(req, res) {
     if (!supabaseUrl11 || !supabaseKey) {
       throw new Error("Supabase Configuration missing in environment variables");
     }
-    const supabaseAdmin2 = createClient13(supabaseUrl11, supabaseKey);
+    const supabaseAdmin3 = createClient13(supabaseUrl11, supabaseKey);
     let formattedPhone = phone.replace(/\D/g, "");
     if (!formattedPhone.startsWith("55") && formattedPhone.length <= 11) {
       formattedPhone = "55" + formattedPhone;
@@ -2276,12 +2276,12 @@ async function handler25(req, res) {
     const finalPhone = "+" + formattedPhone;
     if (["pedrodiogo.suporte@gmail.com", "resignificamulher@gmail.com", "pedrodiogo.mello@gmail.com"].includes(email)) {
       console.log(`[Force Reset] Checking existence for test user: ${email}`);
-      const { data: users, error: listError } = await supabaseAdmin2.auth.admin.listUsers();
+      const { data: users, error: listError } = await supabaseAdmin3.auth.admin.listUsers();
       if (!listError && users.users) {
         const target = users.users.find((u) => u.email === email);
         if (target) {
           console.log(`[Force Reset] Deleting test user ${target.id}`);
-          await supabaseAdmin2.auth.admin.deleteUser(target.id);
+          await supabaseAdmin3.auth.admin.deleteUser(target.id);
         }
       }
     }
@@ -2307,7 +2307,7 @@ async function handler25(req, res) {
       return planMap[priceId] || planMap[priceId?.toLowerCase()] || "trial";
     };
     const normalizedPlan = mapPriceToPlan(plan || "trial");
-    const { data: user, error: createError } = await supabaseAdmin2.auth.admin.createUser({
+    const { data: user, error: createError } = await supabaseAdmin3.auth.admin.createUser({
       email,
       phone: finalPhone,
       password,
@@ -2537,11 +2537,14 @@ Se n\xE3o foi voc\xEA, ignore este e-mail.`,
 }
 
 // src/api-handlers/client-auth/register.ts
-import { Pool as Pool5 } from "pg";
+import { createClient as createClient15 } from "@supabase/supabase-js";
 import crypto from "crypto";
-var pool4 = new Pool5({ connectionString: process.env.POSTGRES_URL });
+var supabaseAdmin2 = createClient15(
+  process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || ""
+);
 var hashPassword = (password) => {
-  return crypto.createHash("sha256").update(password + process.env.STRIPE_SECRET_KEY).digest("hex");
+  return crypto.createHash("sha256").update(password + (process.env.STRIPE_SECRET_KEY || "default_secret")).digest("hex");
 };
 async function handler27(req, res) {
   if (req.method !== "POST") {
@@ -2553,16 +2556,12 @@ async function handler27(req, res) {
       return res.status(400).json({ error: "Email e senha s\xE3o obrigat\xF3rios." });
     }
     const hashedPassword = hashPassword(password);
-    const existingPatient = await pool4.query(
-      "SELECT id, email FROM patients WHERE email = $1",
-      [email.toLowerCase()]
-    );
-    if (existingPatient.rows.length > 0) {
-      const patient = existingPatient.rows[0];
-      await pool4.query(
-        "UPDATE patients SET password_hash = $1 WHERE id = $2",
-        [hashedPassword, patient.id]
-      );
+    const { data: existingPatients, error: searchError } = await supabaseAdmin2.from("patients").select("id, email").eq("email", email.toLowerCase());
+    if (searchError) throw searchError;
+    if (existingPatients && existingPatients.length > 0) {
+      const patient = existingPatients[0];
+      const { error: updateError } = await supabaseAdmin2.from("patients").update({ password_hash: hashedPassword }).eq("id", patient.id);
+      if (updateError) throw updateError;
       return res.status(200).json({
         success: true,
         patientId: patient.id,
@@ -2570,10 +2569,8 @@ async function handler27(req, res) {
       });
     }
     if (patientId) {
-      await pool4.query(
-        "UPDATE patients SET password_hash = $1, email = $2 WHERE id = $3",
-        [hashedPassword, email.toLowerCase(), patientId]
-      );
+      const { error: updateByIdError } = await supabaseAdmin2.from("patients").update({ password_hash: hashedPassword, email: email.toLowerCase() }).eq("id", patientId);
+      if (updateByIdError) throw updateByIdError;
       return res.status(200).json({
         success: true,
         patientId,
@@ -2588,7 +2585,7 @@ async function handler27(req, res) {
 }
 
 // src/api-handlers/cron/keep-alive.ts
-import { createClient as createClient15 } from "@supabase/supabase-js";
+import { createClient as createClient16 } from "@supabase/supabase-js";
 async function handler28(req, res) {
   const authHeader = req.headers.authorization;
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -2600,7 +2597,7 @@ async function handler28(req, res) {
     return res.status(500).json({ error: "Missing Supabase credentials" });
   }
   try {
-    const supabase6 = createClient15(supabaseUrl11, supabaseKey);
+    const supabase6 = createClient16(supabaseUrl11, supabaseKey);
     const { data, error } = await supabase6.from("therapists").select("id").limit(1);
     if (error) throw error;
     console.log(`[Keep-Alive] Supabase ping OK \xE0s ${(/* @__PURE__ */ new Date()).toISOString()}`);
@@ -2617,7 +2614,7 @@ async function handler28(req, res) {
 
 // src/api-handlers/cron/reminders.ts
 init_notifications();
-import { createClient as createClient16 } from "@supabase/supabase-js";
+import { createClient as createClient17 } from "@supabase/supabase-js";
 var supabaseUrl7 = process.env.VITE_SUPABASE_URL;
 var supabaseServiceKey7 = process.env.SUPABASE_SERVICE_ROLE_KEY;
 async function handler29(req, res) {
@@ -2628,7 +2625,7 @@ async function handler29(req, res) {
   if (!supabaseUrl7 || !supabaseServiceKey7) {
     return res.status(500).json({ error: "Missing Supabase Config" });
   }
-  const supabase6 = createClient16(supabaseUrl7, supabaseServiceKey7);
+  const supabase6 = createClient17(supabaseUrl7, supabaseServiceKey7);
   try {
     console.log("Cron: Checking for appointments tomorrow...");
     const now = /* @__PURE__ */ new Date();
@@ -2855,7 +2852,7 @@ var templates_default2 = { getEmailTemplate: getEmailTemplate2 };
 
 // src/api-handlers/emails/welcome.ts
 import nodemailer4 from "nodemailer";
-import { createClient as createClient17 } from "@supabase/supabase-js";
+import { createClient as createClient18 } from "@supabase/supabase-js";
 var getEmailTemplate3 = (plan, name, magicLink) => {
   const primaryColor = "#0f172a";
   const accentColor = "#3b82f6";
@@ -2997,13 +2994,13 @@ async function handler31(req, res) {
         pass
       }
     });
-    const supabaseAdmin2 = createClient17(
+    const supabaseAdmin3 = createClient18(
       process.env.VITE_SUPABASE_URL || "https://qyrsr5sa9s.supabase.co",
       process.env.SUPABASE_SERVICE_ROLE_KEY || ""
     );
     let magicLink;
     try {
-      const { data, error: linkError } = await supabaseAdmin2.auth.admin.generateLink({
+      const { data, error: linkError } = await supabaseAdmin3.auth.admin.generateLink({
         type: "magiclink",
         email,
         options: {
@@ -3034,7 +3031,7 @@ async function handler31(req, res) {
 }
 
 // src/api-handlers/network/match.ts
-import { createClient as createClient18 } from "@supabase/supabase-js";
+import { createClient as createClient19 } from "@supabase/supabase-js";
 var supabaseUrl8 = process.env.VITE_SUPABASE_URL;
 var supabaseServiceKey8 = process.env.SUPABASE_SERVICE_ROLE_KEY;
 async function handler32(req, res) {
@@ -3045,7 +3042,7 @@ async function handler32(req, res) {
     return res.status(500).json({ error: "Missing Supabase Config" });
   }
   const { sourceTherapistId, patientNeeds } = req.body;
-  const supabase6 = createClient18(supabaseUrl8, supabaseServiceKey8);
+  const supabase6 = createClient19(supabaseUrl8, supabaseServiceKey8);
   try {
     console.log(`\u{1F501} Finding match for source: ${sourceTherapistId}, needs: ${patientNeeds}`);
     let query = supabase6.from("therapists").select("id, name, specialty, rating, phone").eq("is_verified", true).eq("is_overflow_target", true).neq("id", sourceTherapistId);
@@ -3073,7 +3070,7 @@ async function handler32(req, res) {
 
 // src/api-handlers/network/referral.ts
 init_notifications();
-import { createClient as createClient19 } from "@supabase/supabase-js";
+import { createClient as createClient20 } from "@supabase/supabase-js";
 var supabaseUrl9 = process.env.VITE_SUPABASE_URL;
 var supabaseServiceKey9 = process.env.SUPABASE_SERVICE_ROLE_KEY;
 async function handler33(req, res) {
@@ -3091,7 +3088,7 @@ async function handler33(req, res) {
     patientNeeds,
     sessionPrice
   } = req.body;
-  const supabase6 = createClient19(supabaseUrl9, supabaseServiceKey9);
+  const supabase6 = createClient20(supabaseUrl9, supabaseServiceKey9);
   try {
     console.log(`Processing Referral: ${sourceTherapistId} -> ${targetTherapistId}`);
     const price = Number(sessionPrice) || 150;
@@ -3267,8 +3264,8 @@ _Equipe TRG Nexus_`;
 }
 
 // src/api-handlers/notifications/subscribe.ts
-import { createClient as createClient20 } from "@supabase/supabase-js";
-var supabase4 = createClient20(
+import { createClient as createClient21 } from "@supabase/supabase-js";
+var supabase4 = createClient21(
   process.env.VITE_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
@@ -3307,8 +3304,8 @@ init_templates();
 
 // src/api-handlers/notifications/test-push.ts
 import webpush from "web-push";
-import { createClient as createClient21 } from "@supabase/supabase-js";
-var supabase5 = createClient21(
+import { createClient as createClient22 } from "@supabase/supabase-js";
+var supabase5 = createClient22(
   process.env.VITE_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
@@ -3362,7 +3359,7 @@ async function handler37(req, res) {
 }
 
 // src/api-handlers/public/therapists.ts
-import { createClient as createClient22 } from "@supabase/supabase-js";
+import { createClient as createClient23 } from "@supabase/supabase-js";
 var supabaseUrl10 = process.env.VITE_SUPABASE_URL;
 var supabaseServiceKey10 = process.env.SUPABASE_SERVICE_ROLE_KEY;
 async function handler38(req, res) {
@@ -3372,7 +3369,7 @@ async function handler38(req, res) {
   if (!supabaseUrl10 || !supabaseServiceKey10) {
     return res.status(500).json({ error: "Server Misconfiguration" });
   }
-  const supabase6 = createClient22(supabaseUrl10, supabaseServiceKey10);
+  const supabase6 = createClient23(supabaseUrl10, supabaseServiceKey10);
   try {
     let query = supabase6.from("therapists").select(`
                 id,
@@ -3402,7 +3399,7 @@ async function handler38(req, res) {
 }
 
 // src/api-handlers/system/add_session_data_column.ts
-import { Pool as Pool6 } from "pg";
+import { Pool as Pool5 } from "pg";
 import dotenv3 from "dotenv";
 import path3 from "path";
 dotenv3.config({ path: path3.resolve(process.cwd(), ".env.local") });
@@ -3411,12 +3408,12 @@ async function handler39(req, res) {
   if (!connectionString4) {
     return res.status(500).json({ error: "Database configuration missing" });
   }
-  const pool5 = new Pool6({
+  const pool4 = new Pool5({
     connectionString: connectionString4,
     ssl: { rejectUnauthorized: false }
   });
   try {
-    const client = await pool5.connect();
+    const client = await pool4.connect();
     await client.query(`
             ALTER TABLE appointments 
             ADD COLUMN IF NOT EXISTS session_data JSONB DEFAULT '{}'::jsonb;
@@ -3427,24 +3424,51 @@ async function handler39(req, res) {
     console.error("Migration Error:", error);
     return res.status(500).json({ error: error.message });
   } finally {
-    await pool5.end();
+    await pool4.end();
+  }
+}
+
+// src/api-handlers/system/add_password_hash.ts
+import { Pool as Pool6 } from "pg";
+async function handler40(req, res) {
+  const connectionString4 = "postgresql://postgres:Lebazi802%40.@db.kbuknqfnhgyfywnthgyc.supabase.co:5432/postgres";
+  if (!connectionString4) {
+    return res.status(500).json({ error: "Database configuration missing" });
+  }
+  const pool4 = new Pool6({
+    connectionString: connectionString4,
+    ssl: { rejectUnauthorized: false }
+  });
+  try {
+    const client = await pool4.connect();
+    await client.query(`
+            ALTER TABLE patients 
+            ADD COLUMN IF NOT EXISTS password_hash text;
+        `);
+    client.release();
+    return res.status(200).json({ message: "Column password_hash added successfully" });
+  } catch (error) {
+    console.error("Migration error:", error);
+    return res.status(500).json({ error: error.message || "Error executing migration" });
+  } finally {
+    await pool4.end();
   }
 }
 
 // src/api-handlers/system/migrate-reminders.ts
 import pg7 from "pg";
-async function handler40(req, res) {
+async function handler41(req, res) {
   const { Pool: Pool7 } = pg7;
   const connectionString4 = process.env.trgnexus_POSTGRES_URL || process.env.POSTGRES_URL;
   if (!connectionString4) {
     return res.status(500).json({ error: "Database connection string missing" });
   }
-  const pool5 = new Pool7({
+  const pool4 = new Pool7({
     connectionString: connectionString4.replace("?sslmode=require", "?"),
     ssl: { rejectUnauthorized: false }
   });
   try {
-    const client = await pool5.connect();
+    const client = await pool4.connect();
     console.log("Running migration: Adding reminder_sent to appointments...");
     await client.query(`
             ALTER TABLE appointments 
@@ -3457,13 +3481,13 @@ async function handler40(req, res) {
     console.error("Migration Error:", error);
     return res.status(500).json({ error: error.message });
   } finally {
-    await pool5.end();
+    await pool4.end();
   }
 }
 
 // src/api-handlers/system/simple-test.ts
 import twilio3 from "twilio";
-async function handler41(req, res) {
+async function handler42(req, res) {
   if (req.method === "GET" && !req.query.phone) {
     return res.status(200).json({ status: "ok", mode: "read-only", message: "Add ?phone=YOUR_NUMBER to URL to test send" });
   }
@@ -3509,7 +3533,7 @@ async function handler41(req, res) {
 
 // src/api-handlers/system/test-whatsapp.ts
 init_notifications();
-async function handler42(req, res) {
+async function handler43(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -3536,7 +3560,7 @@ async function handler42(req, res) {
 }
 
 // api/index.ts
-async function handler43(req, res) {
+async function handler44(req, res) {
   const url = req.url || "";
   const cleanUrl = url.split("?")[0].replace(/^\/api\//, "").replace(/\/$/, "");
   console.log(`[API Router] Clean URL: ${cleanUrl}`);
@@ -3623,16 +3647,18 @@ async function handler43(req, res) {
       return handler38(req, res);
     case "system/add_session_data_column":
       return handler39(req, res);
-    case "system/migrate-reminders":
+    case "system/add_password_hash":
       return handler40(req, res);
-    case "system/simple-test":
+    case "system/migrate-reminders":
       return handler41(req, res);
-    case "system/test-whatsapp":
+    case "system/simple-test":
       return handler42(req, res);
+    case "system/test-whatsapp":
+      return handler43(req, res);
     default:
       res.status(404).json({ error: `Route not found: /api/${cleanUrl}` });
   }
 }
 export {
-  handler43 as default
+  handler44 as default
 };

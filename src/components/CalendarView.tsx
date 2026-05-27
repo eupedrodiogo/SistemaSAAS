@@ -570,7 +570,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
                                              'bg-slate-100 border-slate-200 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400'
                                        }`}
                                  >
-                                    {apt.time} {apt.patientName.split(' ')[0]}
+                                    {apt.time} {(apt.patientName || 'Paciente').split(' ')[0]}
                                  </div>
                               ))}
                               {isFullDayBlocked && (

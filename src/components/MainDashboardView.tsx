@@ -50,49 +50,45 @@ const MainDashboardView: React.FC<MainDashboardViewProps> = ({ onChangeView, the
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [patients, appointments] = await Promise.all([
-          api.patients.list(),
-          api.appointments.list()
-        ]);
-
-        // 1. Filter Appointments for Selected Month
         const selMonth = selectedDate.getMonth();
         const selYear = selectedDate.getFullYear();
+        const prevDate = new Date(selYear, selMonth - 1, 1);
+        const prevMonth = prevDate.getMonth();
+        const prevYear = prevDate.getFullYear();
 
+        // ── SSoT: busca dados reais em paralelo ──────────────────────
+        const [patients, appointments, currentSummary, prevSummary] = await Promise.all([
+          api.patients.list(),
+          api.appointments.list(),
+          // Receita real do mês selecionado (via tabela transactions)
+          api.transactions.summary(selYear, selMonth + 1),
+          // Receita real do mês anterior (para calcular delta)
+          api.transactions.summary(prevYear, prevMonth + 1),
+        ]);
+
+        // 1. Filtra agendamentos para contagem de sessões (não para receita!)
         const currentMonthAppointments = appointments.filter(app => {
           const appDate = new Date(app.date);
           return appDate.getMonth() === selMonth &&
             appDate.getFullYear() === selYear &&
-            (app.status !== 'cancelled' && app.status !== 'Cancelado');
+            app.status !== 'cancelled' && app.status !== 'Cancelado';
         });
-
-        // 2. Filter Appointments for Previous Month (for comparison)
-        const prevDate = new Date(selYear, selMonth - 1, 1);
-        const prevMonth = prevDate.getMonth();
-        const prevYear = prevDate.getFullYear();
 
         const prevMonthAppointments = appointments.filter(app => {
           const appDate = new Date(app.date);
           return appDate.getMonth() === prevMonth &&
             appDate.getFullYear() === prevYear &&
-            (app.status !== 'cancelled' && app.status !== 'Cancelado');
+            app.status !== 'cancelled' && app.status !== 'Cancelado';
         });
 
-        // 3. Stats Calculation
         const sessionsThisMonth = currentMonthAppointments.length;
         const sessionsLastMonth = prevMonthAppointments.length;
 
-        // Revenue
-        const revenue = currentMonthAppointments.reduce((sum, app) => sum + (app.sessionData?.price ?? therapist?.price ?? 0), 0);
-        const revenueLastMonth = prevMonthAppointments.reduce((sum, app) => sum + (app.sessionData?.price ?? therapist?.price ?? 0), 0);
-
-        // Patients (New patients in month vs total?) 
-        // Showing Total Active Patients usually doesn't change by month selection unless we track 'active at date'.
-        // For simplicity, we'll keep Total Active Patients but maybe show "New Patients" growth?
-        // Let's keep Total Active for now as it's a current snapshot.
+        // ── Receita vem da tabela transactions (SSoT) ─────────────────
+        const revenue = Number(currentSummary[0]?.total_revenue ?? 0);
+        const revenueLastMonth = Number(prevSummary[0]?.total_revenue ?? 0);
         const patientsCount = patients.length;
 
-        // Calculate Deltas
         const calcDelta = (curr: number, prev: number) => {
           if (prev === 0) return curr > 0 ? '+100%' : '0%';
           const delta = ((curr - prev) / prev) * 100;
@@ -102,12 +98,12 @@ const MainDashboardView: React.FC<MainDashboardViewProps> = ({ onChangeView, the
         setDashboardStats({
           patientsCount,
           sessionsThisMonth,
-          revenue: revenue,
+          revenue,
           revenueDelta: calcDelta(revenue, revenueLastMonth),
           sessionsDelta: calcDelta(sessionsThisMonth, sessionsLastMonth)
         });
 
-        // 4. Chart Data (Last 6 months ENDING at Selected Date)
+        // 2. Gráfico: últimos 6 meses de sessões (contagem via agendamentos)
         const last6Months = [];
         for (let i = 5; i >= 0; i--) {
           const d = new Date(selYear, selMonth - i, 1);
@@ -117,37 +113,32 @@ const MainDashboardView: React.FC<MainDashboardViewProps> = ({ onChangeView, the
 
           const count = appointments.filter(app => {
             const [aYear, aMonth] = app.date.split('-').map(Number);
-            // aMonth is 1-indexed in string (e.g. 01), but we seek to match 0-indexed 'm'
-            // Wait, d.getMonth() returns 0-11.
-            // split gives 1, 2...
             return (aMonth - 1) === m && aYear === y &&
-              (app.status !== 'cancelled' && app.status !== 'Cancelado');
+              app.status !== 'cancelled' && app.status !== 'Cancelado';
           }).length;
 
-          // Title case for month name
-          const label = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-          last6Months.push({ name: label, sessions: count });
+          last6Months.push({
+            name: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+            sessions: count
+          });
         }
         setChartData(last6Months);
 
-        // 5. Upcoming Appointments (Filter by selected month if not "current"?) 
-        // If selected date is in future, show future. If past, show past?
-        // Let's show appointments for the SELECTED month.
+        // 3. Próximos agendamentos do mês selecionado
         const monthApps = currentMonthAppointments
           .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-          .slice(0, 5); // Show top 5
-
+          .slice(0, 5);
         setUpcomingAppointments(monthApps);
 
       } catch (error) {
-        console.error("Failed to load dashboard data", error);
+        console.error('Failed to load dashboard data', error);
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [selectedDate]); // Re-run when selectedDate changes
+  }, [selectedDate]);
 
   const stats = [
     {

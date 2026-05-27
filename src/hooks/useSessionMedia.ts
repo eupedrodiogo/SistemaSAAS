@@ -18,8 +18,11 @@ export const useSessionMedia = () => {
 
     const startCamera = useCallback(async () => {
         try {
+            const isMobile = window.innerWidth < 768;
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: true,
+                video: isMobile 
+                    ? { aspectRatio: 9 / 16, facingMode: "user" } 
+                    : { aspectRatio: 16 / 9, facingMode: "user" },
                 audio: true
             });
             setLocalStream(stream);

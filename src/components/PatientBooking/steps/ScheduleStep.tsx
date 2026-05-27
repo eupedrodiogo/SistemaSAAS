@@ -136,8 +136,8 @@ const ScheduleStep: React.FC<ScheduleStepProps> = ({ data, onUpdate, onNext, onB
                     </div>
 
                     <div className="grid grid-cols-7 gap-2 text-center mb-2">
-                        {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map(d => (
-                            <span key={d} className="text-xs font-bold text-slate-400">{d}</span>
+                        {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((d, i) => (
+                            <span key={`day-${i}`} className="text-xs font-bold text-slate-400">{d}</span>
                         ))}
                     </div>
                     <div className="grid grid-cols-7 gap-2">

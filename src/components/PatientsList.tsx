@@ -68,7 +68,8 @@ const ClientsList: React.FC<PatientsListProps> = ({ highlightPatientId, onNaviga
     const fetchPatients = async () => {
       try {
         setLoading(true);
-        const data = await api.patients.list();
+        // SSoT: busca pacientes já enriquecidos com totais financeiros dinâmicos
+        const data = await api.patients.listWithFinancials();
         setPatients(data);
       } catch (error) {
         console.error('Error fetching patients:', error);
@@ -466,7 +467,9 @@ const ClientsList: React.FC<PatientsListProps> = ({ highlightPatientId, onNaviga
             <div className="hidden md:flex flex-col items-end justify-between border-l border-slate-100 dark:border-slate-800 pl-5 shrink-0 min-w-[180px]">
               <div className="text-right">
                 <p className="text-xs text-slate-400 font-bold uppercase">Investimento Total</p>
-                <p className="text-lg font-bold text-slate-700 dark:text-slate-200">R$ {(client.totalInvested || 0).toFixed(2)}</p>
+                <p className="text-lg font-bold text-slate-700 dark:text-slate-200">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(client.total_invested ?? 0)}
+                </p>
               </div>
 
               <div className="flex gap-2">
