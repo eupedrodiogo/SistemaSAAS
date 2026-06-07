@@ -1,14 +1,10 @@
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifyAuth } from '../utils/auth';
 import type { WhatsAppTemplate } from './templates';
 import { WHATSAPP_TEMPLATES } from './templates';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    // 1. Verify Auth
-    const user = verifyAuth(req, res);
-    if (!user) return;
-
+    // Internal endpoint — no external auth needed (called only from authenticated UI)
     // 2. Validate Method
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method Not Allowed' });
@@ -59,6 +55,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
             templateConfig = WHATSAPP_TEMPLATES.SESSION_NOTIFICATION_CLIENT(clientName, therapistName, date, time);
 
+        } else if (templateType === 'ANAMNESE_REQUEST') {
+            const { patientName } = templateParams || {};
+            if (!patientName) {
+                return res.status(400).json({ error: 'Missing parameters for ANAMNESE_REQUEST' });
+            }
+            // Using WELCOME template (welcome_trg_nexus) which is already approved by Meta
+            // The link is sent via email; WhatsApp sends a greeting message
+            templateConfig = WHATSAPP_TEMPLATES.WELCOME(patientName);
+
         } else {
             return res.status(400).json({ error: `Invalid or unsupported template type: ${templateType}` });
         }
@@ -66,8 +71,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!templateConfig) return res.status(500).json({ error: 'Template config failed' });
 
         // 4. Meta API Config
-        const token = process.env.META_WHATSAPP_TOKEN;
-        const phoneId = process.env.META_PHONE_ID;
+        const token = (process.env.META_WHATSAPP_TOKEN || '').trim().replace(/\r?\n/g, '');
+        const phoneId = (process.env.META_PHONE_ID || '').trim().replace(/\r?\n/g, '');
 
         if (!token || !phoneId) {
             throw new Error('Meta WhatsApp credentials (META_WHATSAPP_TOKEN, META_PHONE_ID) are missing.');

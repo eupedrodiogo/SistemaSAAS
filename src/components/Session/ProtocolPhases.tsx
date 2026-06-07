@@ -1,8 +1,9 @@
 
 import React from 'react';
 import {
-    Settings, ArrowUp, ArrowDown, Trash2, Wind, Sparkles, AlertTriangle
+    Settings, ArrowUp, ArrowDown, Trash2, Wind, Sparkles, AlertTriangle, ChevronDown, ChevronUp
 } from 'lucide-react';
+import { useState } from 'react';
 
 export interface ProtocolPhase {
     id: string;
@@ -48,13 +49,28 @@ export const ProtocolPhases: React.FC<ProtocolPhasesProps> = ({
     onAddCustomPhase,
     hasPhaseData
 }) => {
+    const [isCollapsed, setIsCollapsed] = useState(false);
+
     return (
-        <div className="hidden lg:flex lg:w-72 flex-col gap-4 shrink-0">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                <div className="p-3 bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Fases</span>
-                    <button onClick={toggleEditing} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600"><Settings size={14} /></button>
+        <div className="flex flex-col gap-4 shrink-0 w-full">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
+                <div 
+                    className="p-3 bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center cursor-pointer select-none group"
+                    onClick={() => setIsCollapsed(!isCollapsed)}
+                >
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Fases</span>
+                        <span className="text-[10px] font-bold text-indigo-500 hover:text-indigo-400 transition-colors uppercase tracking-wider">
+                            {isCollapsed ? '(expandir fases)' : '(ocultar fases)'}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1 text-slate-400 group-hover:text-slate-300 transition-colors">
+                        <button onClick={(e) => { e.stopPropagation(); toggleEditing(); }} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><Settings size={14} /></button>
+                    </div>
                 </div>
+
+                {!isCollapsed && (
+                    <>
 
                 {isEditing && (
                     <div className="p-2 bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
@@ -88,35 +104,27 @@ export const ProtocolPhases: React.FC<ProtocolPhasesProps> = ({
                         );
                     })}
                 </div>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                <button onClick={toggleSafety} className="w-full p-4 flex items-center justify-between bg-red-50 dark:bg-red-900/10 hover:bg-red-100 transition-colors">
-                    <div className="flex items-center gap-2 text-red-600 dark:text-red-400 font-bold text-sm uppercase tracking-wider"><Wind size={16} /> Mecanismo de Segurança</div>
-                    {isSafetyOpen ? <ArrowUp size={16} className="text-red-400" /> : <ArrowDown size={16} className="text-red-400" />}
-                </button>
-                {isSafetyOpen && (
-                    <div className="p-4 bg-red-50/50 dark:bg-red-900/5 animate-slide-up">
-                        <p className="text-sm font-medium text-slate-700 dark:text-slate-300 italic mb-2">"Feche os olhos, repouse suas mãos ao lado do corpo..."</p>
-                        <p className="mt-3 text-xs font-bold text-slate-500 uppercase text-center border-t border-red-200 pt-2">"Cheira a florzinha e sopra a velinha"</p>
-                    </div>
+                    </>
                 )}
             </div>
 
-            <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800 shadow-sm overflow-hidden p-4">
-                <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-300 uppercase tracking-wider mb-3 flex items-center gap-2"><Sparkles size={14} /> Nexus AI Assistant</h4>
-                {aiSuggestions.length > 0 ? (
-                    <div className="space-y-2">
-                        {aiSuggestions.map((sugg, i) => (
-                            <div key={i} className="bg-white dark:bg-slate-900 p-2 rounded-lg text-xs text-slate-600 dark:text-slate-300 border border-indigo-100 dark:border-indigo-900/50 animate-fade-in">
-                                {sugg}
+            {!isCollapsed && (
+                <>
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                        <button onClick={toggleSafety} className="w-full p-4 flex items-center justify-between bg-red-50 dark:bg-red-900/10 hover:bg-red-100 transition-colors">
+                            <div className="flex items-center gap-2 text-red-600 dark:text-red-400 font-bold text-sm uppercase tracking-wider"><Wind size={16} /> Mecanismo de Segurança</div>
+                            {isSafetyOpen ? <ArrowUp size={16} className="text-red-400" /> : <ArrowDown size={16} className="text-red-400" />}
+                        </button>
+                        {isSafetyOpen && (
+                            <div className="p-4 bg-red-50/50 dark:bg-red-900/5 animate-slide-up">
+                                <p className="text-sm font-medium text-slate-700 dark:text-slate-300 italic mb-2">"Feche os olhos, repouse suas mãos ao lado do corpo..."</p>
+                                <p className="mt-3 text-xs font-bold text-slate-500 uppercase text-center border-t border-red-200 pt-2">"Cheira a florzinha e sopra a velinha"</p>
                             </div>
-                        ))}
+                        )}
                     </div>
-                ) : (
-                    <p className="text-xs text-indigo-400 italic text-center py-2">Ouvindo e analisando...</p>
-                )}
-            </div>
+
+                </>
+            )}
         </div>
     );
 };

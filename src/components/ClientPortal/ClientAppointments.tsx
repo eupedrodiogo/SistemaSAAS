@@ -45,7 +45,7 @@ const ClientAppointments: React.FC = () => {
                                                         <Calendar size={18} />
                                                     </div>
                                                     <div>
-                                                        <p className="font-bold text-slate-900 dark:text-white">{new Date(appt.date).toLocaleDateString('pt-BR')}</p>
+                                                        <p className="font-bold text-slate-900 dark:text-white">{new Date(appt.date + (appt.date.includes('T') ? '' : 'T12:00:00')).toLocaleDateString('pt-BR')}</p>
                                                         <p className="text-slate-500">{appt.time}</p>
                                                     </div>
                                                 </div>
@@ -54,17 +54,17 @@ const ClientAppointments: React.FC = () => {
                                                 {patient?.therapist_name || 'Seu Terapeuta'}
                                             </td>
                                             <td className="px-6 py-4">
-                                                {appt.status === 'Agendado' && (
+                                                {['agendado', 'scheduled', 'pending_payment', 'active', 'ativo'].includes(appt.status?.toLowerCase() || '') && (
                                                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
                                                         <Clock size={12} /> Agendado
                                                     </span>
                                                 )}
-                                                {appt.status === 'Concluído' && (
+                                                {['concluído', 'completed'].includes(appt.status?.toLowerCase() || '') && (
                                                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                                                         <CheckCircle size={12} /> Concluído
                                                     </span>
                                                 )}
-                                                {appt.status === 'Cancelado' && (
+                                                {['cancelado', 'canceled'].includes(appt.status?.toLowerCase() || '') && (
                                                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
                                                         <XCircle size={12} /> Cancelado
                                                     </span>
@@ -72,7 +72,7 @@ const ClientAppointments: React.FC = () => {
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-2">
-                                                    {appt.status === 'Agendado' && (
+                                                    {['agendado', 'scheduled', 'pending_payment', 'active', 'ativo'].includes(appt.status?.toLowerCase() || '') && (
                                                         <>
                                                             <AddToCalendar
                                                                 title={`Sessão TRG: ${patient?.therapist_name || 'Terapeuta'}`}

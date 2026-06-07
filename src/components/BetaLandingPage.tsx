@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import {
     Check,
     X,
@@ -25,6 +26,24 @@ const stripePromise = loadStripe('pk_live_51MPKq2Lz0qOQeXyX0B9gZ5q5q5q5q5q5');
 
 const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme }) => {
     const navigate = useNavigate();
+    const { user, loading } = useAuth();
+
+    useEffect(() => {
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
+        const appType = localStorage.getItem('teranexus_app_type');
+
+        if (isStandalone && appType === 'patient') {
+            navigate('/cliente', { replace: true });
+            return;
+        }
+
+        if (!loading && user) {
+            navigate('/dashboard', { replace: true });
+            return;
+        }
+        
+        localStorage.setItem('teranexus_app_type', 'therapist');
+    }, [user, loading, navigate]);
 
     const handleCheckout = async (priceId: string) => {
         // Basic checkout redirection logic (simplified for restoration)

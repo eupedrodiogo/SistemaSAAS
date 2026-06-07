@@ -43,6 +43,7 @@ import cronReminders from '../src/api-handlers/cron/reminders';
 import debugCheckMeta from '../src/api-handlers/debug/check-meta';
 
 // emails
+import emailsAnamnese from '../src/api-handlers/emails/anamnese';
 import emailsTemplates from '../src/api-handlers/emails/templates';
 import emailsWelcome from '../src/api-handlers/emails/welcome';
 
@@ -110,6 +111,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         case 'debug/check-meta': return debugCheckMeta(req, res);
 
+        case 'emails/anamnese': return emailsAnamnese(req, res);
         case 'emails/templates': return emailsTemplates(req, res);
         case 'emails/welcome': return emailsWelcome(req, res);
 

@@ -1,39 +1,70 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
+export type ThemeMode = 'light' | 'dark' | 'system';
+
 interface ThemeContextType {
     isDarkMode: boolean;
-    toggleTheme: () => void;
+    themeMode: ThemeMode;
+    setThemeMode: (mode: ThemeMode) => void;
+    toggleTheme: () => void; // Keep for backward compatibility
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const [themeMode, setThemeModeState] = useState<ThemeMode>('system');
     const [isDarkMode, setIsDarkMode] = useState(false);
 
     useEffect(() => {
-        // Check local storage or system preference on mount
-        const savedTheme = localStorage.getItem('theme');
-        if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-            setIsDarkMode(true);
+        const savedTheme = localStorage.getItem('theme') as ThemeMode;
+        if (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system') {
+            setThemeModeState(savedTheme);
         }
     }, []);
 
     useEffect(() => {
-        if (isDarkMode) {
-            document.documentElement.classList.add('dark');
-            localStorage.setItem('theme', 'dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-            localStorage.setItem('theme', 'light');
-        }
-    }, [isDarkMode]);
+        const updateTheme = () => {
+            let effectiveDark = false;
+            if (themeMode === 'dark') {
+                effectiveDark = true;
+            } else if (themeMode === 'system') {
+                effectiveDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            } else {
+                effectiveDark = false; // light
+            }
 
+            setIsDarkMode(effectiveDark);
+
+            if (effectiveDark) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        };
+
+        updateTheme();
+        localStorage.setItem('theme', themeMode);
+
+        // Listen for system changes if system mode is active
+        if (themeMode === 'system') {
+            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            const handleChange = () => updateTheme();
+            mediaQuery.addEventListener('change', handleChange);
+            return () => mediaQuery.removeEventListener('change', handleChange);
+        }
+    }, [themeMode]);
+
+    const setThemeMode = (mode: ThemeMode) => {
+        setThemeModeState(mode);
+    };
+
+    // Keep toggleTheme for existing components, it cycles or toggles
     const toggleTheme = () => {
-        setIsDarkMode(prev => !prev);
+        setThemeModeState(prev => prev === 'dark' ? 'light' : 'dark');
     };
 
     return (
-        <ThemeContext.Provider value={{ isDarkMode, toggleTheme }}>
+        <ThemeContext.Provider value={{ isDarkMode, themeMode, setThemeMode, toggleTheme }}>
             {children}
         </ThemeContext.Provider>
     );

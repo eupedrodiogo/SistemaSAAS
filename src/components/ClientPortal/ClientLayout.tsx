@@ -16,12 +16,14 @@ const ClientLayout: React.FC<ClientLayoutProps> = ({ children, activePage }) => 
 
     useEffect(() => {
         const storedId = localStorage.getItem('client_portal_id');
-        if (!storedId) {
+        const isSessionWithId = activePage === 'session' && window.location.pathname.split('/').filter(Boolean).length > 1;
+
+        if (!storedId && !isSessionWithId) {
             window.location.href = '/portal-paciente/login';
         } else {
-            setPatientId(storedId);
+            setPatientId(storedId || 'guest');
         }
-    }, []);
+    }, [activePage]);
 
     const handleLogout = () => {
         localStorage.removeItem('client_portal_id');
@@ -39,6 +41,18 @@ const ClientLayout: React.FC<ClientLayoutProps> = ({ children, activePage }) => 
     ];
 
     if (!patientId) return null; // Prevent flash of content before redirect
+
+    if (patientId === 'guest') {
+        return (
+            <div className="min-h-screen bg-slate-950 flex font-sans text-slate-100">
+                <main className="flex-1 min-w-0 overflow-y-auto h-screen">
+                    <div className="h-full">
+                        {children}
+                    </div>
+                </main>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex font-sans text-slate-900 dark:text-slate-100">

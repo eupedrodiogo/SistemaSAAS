@@ -4,101 +4,54 @@ import { Save, AlertCircle, RotateCcw, BarChart2, TrendingUp, CheckCircle2 } fro
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 interface StandardPhaseProps {
-    currentValue: number;
-    onRegister: () => void;
-    history: number[];
-    type?: 'distress' | 'positive'; // distress (SUD 0-10, 0 is good), positive (0-10, 10 is good)
-    scriptTitle?: string;
-    scriptContent?: React.ReactNode;
-    customScriptContent?: string;
-    onUpdateScript?: (text: string) => void;
+    mentalHistory?: number[];
+    physicalHistory?: number[];
+    type?: 'distress' | 'positive'; 
 }
 
 export const StandardPhase: React.FC<StandardPhaseProps> = ({
-    currentValue,
-    onRegister,
-    history,
+    mentalHistory = [],
+    physicalHistory = [],
     type = 'distress',
-    scriptTitle = 'Script',
-    scriptContent,
-    customScriptContent,
-    onUpdateScript
 }) => {
-    const chartData = history.map((val, idx) => ({ name: `${idx + 1}`, value: val }));
+    const maxLen = Math.max(mentalHistory.length, physicalHistory.length);
+    const chartData = Array.from({ length: maxLen }).map((_, idx) => ({
+        name: `${idx + 1}`,
+        Emocional: mentalHistory[idx] ?? null,
+        Físico: physicalHistory[idx] ?? null,
+    }));
 
     const isFinished = type === 'distress'
-        ? (history.length > 0 && history[history.length - 1] === 0)
-        : (history.length > 0 && history[history.length - 1] === 10);
+        ? ((mentalHistory.length > 0 && mentalHistory[mentalHistory.length - 1] === 0) && (physicalHistory.length > 0 && physicalHistory[physicalHistory.length - 1] === 0))
+        : ((mentalHistory.length > 0 && mentalHistory[mentalHistory.length - 1] === 10) && (physicalHistory.length > 0 && physicalHistory[physicalHistory.length - 1] === 10));
 
     const isDistress = type === 'distress';
-    const chartColor = isDistress ? "#6366f1" : "#10b981"; // Indigo vs Emerald
+    const hasData = maxLen > 0;
 
     return (
-        <div className="space-y-6">
+        <div className="h-full flex flex-col gap-2 p-3">
 
-            {/* Script Section */}
-            {(customScriptContent || scriptContent) && (
-                <TherapistScript
-                    title={scriptTitle}
-                    editable={!!onUpdateScript}
-                    onEdit={onUpdateScript}
-                >
-                    {customScriptContent || scriptContent}
-                </TherapistScript>
-            )}
-
-            {/* Register Button Area */}
-            <div className="flex justify-end items-center gap-4 pt-2">
-                {history.length > 0 && (
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
-                        <span className="font-bold">{history.length}</span> registros
-                    </div>
-                )}
-
-                <button
-                    onClick={onRegister}
-                    className={`flex items-center gap-2 px-6 py-2 rounded-lg font-bold transition-all shadow-md text-white
-                        ${isDistress
-                            ? (currentValue === 0 ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-indigo-600 hover:bg-indigo-700')
-                            : (currentValue === 10 ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-blue-600 hover:bg-blue-700') // Potentiation logic
-                        }
-                    `}
-                >
-                    <Save size={18} />
-                    {isDistress
-                        ? (currentValue === 0 ? 'Registrar "Zerado" (0)' : 'Registrar SUD')
-                        : (currentValue === 10 ? 'Registrar Máximo (10)' : 'Registrar Nível')
-                    }
-                </button>
-            </div>
-
-            {/* Feedback / Instructions */}
-            {history.length > 0 && !isFinished && (
-                <div className="p-3 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-sm rounded-lg flex items-start gap-2">
+            {hasData && !isFinished && (
+                <div className="p-3 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-sm rounded-lg flex items-start gap-2 shrink-0">
                     <AlertCircle size={16} className="mt-0.5 shrink-0" />
                     <div>
-                        {isDistress ? (
-                            <>
-                                <strong>SUD ainda não zerou.</strong> <br />
-                                Continue o reprocessamento: "Ainda sobra algo? O que vem agora?"
-                            </>
-                        ) : (
-                            <>
-                                <strong>Ainda podemos fortalecer.</strong> <br />
-                                Continue intensificando a sensação positiva.
-                            </>
-                        )}
+                        {isDistress
+                            ? <><strong>Intensidade ainda não zerou.</strong> <br />
+                                Continue o reprocessamento: "Ainda sobra algo? O que vem agora?"</>
+                            : <><strong>Ainda podemos fortalecer.</strong> <br />
+                                Continue intensificando a sensação positiva.</>
+                        }
                     </div>
                 </div>
             )}
 
             {isFinished && (
-                <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 text-sm rounded-lg flex items-start gap-2">
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 text-sm rounded-lg flex items-start gap-2 shrink-0">
                     {isDistress ? <RotateCcw size={16} className="mt-0.5 shrink-0" /> : <CheckCircle2 size={16} className="mt-0.5 shrink-0" />}
                     <div>
                         {isDistress ? (
                             <>
-                                <strong>SUD Zerado!</strong> <br />
+                                <strong>Desconforto Zerado!</strong> <br />
                                 Pergunte novamente ("Limpeza Final") ou avance para a próxima fase.
                             </>
                         ) : (
@@ -107,47 +60,64 @@ export const StandardPhase: React.FC<StandardPhaseProps> = ({
                                 O cliente atingiu o nível máximo de fortalecimento.
                             </>
                         )}
-
                     </div>
                 </div>
             )}
 
-            {/* Chart */}
-            {history.length > 0 && (
-                <div className="mt-6 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                        {isDistress ? <BarChart2 size={14} /> : <TrendingUp size={14} />}
-                        {isDistress ? 'Progresso do SUD' : 'Progresso do Fortalecimento'}
-                    </h4>
-                    <div className="h-48 w-full">
+            {/* Chart Area */}
+            <div className="shrink-0 h-44 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm px-4 pt-3 pb-2 flex flex-col">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2 shrink-0">
+                    {isDistress ? <BarChart2 size={13} /> : <TrendingUp size={13} />}
+                    {isDistress ? 'Escala de Intensidade do Desconforto' : 'Progresso do Fortalecimento'}
+                </h4>
+
+                {!hasData ? (
+                    <div className="flex-1 flex items-center justify-center text-slate-600 text-xs font-medium">
+                        Nenhum dado registrado para esta fase ainda.
+                    </div>
+                ) : (
+                    <div className="flex-1 min-h-0">
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={chartData}>
+                            <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                                 <defs>
-                                    <linearGradient id={`colorValue-${type}`} x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor={chartColor} stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor={chartColor} stopOpacity={0} />
+                                    <linearGradient id="gradMental" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#818cf8" stopOpacity={0.35} />
+                                        <stop offset="95%" stopColor="#818cf8" stopOpacity={0} />
+                                    </linearGradient>
+                                    <linearGradient id="gradPhysical" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#34d399" stopOpacity={0.35} />
+                                        <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
                                     </linearGradient>
                                 </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
-                                <YAxis domain={[0, 10]} stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
+                                <XAxis dataKey="name" stroke="#475569" fontSize={10} tickLine={false} axisLine={false} />
+                                <YAxis domain={[0, 10]} stroke="#475569" fontSize={10} tickLine={false} axisLine={false} ticks={[0, 3, 5, 7, 10]} />
                                 <Tooltip
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                    cursor={{ stroke: chartColor, strokeWidth: 1 }}
+                                    contentStyle={{ borderRadius: '12px', border: '1px solid #334155', backgroundColor: '#0f172a', color: '#f8fafc', fontSize: '12px' }}
                                 />
                                 <Area
                                     type="monotone"
-                                    dataKey="value"
-                                    stroke={chartColor}
-                                    strokeWidth={3}
+                                    dataKey="Emocional"
+                                    stroke="#818cf8"
+                                    strokeWidth={2.5}
                                     fillOpacity={1}
-                                    fill={`url(#colorValue-${type})`}
+                                    fill="url(#gradMental)"
+                                    dot={{ r: 4, fill: "#818cf8", strokeWidth: 0 }}
+                                />
+                                <Area
+                                    type="monotone"
+                                    dataKey="Físico"
+                                    stroke="#34d399"
+                                    strokeWidth={2.5}
+                                    fillOpacity={1}
+                                    fill="url(#gradPhysical)"
+                                    dot={{ r: 4, fill: "#34d399", strokeWidth: 0 }}
                                 />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 };

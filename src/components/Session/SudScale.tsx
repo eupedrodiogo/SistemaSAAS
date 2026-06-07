@@ -62,7 +62,7 @@ export const SudScale: React.FC<SudScaleProps> = ({ value, onChange, label, scal
             <div className="flex justify-between items-end mb-4">
                 <div>
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                        {label || "SUD (Nível de Perturbação)"}
+                        {label || "Intensidade do Desconforto"}
                     </h3>
                     <p className={`text-lg font-bold mt-1 transition-colors ${colors.text} dark:${colors.text}`}>
                         {value} - {getLabel(value)}

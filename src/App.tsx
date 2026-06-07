@@ -8,6 +8,7 @@ import { Moon, Sun } from 'lucide-react';
 // Components
 import BookingWizard from './components/PatientBooking/BookingWizard';
 import TherapistPersonalPage from './components/PatientBooking/TherapistPersonalPage';
+import AnjoInvitationPage from './components/PatientBooking/AnjoInvitationPage';
 import PatientLandingPage from './components/PatientBooking/PatientLandingPage';
 import LoginPage from './components/Auth/LoginPage';
 import RegisterPage from './components/Auth/RegisterPage';
@@ -68,9 +69,8 @@ function AppContent() {
 
   useEffect(() => {
     // Recovery logic for Firebase can be added later if needed.
-    // Supabase recovery logic removed as project is migrated.
     return () => { };
-  }, [location, navigate]);
+  }, [location.pathname, navigate]);
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'dark' : ''}`}>
@@ -93,6 +93,7 @@ function AppContent() {
         <Route path="/agendar/:step" element={<BookingWizard />} />
         <Route path="/agendar/u/:therapistId" element={<BookingWizard />} />
         <Route path="/t/:therapistId" element={<TherapistPersonalPage />} />
+        <Route path="/convite-anjo/:therapistId" element={<AnjoInvitationPage />} />
         <Route path="/cliente" element={<PatientLandingPage isDarkMode={isDarkMode} toggleTheme={toggleTheme} />} />
 
         {/* Validation Module (Stealth Mode) */}

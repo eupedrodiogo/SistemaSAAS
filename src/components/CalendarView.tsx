@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { ClipboardCopy } from 'lucide-react';
 import OptimizationModal from './OptimizationModal';
 import {
    ChevronLeft,
@@ -29,11 +30,15 @@ import {
    Cloud,
    Sparkles,
    AlertCircle,
-   Wand2
+   Wand2,
+   Heart,
+   Link,
+   Copy
 } from 'lucide-react';
 import { DEFAULT_BLOCKED_TIMES } from '../constants';
 import { Appointment, BlockedTime } from 'types';
 import { api } from '../services/api';
+import { supabase } from '../lib/supabase';
 import { AddToCalendar } from './AddToCalendar';
 
 type ViewType = 'day' | 'week' | 'month' | 'list';
@@ -42,10 +47,27 @@ interface CalendarViewProps {
    onNavigateToPatient?: (id: string) => void;
    onNavigateToSession?: (patientId: string) => void;
    initialAction?: 'create' | null;
+   initialPatientId?: string;
+   initialPatientName?: string;
    onActionConsumed?: () => void;
 }
 
-const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavigateToSession, initialAction, onActionConsumed }) => {
+const ToggleSwitch = ({ checked, onChange }: { checked: boolean; onChange: () => void }) => (
+  <button
+    onClick={onChange}
+    className={`w-12 h-6 rounded-full p-1 transition-colors relative focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 ${
+      checked ? 'bg-primary-600' : 'bg-slate-200 dark:bg-slate-700'
+    }`}
+  >
+    <div
+      className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
+        checked ? 'translate-x-6' : 'translate-x-0'
+      }`}
+    />
+  </button>
+);
+
+const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavigateToSession, initialAction, initialPatientId, initialPatientName, onActionConsumed }) => {
    const [currentDate, setCurrentDate] = useState(new Date());
    const [selectedDay, setSelectedDay] = useState<Date>(new Date());
    const [viewType, setViewType] = useState<ViewType>('month');
@@ -55,21 +77,27 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
    const [error, setError] = useState<string>('');
    const [statusFilter, setStatusFilter] = useState<string>('all');
    const [blockedTimes, setBlockedTimes] = useState<BlockedTime[]>([]);
+   const [availability, setAvailability] = useState<any[]>([]);
    const [suggestedSlot, setSuggestedSlot] = useState<{ date: string, time: string } | null>(null);
    const [isRescheduling, setIsRescheduling] = useState(false);
    const [reschedulingAppointment, setReschedulingAppointment] = useState<Appointment | null>(null);
+   const [addModal, setAddModal] = useState<{isOpen: boolean, date: Date, time: string, isAnjo?: boolean, patientName?: string, patientId?: string, patientEmail?: string, patientPhone?: string} | null>(null);
    const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
+   const [isAvailabilityModalOpen, setIsAvailabilityModalOpen] = useState(false);
    const [blockForm, setBlockForm] = useState({ type: 'date', date: '', dayOfWeek: 1, startTime: '12:00', endTime: '13:00', label: '' });
    const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'warning' | 'info' | 'error' } | null>(null);
    const [isOptimizationModalOpen, setIsOptimizationModalOpen] = useState(false);
    const [optimizationData, setOptimizationData] = useState<any>(null);
+   const [sidebarTab, setSidebarTab] = useState<'sessions' | 'blocks'>('sessions');
+   const [patientsList, setPatientsList] = useState<any[]>([]);
+   const [showPatientDropdown, setShowPatientDropdown] = useState(false);
 
    // Trigger initial action
    useEffect(() => {
       if (initialAction === 'create') {
          setTimeout(() => {
-            handleManualAdd();
-            if (onActionConsumed) onActionConsumed();
+            setViewType('week'); // Switch to week view to show hours
+            showNotification('Selecione o horário desejado clicando em um espaço livre na agenda.', 'info');
          }, 500);
       }
    }, [initialAction]);
@@ -77,9 +105,17 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
    useEffect(() => {
       const fetchBlockedTimes = async () => {
          const times = await api.blockedTimes.list();
-         if (times) setBlockedTimes(times);
+         if (times) setBlockedTimes(times.filter(Boolean));
       };
       fetchBlockedTimes();
+      
+      const savedSettings = localStorage.getItem('TRG_SETTINGS');
+      if (savedSettings) {
+         try {
+            const parsed = JSON.parse(savedSettings);
+            if (parsed.availability) setAvailability(parsed.availability);
+         } catch(e) {}
+      }
    }, []);
 
    const formatDateKey = (date: Date) => {
@@ -94,6 +130,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
    };
 
    const filteredAppointments = appointments.filter(apt => {
+      if (!apt) return false;
       if (statusFilter === 'all') return true;
       return apt.status === statusFilter;
    });
@@ -113,9 +150,18 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
       setLoading(true);
       setError('');
       api.appointments.list()
-         .then((data: Appointment[]) => { if (mounted) setAppointments(data); })
+         .then((data: Appointment[]) => { 
+            if (mounted) {
+               setAppointments((data || []).filter(Boolean));
+            } 
+         })
          .catch(() => { if (mounted) setError('Falha ao carregar agenda'); })
          .finally(() => { if (mounted) setLoading(false); });
+
+      api.patients.list()
+         .then(data => { if (mounted) setPatientsList(data || []); })
+         .catch(() => {});
+
       return () => { mounted = false; };
    }, []);
 
@@ -132,6 +178,16 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
       if (!t || !t.includes(':')) return '00';
       const m = t.split(':')[1];
       return m || '00';
+   };
+
+   const formatPhone = (val: string) => {
+      let v = val.replace(/\D/g, '');
+      if (v.length > 11) v = v.slice(0, 11);
+      if (v.length === 0) return '';
+      if (v.length <= 2) return `(${v}`;
+      if (v.length <= 6) return `(${v.slice(0, 2)}) ${v.slice(2)}`;
+      if (v.length <= 10) return `(${v.slice(0, 2)}) ${v.slice(2, 6)}-${v.slice(6)}`;
+      return `(${v.slice(0, 2)}) ${v.slice(2, 7)}-${v.slice(7)}`;
    };
 
    const showNotification = (message: string, type: 'success' | 'warning' | 'info' | 'error' = 'success') => {
@@ -157,12 +213,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
       if (hasAppointment) return true;
 
       // Check Blocked Times
-      const dayOfWeek = date.getDay();
-      const isBlocked = blockedTimes.some(block =>
-         ((block.date === dateKey) || (block.dayOfWeek !== undefined && block.dayOfWeek === dayOfWeek)) &&
-         hour >= parseInt(block.startTime.split(':')[0]) &&
-         hour < parseInt(block.endTime.split(':')[0])
-      );
+      const isBlocked = getBlockedTimeForDay(date).some(block => {
+         if (!block) return false;
+         return hour >= parseInt(block.startTime.split(':')[0]) &&
+                hour < parseInt(block.endTime.split(':')[0]);
+      });
 
       return isBlocked;
    };
@@ -208,6 +263,20 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
       } catch (error) {
          showNotification('Erro ao atualizar valor.', 'error');
       }
+   };
+
+
+
+   const handleSaveAvailability = () => {
+      const savedSettings = localStorage.getItem('TRG_SETTINGS');
+      let parsed: any = {};
+      if (savedSettings) {
+         try { parsed = JSON.parse(savedSettings); } catch(e) {}
+      }
+      parsed.availability = availability;
+      localStorage.setItem('TRG_SETTINGS', JSON.stringify(parsed));
+      setIsAvailabilityModalOpen(false);
+      showNotification('Horários atualizados com sucesso!', 'success');
    };
 
    const handleFindSlot = () => {
@@ -322,10 +391,20 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
 
          const newBlock = await api.blockedTimes.create(payload);
 
-         const updatedBlocks = [...blockedTimes, newBlock];
-         setBlockedTimes(updatedBlocks);
-         setIsBlockModalOpen(false);
-         showNotification('Horário bloqueado com sucesso.', 'success');
+         if (newBlock) {
+            const updatedBlocks = [...blockedTimes, newBlock].filter(Boolean);
+            setBlockedTimes(updatedBlocks);
+            setIsBlockModalOpen(false);
+            
+            const isFullDay = blockForm.startTime === '00:00' && blockForm.endTime === '23:59';
+            if (isFullDay) {
+               showNotification('Esse dia foi bloqueado com sucesso.', 'success');
+            } else {
+               showNotification('Esse horário foi bloqueado com sucesso.', 'success');
+            }
+         } else {
+            showNotification('Erro ao bloquear: resposta inválida', 'error');
+         }
       } catch (e: any) {
          console.error(e);
          showNotification(`Erro ao bloquear horário: ${e.message || 'Falha na comunicação'}`, 'error');
@@ -385,22 +464,119 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
          return;
       }
 
-      if (window.confirm(`Agendar novo paciente para ${time}?`)) {
-         const dateKey = formatDateKey(date);
-         api.appointments.create({
-            date: dateKey,
-            time,
-            status: 'scheduled',
-            type: 'Anamnese',
-            patientId: 'unregistered',
-            patientName: 'Paciente (A definir)',
-         }).then((created) => {
-            setAppointments(prev => [created as Appointment, ...prev]);
-            showNotification('Agendamento pré-criado. Edite para vincular um paciente.', 'success');
-            setTimeout(() => setSelectedAppointment(created as Appointment), 100);
-         }).catch(() => showNotification('Erro ao criar agendamento.', 'error'));
-      }
+      setAddModal({ isOpen: true, date, time });
    }
+
+   const handleConfirmAdd = async () => {
+      if (!addModal) return;
+      const { date, time, isAnjo, patientName, patientId, patientEmail, patientPhone } = addModal;
+      const dateKey = formatDateKey(date);
+      
+      const priceInput = document.getElementById('new-apt-price') as HTMLInputElement;
+      const price = priceInput ? Number(priceInput.value) : 0;
+
+      const payload = isAnjo
+         ? {
+              date: dateKey,
+              time,
+              status: 'scheduled',
+              type: 'Anjo',
+              patientId: patientId || 'unregistered',
+              patientName: patientName || 'Cliente Anjo (Pendente)',
+              patientEmail: patientEmail,
+              patientPhone: patientPhone,
+              sessionData: { price: 0 },
+           }
+         : {
+              date: dateKey,
+              time,
+              status: 'scheduled',
+              type: 'Regular', // Ajustado para Regular
+              patientId: patientId || initialPatientId || 'unregistered',
+              patientName: patientName || initialPatientName || 'Paciente (A definir)',
+              patientEmail: patientEmail,
+              patientPhone: patientPhone,
+              sessionData: { price },
+           };
+
+      try {
+         const created = await api.appointments.create(payload);
+         setAppointments(prev => [created as Appointment, ...prev]);
+         
+         // Disparar e-mail de confirmação ou Convite Anjo
+         try {
+             // Pegar token do supabase
+             const { data: { session } } = await supabase.auth.getSession();
+             if (session?.access_token) {
+                 const { data: userData } = await supabase.auth.getUser();
+                 const therapistName = userData?.user?.user_metadata?.name || userData?.user?.email?.split('@')[0] || 'Terapeuta';
+                 const therapistEmail = userData?.user?.email;
+
+                 if (isAnjo) {
+                     const link = `${window.location.origin}/convite-anjo/${created.id}`;
+                     
+                     // 1. Auto Copy
+                     try { await navigator.clipboard.writeText(link); } catch(e) {}
+                     
+                     // 2. Enviar Convite Anamnese / Link Anjo
+                     if ((payload as any).patientEmail) {
+                         await fetch('/api/emails/anamnese', {
+                             method: 'POST',
+                             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                             body: JSON.stringify({ 
+                                email: (payload as any).patientEmail, 
+                                patientName: payload.patientName, 
+                                link,
+                                date: date.toLocaleDateString('pt-BR', { timeZone: 'UTC' }),
+                                time
+                             })
+                         });
+                     }
+                     if ((payload as any).patientPhone) {
+                         await fetch('/api/notifications/manual', {
+                             method: 'POST',
+                             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                             body: JSON.stringify({ phone: (payload as any).patientPhone, templateType: 'ANAMNESE_REQUEST', templateParams: { patientName: payload.patientName, link } })
+                         });
+                     }
+                 }
+                 
+                 // 3. SEMPRE enviar e-mail de confirmação (notifica Terapeuta e Paciente)
+                 await fetch('/api/emails/confirmacao-agendamento', {
+                     method: 'POST',
+                     headers: {
+                         'Content-Type': 'application/json',
+                         'Authorization': `Bearer ${session.access_token}`
+                     },
+                     body: JSON.stringify({
+                         patientName: payload.patientName,
+                         patientEmail: (payload as any).patientEmail,
+                         patientPhone: (payload as any).patientPhone,
+                         therapistName,
+                         therapistEmail,
+                         date: date.toLocaleDateString('pt-BR', { timeZone: 'UTC' }),
+                         time,
+                         type: payload.type
+                     })
+                 });
+             }
+         } catch (emailError) {
+             console.error("Erro ao enviar comunicados:", emailError);
+         }
+
+         showNotification(
+            isAnjo
+               ? '✅ Sessão Anjo criada! Link copiado e convites enviados.'
+               : ((payload.patientName && payload.patientName !== 'Paciente (A definir)') ? `Agendamento criado para ${payload.patientName}!` : 'Agendamento pré-criado. Edite para vincular um paciente.'),
+            'success'
+         );
+         setAddModal(null);
+         setTimeout(() => setSelectedAppointment(created as Appointment), 100);
+         if (onActionConsumed) onActionConsumed();
+      } catch (error) {
+         showNotification('Erro ao criar agendamento.', 'error');
+      }
+   };
 
    const handleExportICS = () => {
       try {
@@ -485,11 +661,34 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
    };
    const getBlockedTimeForDay = (date: Date) => {
       const d = date.getDay();
+      const dayMapping: { [key: number]: string } = { 0: 'dom', 1: 'seg', 2: 'ter', 3: 'qua', 4: 'qui', 5: 'sex', 6: 'sab' };
+      const dayStr = dayMapping[d];
       const k = formatDateKey(date);
-      return blockedTimes.filter(b => {
+      const explicitBlocks = blockedTimes.filter(b => {
+         if (!b) return false;
          const blockDate = b.date ? (typeof b.date === 'string' ? b.date.split('T')[0] : b.date) : null;
-         return (blockDate === k) || (b.dayOfWeek === d);
-      });
+         return (blockDate === k) || (b.dayOfWeek === d || b.dayOfWeek === dayStr);
+      }) as any[];
+
+      if (availability && availability.length > 0) {
+         const currentAvail = availability.find(a => a.dayOfWeek === dayStr);
+         if (currentAvail) {
+            if (!currentAvail.isActive) {
+               explicitBlocks.push({ id: 'avail-block', dayOfWeek: dayStr, startTime: '00:00', endTime: '23:59', label: 'Fora de Horário' });
+            } else {
+               const startH = currentAvail.startTime;
+               const endH = currentAvail.endTime;
+               if (startH !== '00:00') {
+                  explicitBlocks.push({ id: 'avail-block-1', dayOfWeek: dayStr, startTime: '00:00', endTime: startH, label: 'Fora de Horário' });
+               }
+               if (endH !== '23:59' && endH !== '24:00') {
+                  explicitBlocks.push({ id: 'avail-block-2', dayOfWeek: dayStr, startTime: endH, endTime: '23:59', label: 'Fora de Horário' });
+               }
+            }
+         }
+      }
+
+      return explicitBlocks;
    };
    const weekDays = [{ val: 0, label: 'Domingo', short: 'Dom' }, { val: 1, label: 'Segunda', short: 'Seg' }, { val: 2, label: 'Terça', short: 'Ter' }, { val: 3, label: 'Quarta', short: 'Qua' }, { val: 4, label: 'Quinta', short: 'Qui' }, { val: 5, label: 'Sexta', short: 'Sex' }, { val: 6, label: 'Sábado', short: 'Sáb' }];
 
@@ -551,34 +750,124 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
                               <span className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full transition-all ${isToday ? 'bg-primary-600 text-white' : isSelected ? 'text-primary-600 dark:text-primary-400' : 'text-slate-700 dark:text-slate-300'}`}>
                                  {date.getDate()}
                               </span>
-                              <span className="hidden md:block text-[10px] font-bold text-slate-400">{apts.length > 0 ? apts.length : ''}</span>
+                              <div className="relative">
+                                  {/* Resumo de sessões (some no hover ou quando selecionado para dar lugar ao botão +) */}
+                                  {apts.length > 0 && (
+                                     <div className={`transition-opacity duration-150 hidden md:flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900/50 px-1.5 py-0.5 rounded-full border border-slate-100 dark:border-slate-800 shadow-sm ${isSelected ? 'opacity-0 pointer-events-none' : 'group-hover:opacity-0'}`} title={`${apts.length} sessões no total`}>
+                                        {apts.filter(a => a.sessionData?.price !== 0).length > 0 && <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center"><DollarSign size={10} strokeWidth={3} className="-mr-0.5" />{apts.filter(a => a.sessionData?.price !== 0).length}</span>}
+                                        {apts.filter(a => a.sessionData?.price === 0).length > 0 && <span className="text-[10px] font-bold text-pink-500 dark:text-pink-400 flex items-center gap-0.5"><Heart size={10} fill="currentColor" className="opacity-80" />{apts.filter(a => a.sessionData?.price === 0).length}</span>}
+                                     </div>
+                                  )}
+
+                                  {/* Botão + no canto superior direito no hover (quando já existem agendamentos) */}
+                                  {!isFullDayBlocked && apts.length > 0 && (
+                                     <button
+                                        onClick={(e) => {
+                                           e.stopPropagation();
+                                           setSelectedDay(date);
+                                           setCurrentDate(date);
+                                           
+                                           const now = new Date();
+                                           let time = '08:00';
+                                           if (date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()) {
+                                              const h = now.getHours() + 1;
+                                              if (h >= 8 && h < 18) time = `${h.toString().padStart(2, '0')}:00`;
+                                           }
+                                           
+                                           let h = parseInt(time.split(':')[0]);
+                                           let found = false;
+                                           while (h < 18) {
+                                              const t = `${h.toString().padStart(2, '0')}:00`;
+                                              if (!isSlotConflicting(date, t)) {
+                                                 time = t;
+                                                 found = true;
+                                                 break;
+                                              }
+                                              h++;
+                                           }
+                                           if (found) {
+                                              setAddModal({ isOpen: true, date, time });
+                                           } else {
+                                              showNotification("Não há horários livres padrão das 8h às 18h neste dia.", "warning");
+                                           }
+                                        }}
+                                        className={`absolute right-0 top-0 w-6 h-6 rounded-full bg-primary-600 hover:bg-primary-750 text-white flex items-center justify-center shadow-md transition-all z-10 duration-150 ${isSelected ? 'scale-100 opacity-100' : 'scale-0 md:group-hover:scale-100 opacity-0 md:group-hover:opacity-100'}`}
+                                        title="Agendar nova sessão neste dia"
+                                     >
+                                        <Plus size={12} />
+                                     </button>
+                                  )}
+                               </div>
                            </div>
 
                            <div className="hidden md:block space-y-1 overflow-y-auto max-h-[80px] custom-scrollbar">
-                              {blocked.filter(b => !(b.startTime === '00:00' && b.endTime === '23:59')).map((b, i) => (
+                              {blocked.filter(b => !(b.startTime === '00:00' && b.endTime === '23:59') && b.id !== 'avail-block-1' && b.id !== 'avail-block-2').map((b, i) => (
                                  <div key={`blk-${i}`} className="text-[9px] px-1.5 py-0.5 rounded border border-slate-200 bg-slate-100 text-slate-500 flex items-center gap-1 truncate">
                                     <Ban size={8} /> {b.startTime}
                                  </div>
                               ))}
-                              {apts.map(apt => (
-                                 <div
-                                    key={apt.id}
-                                    onClick={(e) => { e.stopPropagation(); setSelectedAppointment(apt); }}
-                                    className={`text-[9px] px-1.5 py-0.5 rounded border truncate cursor-pointer ${(apt.status === 'scheduled' || apt.status === 'Agendado') ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300' :
-                                       apt.status === 'pending_payment' ? 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300' :
-                                          (apt.status === 'completed' || apt.status === 'Concluído') ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300' :
-                                             'bg-slate-100 border-slate-200 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400'
+                              {apts.map(apt => {
+                                 const isAnjo = apt.sessionData?.price === 0;
+                                 return (
+                                    <div
+                                       key={apt.id}
+                                       onClick={(e) => { e.stopPropagation(); setSelectedAppointment(apt); }}
+                                       className={`text-[9px] px-1.5 py-0.5 rounded border flex items-center justify-center gap-1 cursor-pointer font-medium transition-colors ${
+                                          isAnjo 
+                                             ? 'bg-pink-50 border-pink-100 text-pink-500 hover:bg-pink-100 dark:bg-pink-900/10 dark:border-pink-900/20 dark:text-pink-400'
+                                             : 'bg-emerald-50 border-emerald-100 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/10 dark:border-emerald-900/20 dark:text-emerald-400'
                                        }`}
-                                 >
-                                    {apt.time} {(apt.patientName || 'Paciente').split(' ')[0]}
-                                 </div>
-                              ))}
+                                    >
+                                       {isAnjo ? <Heart size={8} className="shrink-0" fill="currentColor" /> : <DollarSign size={8} strokeWidth={3} className="shrink-0" />}
+                                       <span className="truncate">{apt.time} {(apt.patientName || 'Paciente').split(' ')[0]}</span>
+                                    </div>
+                                 );
+                              })}
                               {isFullDayBlocked && (
                                  <div className="text-[9px] px-1.5 py-0.5 rounded border border-red-100 bg-red-50 text-red-400 dark:bg-red-900/10 dark:border-red-900/20 text-center font-medium">
                                     Bloqueado
                                  </div>
                               )}
                            </div>
+
+                            {/* Botão + grande e centralizado no hover ou selecionado (quando o dia está livre) */}
+                            {!isFullDayBlocked && apts.length === 0 && (
+                               <button
+                                  onClick={(e) => {
+                                     e.stopPropagation();
+                                     setSelectedDay(date);
+                                     setCurrentDate(date);
+                                     
+                                     const now = new Date();
+                                     let time = '08:00';
+                                     if (date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()) {
+                                        const h = now.getHours() + 1;
+                                        if (h >= 8 && h < 18) time = `${h.toString().padStart(2, '0')}:00`;
+                                     }
+                                     
+                                     let h = parseInt(time.split(':')[0]);
+                                     let found = false;
+                                     while (h < 18) {
+                                        const t = `${h.toString().padStart(2, '0')}:00`;
+                                        if (!isSlotConflicting(date, t)) {
+                                           time = t;
+                                           found = true;
+                                           break;
+                                        }
+                                        h++;
+                                     }
+                                     if (found) {
+                                        setAddModal({ isOpen: true, date, time });
+                                     } else {
+                                        showNotification("Não há horários livres padrão das 8h às 18h neste dia.", "warning");
+                                     }
+                                  }}
+                                  className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-primary-600 hover:bg-primary-700 text-white flex items-center justify-center shadow-lg transition-all z-10 duration-150 ${isSelected ? 'scale-100 opacity-100' : 'scale-0 md:group-hover:scale-100 opacity-0 md:group-hover:opacity-100'}`}
+                                  title="Agendar nova sessão neste dia"
+                               >
+                                  <Plus size={16} />
+                               </button>
+                            )}
 
                            <div className="md:hidden flex flex-wrap justify-center gap-1 mt-1">
                               {isFullDayBlocked && <div className="w-1.5 h-1.5 rounded-full bg-red-400" />}
@@ -780,6 +1069,26 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
 
                <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
                   {[
+                     { id: 'month', icon: <CalendarIcon size={16} />, label: 'Mês' },
+                     { id: 'week', icon: <LayoutGrid size={16} />, label: 'Semana' },
+                     { id: 'day', icon: <Clock size={16} />, label: 'Dia' },
+                     { id: 'list', icon: <List size={16} />, label: 'Lista' }
+                  ].map(v => (
+                     <button
+                        key={v.id}
+                        onClick={() => setViewType(v.id as ViewType)}
+                        className={`p-1.5 sm:px-3 sm:py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewType === v.id ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
+                           }`}
+                        title={v.label}
+                     >
+                        {v.icon}
+                        <span className="hidden lg:inline">{v.label}</span>
+                     </button>
+                  ))}
+               </div>
+
+               <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                  {[
                      { id: 'all', label: 'Todos' },
                      { id: 'scheduled', label: 'Agendados' },
                      { id: 'pending_payment', label: 'Pendentes' }
@@ -795,7 +1104,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
                   ))}
                </div>
 
-               <button onClick={openBlockModal} className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 hover:text-red-500"><Ban size={20} /></button>
+               <button onClick={() => setIsAvailabilityModalOpen(true)} title="Horários de Atendimento" className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 hover:text-indigo-500 transition-colors"><Clock size={20} /></button>
+               <button onClick={openBlockModal} title="Bloquear Horário Extraordinário" className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 hover:text-red-500 transition-colors"><Ban size={20} /></button>
                <button onClick={handleExportICS} title="Exportar Agenda (.ics)" className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 hover:text-primary-600 transition-colors">
                   <Download size={20} />
                </button>
@@ -822,14 +1132,39 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
                )}
             </div>
             <div className="hidden xl:flex w-80 flex-col gap-4 shrink-0">
-               {renderMiniCalendar()}
-               {/* Weather Widget Removed (was mock data) */}
-               <button onClick={handleOptimizeSchedule} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 group"><Wand2 size={18} className="group-hover:rotate-12 transition-transform" /> Otimização Inteligente</button>
-               <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm"><h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2"><img src="/logo-new.jpg" alt="Logo" className="w-4 h-4 opacity-50 grayscale" /> Insights</h3><div className="space-y-4"><div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-950/50 rounded-xl border border-slate-100 dark:border-slate-800"><div className="flex items-center gap-3"><div className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-lg"><Percent size={18} /></div><div><p className="text-xs text-slate-500 font-bold">Ocupação</p><p className="text-lg font-bold text-slate-800 dark:text-white">{insights.occupancy}%</p></div></div></div><div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-950/50 rounded-xl border border-slate-100 dark:border-slate-800"><div className="flex items-center gap-3"><div className="p-2 bg-green-100 dark:bg-green-900/30 text-green-600 rounded-lg"><DollarSign size={18} /></div><div><p className="text-xs text-slate-500 font-bold">Receita Est.</p><p className="text-lg font-bold text-slate-800 dark:text-white">R$ {insights.revenue}</p></div></div></div></div></div>
-               <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm"><h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2"><AlertCircle size={16} /> Pendências</h3><div className="space-y-3">
-                  {/* Todo: Fetch pending items from API */}
-                  <div className="text-center py-4 text-slate-400 text-xs">Nenhuma pendência.</div>
-               </div></div>
+               {viewType !== 'month' && renderMiniCalendar()}
+               <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col h-[calc(100vh-200px)]">
+                  <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-4 shrink-0">
+                     <button onClick={() => setSidebarTab('sessions')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${sidebarTab === 'sessions' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Sessões Agendadas</button>
+                     <button onClick={() => setSidebarTab('blocks')} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${sidebarTab === 'blocks' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Bloqueios de Horários</button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-3">
+                     {sidebarTab === 'sessions' ? (
+                        appointments.filter(a => safeParseDate(a.date).getTime() >= new Date().setHours(0,0,0,0)).sort((a,b) => safeParseDate(a.date).getTime() - safeParseDate(b.date).getTime()).slice(0,10).map(apt => (
+                           <div key={apt.id} className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700 cursor-pointer hover:border-primary-300" onClick={() => setSelectedAppointment(apt)}>
+                              <div className="flex justify-between items-start mb-1">
+                                 <span className="font-bold text-slate-800 dark:text-white text-sm">{safeParseDate(apt.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} às {apt.time}</span>
+                                 {apt.sessionData?.price === 0 ? <Heart size={14} className="text-pink-500" /> : <DollarSign size={14} className="text-emerald-500" />}
+                              </div>
+                              <h4 className="font-bold text-primary-600 dark:text-primary-400 text-xs truncate">{apt.patientName}</h4>
+                           </div>
+                        ))
+                     ) : (
+                        blockedTimes.map(b => (
+                           <div key={b.id} className="p-3 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-100 dark:border-red-900/30">
+                              <div className="flex justify-between items-start mb-1">
+                                 <span className="font-bold text-red-600 dark:text-red-400 text-sm">
+                                    {b.date ? safeParseDate(b.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) : b.dayOfWeek !== undefined ? weekDays[b.dayOfWeek]?.label : ''}
+                                 </span>
+                                 <Ban size={14} className="text-red-400" />
+                              </div>
+                              <h4 className="text-xs text-red-500 font-bold">{b.startTime} - {b.endTime}</h4>
+                              <p className="text-[10px] text-red-400 uppercase mt-1 truncate">{b.label}</p>
+                           </div>
+                        ))
+                     )}
+                  </div>
+               </div>
             </div>
          </div>
 
@@ -883,10 +1218,118 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
                         />
                      </div>
 
-                     <div className="flex gap-2">
-                        <button onClick={() => onNavigateToPatient?.(selectedAppointment.patientId)} className="flex-1 py-2.5 bg-slate-800 dark:bg-slate-700 text-white font-bold rounded-xl hover:bg-slate-900 transition-colors text-sm flex items-center justify-center gap-2"><User size={16} /> Ver Ficha</button>
-                        <button onClick={handleStartSession} className="flex-1 py-2.5 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-sm flex items-center justify-center gap-2"><BrainCircuit size={16} /> Iniciar Sessão</button>
-                     </div>
+                      {/* Botão Link Anjo - só aparece para sessões Anjo sem paciente vinculado */}
+                      {(selectedAppointment.type === 'Anjo' || selectedAppointment.sessionData?.price === 0) && selectedAppointment.patientId === 'unregistered' && (
+                         <button
+                            onClick={() => {
+                               const link = `${window.location.origin}/convite-anjo/${selectedAppointment.id}`;
+                               navigator.clipboard.writeText(link);
+                               showNotification('💗 Link Anjo copiado! Envie ao cliente.', 'success');
+                            }}
+                            className="w-full py-2.5 mb-2 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 font-bold rounded-xl hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors text-sm flex items-center justify-center gap-2 border border-rose-200 dark:border-rose-800"
+                         >
+                            <Heart size={16} fill="currentColor" /> Copiar Link Anjo
+                         </button>
+                      )}
+
+                      {selectedAppointment.patientId !== 'unregistered' && (
+                         <>
+                            <button 
+                               onClick={async () => {
+                                   const link = `${window.location.origin}/anamnese/${selectedAppointment.patientId}`;
+                                   
+                                   // Copia pro clipboard como backup
+                                   navigator.clipboard.writeText(`Olá ${selectedAppointment.patientName}! Preencha sua ficha de anamnese: ${link}`);
+                                   showNotification('Enviando solicitações...', 'info');
+
+                                   const hasEmail = !!selectedAppointment.patientEmail;
+                                   const hasPhone = !!selectedAppointment.patientPhone;
+
+                                   if (!hasEmail && !hasPhone) {
+                                      showNotification('Paciente sem e-mail e telefone cadastrados. Link copiado!', 'warning');
+                                      return;
+                                   }
+
+                                   const results: string[] = [];
+                                   const errors: string[] = [];
+
+                                   // Send Email via Backend
+                                   if (hasEmail) {
+                                      try {
+                                         const { data: { session } } = await supabase.auth.getSession();
+                                         const emailRes = await fetch('/api/emails/anamnese', {
+                                            method: 'POST',
+                                            headers: {
+                                               'Content-Type': 'application/json',
+                                               ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {})
+                                            },
+                                            body: JSON.stringify({
+                                               email: selectedAppointment.patientEmail,
+                                               patientName: selectedAppointment.patientName,
+                                               link: link
+                                            })
+                                         });
+                                         const emailData = await emailRes.json();
+                                         if (emailRes.ok) {
+                                            results.push('Email ✓');
+                                         } else {
+                                            errors.push(`Email: ${emailData.error || 'Erro desconhecido'}`);
+                                         }
+                                      } catch (e: any) {
+                                         errors.push(`Email: ${e.message}`);
+                                      }
+                                   }
+
+                                   // Send WhatsApp via Backend
+                                   if (hasPhone) {
+                                      try {
+                                         const { data: { session: waSession } } = await supabase.auth.getSession();
+                                         const waRes = await fetch('/api/notifications/manual', {
+                                            method: 'POST',
+                                            headers: {
+                                               'Content-Type': 'application/json',
+                                               ...(waSession?.access_token ? { 'Authorization': `Bearer ${waSession.access_token}` } : {})
+                                            },
+                                            body: JSON.stringify({
+                                               phone: selectedAppointment.patientPhone,
+                                               templateType: 'ANAMNESE_REQUEST',
+                                               templateParams: {
+                                                  patientName: selectedAppointment.patientName,
+                                                  link: link
+                                               }
+                                            })
+                                         });
+                                         const waData = await waRes.json();
+                                         if (waRes.ok) {
+                                            results.push('WhatsApp ✓');
+                                         } else {
+                                            errors.push(`WhatsApp: ${waData.error || 'Erro desconhecido'}`);
+                                         }
+                                      } catch (e: any) {
+                                         errors.push(`WhatsApp: ${e.message}`);
+                                      }
+                                   }
+
+                                   if (results.length > 0 && errors.length === 0) {
+                                      showNotification(`Anamnese solicitada via ${results.join(' e ')}!`, 'success');
+                                   } else if (results.length > 0 && errors.length > 0) {
+                                      showNotification(`Parcial: ${results.join(', ')}. Erros: ${errors.join(', ')}`, 'warning');
+                                   } else {
+                                      showNotification(`Falha no envio: ${errors.join(' | ')}`, 'error');
+                                   }
+                                }}
+                               className="w-full py-2.5 mb-3 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-bold rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors text-sm flex items-center justify-center gap-2"
+                            >
+                               <ClipboardCopy size={16} /> Solicitar Anamnese
+                            </button>
+
+                            <div className="flex gap-2">
+                               <button onClick={() => onNavigateToPatient?.(selectedAppointment.patientId)} className="flex-1 py-2.5 bg-slate-800 dark:bg-slate-700 text-white font-bold rounded-xl hover:bg-slate-900 transition-colors text-sm flex items-center justify-center gap-2"><User size={16} /> Ver Ficha</button>
+                               <button onClick={handleStartSession} className="flex-1 py-2.5 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-sm flex items-center justify-center gap-2"><BrainCircuit size={16} /> Iniciar Sessão</button>
+                            </div>
+                         </>
+                      )}
+
                      <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center"><button onClick={handleCancelAppointment} className="text-red-500 text-sm font-bold hover:underline">Cancelar Agendamento</button><button onClick={handleReschedule} className="text-primary-600 dark:text-secondary-400 text-sm font-bold hover:underline">Reagendar</button></div>
                   </div>
                </div>
@@ -973,12 +1416,296 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
                </div>
             </div>
          )}
+
+         {isAvailabilityModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+               <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-2xl shadow-2xl p-6 animate-slide-up ring-1 ring-slate-200 dark:ring-slate-800 max-h-[90vh] overflow-y-auto custom-scrollbar">
+                  <div className="flex justify-between items-center mb-6">
+                     <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2"><Clock size={20} className="text-indigo-500" /> Horários de Atendimento</h3>
+                     <button onClick={() => setIsAvailabilityModalOpen(false)}><X size={20} className="text-slate-400" /></button>
+                  </div>
+                  <p className="text-sm text-slate-500 mb-6">Defina seus dias e horários padrão de trabalho.</p>
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {availability.map((avail, index) => {
+                      const dayMapping: { [key: string]: string } = { 'dom': 'Domingo', 'seg': 'Segunda-feira', 'ter': 'Terça-feira', 'qua': 'Quarta-feira', 'qui': 'Quinta-feira', 'sex': 'Sexta-feira', 'sab': 'Sábado' };
+                      const dayName = dayMapping[avail.dayOfWeek] || avail.dayOfWeek;
+                      return (
+                        <div key={avail.dayOfWeek} className="py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 first:pt-0 last:pb-0">
+                          <div className="flex items-center gap-4 w-full md:w-1/3">
+                            <ToggleSwitch 
+                              checked={avail.isActive} 
+                              onChange={() => {
+                                const newAvail = [...availability];
+                                newAvail[index].isActive = !newAvail[index].isActive;
+                                setAvailability(newAvail);
+                              }} 
+                            />
+                            <span className={`font-medium ${avail.isActive ? 'text-slate-800 dark:text-white' : 'text-slate-400'}`}>
+                              {dayName}
+                            </span>
+                          </div>
+                          
+                          <div className={`flex items-center gap-3 transition-opacity ${avail.isActive ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase mb-1">Início</span>
+                              <input
+                                type="time"
+                                className="p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm dark:text-white outline-none"
+                                value={avail.startTime}
+                                onChange={(e) => {
+                                  const newAvail = [...availability];
+                                  newAvail[index].startTime = e.target.value;
+                                  setAvailability(newAvail);
+                                }}
+                              />
+                            </div>
+                            <span className="text-slate-400 mt-5">até</span>
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase mb-1">Fim</span>
+                              <input
+                                type="time"
+                                className="p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm dark:text-white outline-none"
+                                value={avail.endTime}
+                                onChange={(e) => {
+                                  const newAvail = [...availability];
+                                  newAvail[index].endTime = e.target.value;
+                                  setAvailability(newAvail);
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-6">
+                     <button onClick={handleSaveAvailability} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg transition-colors">Salvar Alterações</button>
+                  </div>
+               </div>
+            </div>
+         )}
+
          <OptimizationModal
             isOpen={isOptimizationModalOpen}
             onClose={() => setIsOptimizationModalOpen(false)}
             data={optimizationData}
             onApply={handleApplyOptimization}
          />
+         {/* Painel de Criação de Agendamento — mesmo estilo do painel de detalhes */}
+         {addModal && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+               <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-slide-up ring-1 ring-slate-200 dark:ring-slate-800">
+
+                  {/* Header */}
+                  <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950">
+                     <div>
+                        <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                           <CalendarIcon size={18} className="text-primary-600 dark:text-secondary-400" />
+                           Nova Sessão
+                        </h3>
+                        <p className="text-xs text-slate-400">
+                           Configure os detalhes do novo agendamento
+                        </p>
+                     </div>
+                     <button onClick={() => setAddModal(null)} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 transition-colors">
+                        <X size={20} />
+                     </button>
+                  </div>
+
+                  {/* Body — mesmo layout dos cards de Data e Horário */}
+                  <div className="p-6 space-y-4">
+
+                     {/* Seleção do Tipo de Atendimento */}
+                     <div>
+                        <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Tipo de Atendimento</label>
+                        <div className="grid grid-cols-2 gap-3">
+                           {/* Card Sessão Regular */}
+                           <button
+                              type="button"
+                              onClick={() => setAddModal({ ...addModal, isAnjo: false })}
+                              className={`p-3.5 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center ${
+                                 !addModal.isAnjo
+                                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-950/20 text-primary-700 dark:text-primary-300'
+                                    : 'border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-850/50 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                              }`}
+                           >
+                              <DollarSign size={20} className={!addModal.isAnjo ? 'text-primary-600 dark:text-primary-400' : 'text-slate-400'} />
+                              <span className="font-bold text-xs">Regular</span>
+                              <span className="text-[9px] leading-tight opacity-75">Sessão padrão individual</span>
+                           </button>
+
+                           {/* Card Sessão Anjo */}
+                           <button
+                              type="button"
+                              onClick={() => setAddModal({ ...addModal, isAnjo: true })}
+                              className={`p-3.5 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all text-center ${
+                                 addModal.isAnjo
+                                    ? 'border-rose-400 bg-rose-50 dark:bg-rose-950/15 text-rose-600 dark:text-rose-400'
+                                    : 'border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-850/50 text-slate-400 hover:text-rose-400'
+                              }`}
+                           >
+                              <Heart size={20} fill={addModal.isAnjo ? 'currentColor' : 'none'} className={addModal.isAnjo ? 'text-rose-500' : 'text-slate-400'} />
+                              <span className="font-bold text-xs">Anjo</span>
+                              <span className="text-[9px] leading-tight opacity-75">Social gratuita via link</span>
+                           </button>
+                        </div>
+                     </div>
+
+                     {/* Data e Hora */}
+                     <div className="flex gap-4">
+                        <div className="flex-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                           <p className="text-xs text-slate-400 font-bold uppercase mb-1">Data</p>
+                           <p className="font-semibold text-slate-800 dark:text-white flex items-center gap-2">
+                              <CalendarIcon size={16} />
+                              {addModal.date.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
+                           </p>
+                        </div>
+                        <div className="flex-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                           <p className="text-xs text-slate-400 font-bold uppercase mb-1">Horário</p>
+                           <div className="flex items-center gap-2">
+                              <Clock size={16} className="text-slate-500 shrink-0" />
+                              <input
+                                 type="time"
+                                 className="font-semibold text-slate-800 dark:text-white bg-transparent outline-none w-full"
+                                 value={addModal.time}
+                                 onChange={(e) => setAddModal({ ...addModal, time: e.target.value })}
+                              />
+                           </div>
+                        </div>
+                     </div>
+
+                     {/* Campos do Paciente (Comum para Regular e Anjo) */}
+                     <div className="space-y-3">
+                        <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 relative z-50">
+                           <p className="text-xs text-slate-400 font-bold uppercase mb-1">{addModal.isAnjo ? 'Nome do Paciente (Opcional)' : 'Nome do Paciente *'}</p>
+                           <div className="flex items-center gap-2">
+                              <User size={16} className="text-slate-500 shrink-0" />
+                              <input
+                                 type="text"
+                                 required={!addModal.isAnjo}
+                                 className="w-full bg-transparent font-semibold text-slate-800 dark:text-white outline-none placeholder-slate-400"
+                                 placeholder="Ex: João da Silva"
+                                 value={addModal.patientName || initialPatientName || ''}
+                                 onChange={(e) => {
+                                    setAddModal({ ...addModal, patientName: e.target.value, patientId: undefined });
+                                    setShowPatientDropdown(true);
+                                 }}
+                                 onFocus={() => setShowPatientDropdown(true)}
+                                 onBlur={() => setTimeout(() => setShowPatientDropdown(false), 200)}
+                              />
+                           </div>
+                           
+                           {/* Dropdown de Autocomplete */}
+                           {showPatientDropdown && addModal.patientName && (
+                              <div className="absolute left-0 top-full mt-2 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-h-48 overflow-y-auto overflow-x-hidden">
+                                 {patientsList
+                                    .filter(p => p.name.toLowerCase().includes(addModal.patientName!.toLowerCase()))
+                                    .map(p => (
+                                    <div
+                                       key={p.id}
+                                       className="p-3 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer transition-colors border-b border-slate-100 dark:border-slate-700/50 last:border-0"
+                                       onMouseDown={(e) => {
+                                          // Use onMouseDown instead of onClick to fire before onBlur of the input
+                                          e.preventDefault(); 
+                                          setAddModal({
+                                             ...addModal, 
+                                             patientId: p.id,
+                                             patientName: p.name, 
+                                             patientEmail: p.email || '', 
+                                             patientPhone: p.phone ? formatPhone(p.phone) : ''
+                                          });
+                                          setShowPatientDropdown(false);
+                                       }}
+                                    >
+                                       <p className="font-semibold text-slate-800 dark:text-slate-200 text-sm">{p.name}</p>
+                                       <p className="text-xs text-slate-500">{p.email || 'Sem e-mail'} • {p.phone ? formatPhone(p.phone) : 'Sem telefone'}</p>
+                                    </div>
+                                 ))}
+                                 {patientsList.filter(p => p.name.toLowerCase().includes(addModal.patientName!.toLowerCase())).length === 0 && (
+                                    <div className="p-3 text-xs text-slate-500 text-center">Nenhum paciente encontrado</div>
+                                 )}
+                              </div>
+                           )}
+                        </div>
+                        
+                        <div className="flex gap-3">
+                           <div className="flex-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                              <p className="text-xs text-slate-400 font-bold uppercase mb-1">E-mail (Opcional)</p>
+                              <input
+                                 type="email"
+                                 className="w-full bg-transparent text-sm text-slate-800 dark:text-white outline-none placeholder-slate-400"
+                                 placeholder="email@exemplo.com"
+                                 value={addModal.patientEmail || ''}
+                                 onChange={(e) => setAddModal({ ...addModal, patientEmail: e.target.value })}
+                              />
+                           </div>
+                           <div className="flex-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                              <p className="text-xs text-slate-400 font-bold uppercase mb-1">WhatsApp (Opcional)</p>
+                              <input
+                                 type="tel"
+                                 className="w-full bg-transparent text-sm text-slate-800 dark:text-white outline-none placeholder-slate-400"
+                                 placeholder="(00) 00000-0000"
+                                 value={addModal.patientPhone || ''}
+                                 onChange={(e) => setAddModal({ ...addModal, patientPhone: formatPhone(e.target.value) })}
+                              />
+                           </div>
+                        </div>
+                     </div>
+
+                     {/* Financeiro (Só Sessão Regular) */}
+                     {!addModal.isAnjo && (
+                        <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                           <p className="text-xs text-slate-400 font-bold uppercase mb-1">Valor da Sessão</p>
+                           <div className="flex items-center gap-2">
+                              <span className="font-semibold text-slate-500">R$</span>
+                              <input
+                                 id="new-apt-price"
+                                 type="number"
+                                 className="w-full bg-transparent font-semibold text-slate-800 dark:text-white outline-none"
+                                 defaultValue={150}
+                                 step={10}
+                                 min={0}
+                              />
+                           </div>
+                        </div>
+                     )}
+
+                     {/* Hint Anjo */}
+                     {addModal.isAnjo && (
+                        <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-4 mt-2 text-rose-500 text-sm">
+                           <span className="font-bold flex items-center mb-1">
+                              <Heart className="w-4 h-4 mr-2" /> Convite Automático
+                           </span>
+                           <p className="text-rose-600/80 dark:text-rose-400/80 leading-relaxed">
+                              O link será copiado automaticamente para a área de transferência. Preencha os campos acima para enviar o convite também por WhatsApp ou E-mail.
+                           </p>
+                        </div>
+                     )}
+
+                     {/* Botões de ação — "Ver Ficha" / "Iniciar Sessão" substituídos por "Cancelar" / "Confirmar" */}
+                     <div className="flex gap-2">
+                        <button
+                           onClick={() => setAddModal(null)}
+                           className="flex-1 py-2.5 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-sm flex items-center justify-center gap-2"
+                        >
+                           <X size={16} /> Cancelar
+                        </button>
+                        <button
+                           onClick={handleConfirmAdd}
+                           className={`flex-1 py-2.5 font-bold rounded-xl text-white transition-all shadow-lg active:scale-95 text-sm flex items-center justify-center gap-2 ${
+                              addModal.isAnjo
+                                 ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-500/20'
+                                 : 'bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600'
+                           }`}
+                        >
+                           <CalendarIcon size={16} /> Confirmar
+                        </button>
+                     </div>
+
+                  </div>
+               </div>
+            </div>
+         )}
       </div>
    );
 };

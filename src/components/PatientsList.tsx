@@ -47,6 +47,7 @@ import WhatsAppModal from './WhatsAppModal';
 interface PatientsListProps {
   highlightPatientId?: string | null;
   onNavigateToSession?: () => void;
+  onNavigateToAgenda?: (patientId: string, patientName?: string) => void;
 }
 
 // Mock extensions for Client CRM features
@@ -59,7 +60,7 @@ interface UploadingFile {
   size: string;
 }
 
-const ClientsList: React.FC<PatientsListProps> = ({ highlightPatientId, onNavigateToSession }) => {
+const ClientsList: React.FC<PatientsListProps> = ({ highlightPatientId, onNavigateToSession, onNavigateToAgenda }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -197,7 +198,9 @@ const ClientsList: React.FC<PatientsListProps> = ({ highlightPatientId, onNaviga
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = activeFilter === 'Todos' ||
-      (activeFilter === 'Leads' ? p.status === 'Em Pausa' : p.status === activeFilter); // Mapping 'Em Pausa' to Leads for demo
+      (activeFilter === 'Ativo' ? ['Ativo', 'active', 'ativo'].includes(p.status?.toLowerCase() || '') :
+       activeFilter === 'Leads' ? p.status === 'Em Pausa' : 
+       p.status === activeFilter);
     return matchesSearch && matchesFilter;
   });
 
@@ -228,7 +231,7 @@ const ClientsList: React.FC<PatientsListProps> = ({ highlightPatientId, onNaviga
       try {
         const newClient = await api.patients.create({
           ...editForm,
-          status: editForm.status || 'Ativo',
+          status: editForm.status || 'active',
         });
         if (newClient) {
           setPatients(prev => [newClient, ...prev]);
@@ -253,7 +256,7 @@ const ClientsList: React.FC<PatientsListProps> = ({ highlightPatientId, onNaviga
   };
 
   const handleAddNewClient = () => {
-    setEditForm({ name: '', email: '', phone: '', status: 'Ativo' });
+    setEditForm({ name: '', email: '', phone: '', status: 'active' });
     setIsAddingClient(true);
   };
 
@@ -412,11 +415,12 @@ const ClientsList: React.FC<PatientsListProps> = ({ highlightPatientId, onNaviga
                   <div>
                     <h3 className="font-bold text-slate-800 dark:text-white text-lg leading-tight group-hover:text-primary-600 dark:group-hover:text-secondary-400 transition-colors">{client.name}</h3>
                     <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider ${client.status === 'Ativo' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider ${
+                        ['ativo', 'active'].includes(client.status?.toLowerCase() || '') ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
                         client.status === 'Em Pausa' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' :
                           'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                         }`}>
-                        {client.status}
+                        {['ativo', 'active'].includes(client.status?.toLowerCase() || '') ? 'Ativo' : client.status}
                       </span>
                       {/* Random Tag for Demo */}
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider bg-slate-50 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700">
@@ -481,7 +485,7 @@ const ClientsList: React.FC<PatientsListProps> = ({ highlightPatientId, onNaviga
                   <Edit2 size={18} />
                 </button>
                 <button
-                  onClick={(e) => { e.stopPropagation(); /* Handle Calendar */ }}
+                  onClick={(e) => { e.stopPropagation(); onNavigateToAgenda && onNavigateToAgenda(client.id, client.name); }}
                   className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-primary-600 hover:border-primary-200 dark:hover:border-secondary-600 hover:bg-primary-50 dark:hover:bg-slate-800 transition-colors"
                   title="Agendar Sessão"
                 >
@@ -642,9 +646,9 @@ const ClientsList: React.FC<PatientsListProps> = ({ highlightPatientId, onNaviga
                 <div>
                   <h2 className="text-2xl font-bold text-slate-800 dark:text-white leading-none">{viewingClient.name}</h2>
                   <div className="flex items-center gap-2 mt-2">
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${viewingClient.status === 'Ativo' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${viewingClient.status === 'Ativo' ? 'bg-green-500' : 'bg-slate-500'}`}></span>
-                      {viewingClient.status}
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${['ativo', 'active'].includes(viewingClient.status?.toLowerCase() || '') ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${['ativo', 'active'].includes(viewingClient.status?.toLowerCase() || '') ? 'bg-green-500' : 'bg-slate-500'}`}></span>
+                      {['ativo', 'active'].includes(viewingClient.status?.toLowerCase() || '') ? 'Ativo' : viewingClient.status}
                     </span>
                     <span className="text-slate-400 text-xs flex items-center gap-1">
                       <MapPin size={12} /> São Paulo, SP
@@ -727,11 +731,15 @@ const ClientsList: React.FC<PatientsListProps> = ({ highlightPatientId, onNaviga
                           <div className="flex items-center gap-2">
                             <Calendar size={16} className="text-primary-600 dark:text-primary-400" />
                             <div>
-                              <p className="text-xs font-bold text-primary-800 dark:text-primary-300">Próxima Sessão</p>
-                              <p className="text-xs text-primary-600 dark:text-primary-400 font-semibold">{viewingClient.nextSession ? new Date(viewingClient.nextSession).toLocaleDateString('pt-BR') : 'Não agendada'}</p>
+                              <p className="text-xs font-bold text-primary-800 dark:text-white">Próxima Sessão</p>
+                              <p className="text-xs text-primary-600 dark:text-primary-400 font-semibold">
+                                {viewingClient.nextSession 
+                                  ? new Date(viewingClient.nextSession).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(',', ' às') 
+                                  : 'Não agendada'}
+                              </p>
                             </div>
                           </div>
-                          <button className="text-xs bg-white dark:bg-slate-800 text-primary-600 dark:text-primary-400 font-bold px-3 py-1.5 rounded-md shadow-sm">Agendar</button>
+                          <button onClick={() => { setViewingClient(null); onNavigateToAgenda && onNavigateToAgenda(viewingClient.id, viewingClient.name); }} className="text-xs bg-white dark:bg-slate-800 text-primary-600 dark:text-primary-400 font-bold px-3 py-1.5 rounded-md shadow-sm">Agendar</button>
                         </div>
                       </div>
                     </div>
@@ -1068,35 +1076,45 @@ const ClientsList: React.FC<PatientsListProps> = ({ highlightPatientId, onNaviga
 
             <div className="p-6 overflow-y-auto space-y-6">
               <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Resumo</h4>
-                <p className="text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700 leading-relaxed">
-                  {viewingSession.desc}
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Anotações da Sessão</h4>
+                <p className="text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700 leading-relaxed whitespace-pre-wrap">
+                  {viewingSession.sessionData?.clinicalRecord?.observation || viewingSession.desc}
                 </p>
               </div>
 
               <div>
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Evolução Clínica (SUD)</h4>
                 <div className="flex items-end gap-2 h-24 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
-                  {[8, 6, 4, 2, 0].map((val, idx) => (
-                    <div key={idx} className="flex-1 flex flex-col items-center gap-1 group">
-                      <div
-                        className="w-full bg-primary-400 dark:bg-primary-600 rounded-t-sm transition-all group-hover:bg-primary-500"
-                        style={{ height: `${(val / 10) * 100}%`, minHeight: '4px' }}
-                      ></div>
-                      <span className="text-[10px] font-bold text-slate-500">{val}</span>
-                    </div>
-                  ))}
+                  {viewingSession.sessionData?.clinicalRecord?.sudLevels ? (
+                    Object.entries(viewingSession.sessionData.clinicalRecord.sudLevels).map(([key, val]: [string, any], idx: number) => (
+                      <div key={idx} className="flex-1 flex flex-col items-center gap-1 group" title={key}>
+                        <div
+                          className="w-full bg-primary-400 dark:bg-primary-600 rounded-t-sm transition-all group-hover:bg-primary-500"
+                          style={{ height: `${(Number(val) / 10) * 100}%`, minHeight: '4px' }}
+                        ></div>
+                        <span className="text-[10px] font-bold text-slate-500">{val}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="w-full text-center text-xs text-slate-400">Nenhum registro de SUD disponível</div>
+                  )}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/30 rounded-xl">
                   <p className="text-xs font-bold text-green-700 dark:text-green-400 uppercase mb-1">Duração</p>
-                  <p className="text-lg font-bold text-slate-700 dark:text-white">55 min</p>
+                  <p className="text-lg font-bold text-slate-700 dark:text-white">
+                    {viewingSession.sessionData?.clinicalRecord?.durationSeconds 
+                      ? `${Math.floor(viewingSession.sessionData.clinicalRecord.durationSeconds / 60)} min`
+                      : 'N/A'}
+                  </p>
                 </div>
                 <div className="p-3 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl">
-                  <p className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase mb-1">Protocolo</p>
-                  <p className="text-lg font-bold text-slate-700 dark:text-white">Somático</p>
+                  <p className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase mb-1">Sessão / Protocolo</p>
+                  <p className="text-lg font-bold text-slate-700 dark:text-white">
+                    Sessão {viewingSession.sessionData?.clinicalRecord?.sessionNumber || 1}
+                  </p>
                 </div>
               </div>
             </div>

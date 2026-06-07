@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, X, Send, Bot, ChevronDown, Zap } from 'lucide-react';
+import { Sparkles, X, Send, Bot, ChevronDown, Zap, ChevronLeft } from 'lucide-react';
 import { AppView } from 'types';
 
 interface Message {
@@ -36,6 +36,74 @@ const AiAssistant: React.FC<AiAssistantProps> = ({ currentView = AppView.DASHBOA
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Drag and Resize states
+  const [tabTop, setTabTop] = useState<number | null>(null);
+  const tabDragRef = useRef({ isDragging: false, startY: 0, startTop: 0, hasMoved: false });
+
+  const [chatPos, setChatPos] = useState({ x: 0, y: 0 });
+  const [chatSize, setChatSize] = useState({ width: 380, height: 550 });
+  const chatDragRef = useRef({ isDragging: false, startX: 0, startY: 0, initX: 0, initY: 0 });
+  const resizeRef = useRef({ isResizing: false, startX: 0, startY: 0, initW: 0, initH: 0 });
+
+  // Tab dragging
+  const onTabPointerDown = (e: React.PointerEvent) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    tabDragRef.current = { isDragging: true, startY: e.clientY, startTop: rect.top + rect.height / 2, hasMoved: false };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onTabPointerMove = (e: React.PointerEvent) => {
+    if (!tabDragRef.current.isDragging) return;
+    const deltaY = e.clientY - tabDragRef.current.startY;
+    if (Math.abs(deltaY) > 5) tabDragRef.current.hasMoved = true;
+    if (tabDragRef.current.hasMoved) setTabTop(tabDragRef.current.startTop + deltaY);
+  };
+  const onTabPointerUp = (e: React.PointerEvent) => {
+    if (!tabDragRef.current.isDragging) return;
+    tabDragRef.current.isDragging = false;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+  const handleTabClick = (e: React.MouseEvent) => {
+    if (tabDragRef.current.hasMoved) return;
+    setIsOpen(true);
+  };
+
+  // Chat dragging
+  const onChatPointerDown = (e: React.PointerEvent) => {
+    chatDragRef.current = { isDragging: true, startX: e.clientX, startY: e.clientY, initX: chatPos.x, initY: chatPos.y };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onChatPointerMove = (e: React.PointerEvent) => {
+    if (!chatDragRef.current.isDragging) return;
+    const dx = e.clientX - chatDragRef.current.startX;
+    const dy = e.clientY - chatDragRef.current.startY;
+    setChatPos({ x: chatDragRef.current.initX + dx, y: chatDragRef.current.initY + dy });
+  };
+  const onChatPointerUp = (e: React.PointerEvent) => {
+    if (!chatDragRef.current.isDragging) return;
+    chatDragRef.current.isDragging = false;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
+  // Chat resizing
+  const onResizePointerDown = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    resizeRef.current = { isResizing: true, startX: e.clientX, startY: e.clientY, initW: chatSize.width, initH: chatSize.height };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onResizePointerMove = (e: React.PointerEvent) => {
+    if (!resizeRef.current.isResizing) return;
+    e.stopPropagation();
+    const dx = e.clientX - resizeRef.current.startX;
+    const dy = e.clientY - resizeRef.current.startY;
+    setChatSize({ width: Math.max(300, resizeRef.current.initW + dx), height: Math.max(400, resizeRef.current.initH + dy) });
+  };
+  const onResizePointerUp = (e: React.PointerEvent) => {
+    if (!resizeRef.current.isResizing) return;
+    e.stopPropagation();
+    resizeRef.current.isResizing = false;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
 
   // Context Detection
   const [currentContext, setCurrentContext] = useState<string>(currentView);
@@ -98,19 +166,58 @@ const AiAssistant: React.FC<AiAssistantProps> = ({ currentView = AppView.DASHBOA
   if (!isOpen) {
     return (
       <button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-[90] w-14 h-14 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full shadow-2xl flex items-center justify-center text-white hover:scale-110 transition-transform active:scale-95 animate-fade-in group"
+        onClick={handleTabClick}
+        onPointerDown={onTabPointerDown}
+        onPointerMove={onTabPointerMove}
+        onPointerUp={onTabPointerUp}
+        onPointerCancel={onTabPointerUp}
+        style={{ top: tabTop !== null ? `${tabTop}px` : '50%', touchAction: 'none' }}
+        className="fixed right-0 -translate-y-1/2 z-[90] bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-r-0 border-slate-200 dark:border-white/10 shadow-[-8px_0_30px_rgba(0,0,0,0.08)] dark:shadow-[-8px_0_30px_rgba(0,0,0,0.4)] rounded-l-[30px] flex flex-col items-center justify-between py-6 px-1 w-[46px] hover:w-[56px] transition-all duration-300 group cursor-grab active:cursor-grabbing overflow-hidden touch-none"
       >
-        <Sparkles size={24} className="group-hover:animate-spin-slow" />
-        <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>
+        {/* Glow indicator at the top */}
+        <div className="w-2 h-2 bg-red-500 rounded-full shadow-[0_0_8px_rgba(239,68,68,0.6)] mb-6 group-hover:bg-green-500 group-hover:shadow-[0_0_12px_rgba(34,197,94,0.8)] group-hover:animate-pulse transition-all duration-500 relative">
+          <span className="absolute inset-0 rounded-full bg-red-500 opacity-50 group-hover:bg-green-500 group-hover:animate-ping"></span>
+        </div>
+        
+        <div className="flex flex-col items-center gap-4 text-slate-400 dark:text-slate-500">
+          <ChevronLeft size={18} className="group-hover:-translate-x-1 group-hover:text-indigo-500 dark:group-hover:text-indigo-400 transition-all duration-300" strokeWidth={2.5} />
+          
+          <div className="p-2 rounded-[14px] bg-slate-100 dark:bg-slate-800 shadow-inner group-hover:bg-gradient-to-br from-indigo-500 to-purple-600 transition-colors duration-500 relative group-hover:scale-110">
+            <Bot size={20} className="text-slate-600 dark:text-slate-300 group-hover:text-white transition-colors duration-500" />
+          </div>
+          
+          {/* Grip dots to simulate a pull handle */}
+          <div className="flex flex-col gap-1.5 mt-2 opacity-60 group-hover:text-indigo-500 dark:group-hover:text-indigo-400 transition-colors duration-300">
+            <div className="w-1.5 h-1.5 rounded-full bg-current"></div>
+            <div className="w-1.5 h-1.5 rounded-full bg-current"></div>
+            <div className="w-1.5 h-1.5 rounded-full bg-current"></div>
+          </div>
+        </div>
       </button>
     );
   }
 
   return (
-    <div className={`fixed z-[90] bg-white dark:bg-slate-900 shadow-2xl rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden transition-all duration-300 flex flex-col ${isMinimized ? 'bottom-6 right-6 w-72 h-16' : 'bottom-6 right-6 w-full max-w-[380px] h-[550px]'}`}>
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 flex items-center justify-between cursor-pointer shrink-0" onClick={() => !isMinimized && setIsMinimized(true)}>
-        <div className="flex items-center gap-2 text-white"><Bot size={20} /><div><h3 className="font-bold text-sm">Nexus AI Copilot</h3><span className="text-[10px] opacity-80 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-400 rounded-full"></span> Online</span></div></div>
+    <div 
+      className={`fixed z-[90] bg-white dark:bg-slate-900 shadow-2xl rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden transition-all duration-100 flex flex-col`}
+      style={{
+        bottom: chatPos.y === 0 ? '24px' : `calc(24px - ${chatPos.y}px)`,
+        right: chatPos.x === 0 ? '24px' : `calc(24px - ${chatPos.x}px)`,
+        width: isMinimized ? '288px' : `${chatSize.width}px`,
+        height: isMinimized ? '64px' : `${chatSize.height}px`,
+        maxWidth: '100vw',
+        maxHeight: '100vh',
+      }}
+    >
+      <div 
+        className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 flex items-center justify-between cursor-grab active:cursor-grabbing shrink-0 touch-none" 
+        onClick={() => !isMinimized && setIsMinimized(true)}
+        onPointerDown={onChatPointerDown}
+        onPointerMove={onChatPointerMove}
+        onPointerUp={onChatPointerUp}
+        onPointerCancel={onChatPointerUp}
+      >
+        <div className="flex items-center gap-2 text-white pointer-events-none"><Bot size={20} /><div><h3 className="font-bold text-sm">Nexus AI Copilot</h3><span className="text-[10px] opacity-80 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-400 rounded-full"></span> Online</span></div></div>
         <div className="flex items-center gap-2 text-white/80">
           {isMinimized ? <button onClick={(e) => { e.stopPropagation(); setIsMinimized(false); }}><ChevronDown className="transform rotate-180" size={18} /></button> : <button onClick={(e) => { e.stopPropagation(); setIsMinimized(true); }}><ChevronDown size={18} /></button>}
           <button onClick={(e) => { e.stopPropagation(); setIsOpen(false); }}><X size={18} /></button>
@@ -140,6 +247,18 @@ const AiAssistant: React.FC<AiAssistantProps> = ({ currentView = AppView.DASHBOA
               <button type="submit" disabled={!inputValue.trim() || isTyping} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"><Send size={16} /></button>
             </div>
           </form>
+
+          {/* Resize Handle */}
+          <div 
+            className="absolute bottom-0 right-0 w-6 h-6 cursor-nwse-resize z-50 flex items-end justify-end p-1.5 opacity-30 hover:opacity-100 transition-opacity"
+            onPointerDown={onResizePointerDown}
+            onPointerMove={onResizePointerMove}
+            onPointerUp={onResizePointerUp}
+            onPointerCancel={onResizePointerUp}
+            style={{ touchAction: 'none' }}
+          >
+            <div className="w-2.5 h-2.5 border-r-2 border-b-2 border-slate-500 rounded-br-sm" />
+          </div>
         </>
       )}
     </div>

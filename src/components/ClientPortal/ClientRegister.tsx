@@ -3,6 +3,7 @@ import { Lock, Mail, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react
 
 const ClientRegister: React.FC = () => {
     const [email, setEmail] = useState('');
+    const [name, setName] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -10,8 +11,18 @@ const ClientRegister: React.FC = () => {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
     const [patientId, setPatientId] = useState<string | null>(null);
+    const [appointmentId, setAppointmentId] = useState<string | null>(null);
+    const [isAnjoFlow, setIsAnjoFlow] = useState(false);
 
     useEffect(() => {
+        // Lê o appointmentId da URL (fluxo Anjo)
+        const params = new URLSearchParams(window.location.search);
+        const apptId = params.get('appointmentId');
+        if (apptId) {
+            setAppointmentId(apptId);
+            setIsAnjoFlow(true);
+        }
+
         // Try to get patient ID from localStorage (set during booking)
         const storedId = localStorage.getItem('client_portal_id');
         if (storedId) {
@@ -23,9 +34,8 @@ const ClientRegister: React.FC = () => {
         if (bookingDraft) {
             try {
                 const data = JSON.parse(bookingDraft);
-                if (data.email) {
-                    setEmail(data.email);
-                }
+                if (data.email) setEmail(data.email);
+                if (data.name) setName(data.name);
             } catch (e) {
                 console.error('Error parsing booking draft', e);
             }
@@ -55,7 +65,9 @@ const ClientRegister: React.FC = () => {
                 body: JSON.stringify({
                     email,
                     password,
-                    patientId
+                    name: name || email.split('@')[0],
+                    patientId,
+                    appointmentId,
                 })
             });
 
@@ -67,7 +79,7 @@ const ClientRegister: React.FC = () => {
                 localStorage.setItem('client_portal_id', data.patientId);
                 localStorage.setItem('client_portal_email', email);
 
-                // Redirect to agendamentos after 2 seconds
+                // Redirect based on flow
                 setTimeout(() => {
                     window.location.href = '/portal-paciente/agendamentos';
                 }, 2000);
@@ -114,13 +126,32 @@ const ClientRegister: React.FC = () => {
                 {/* Card */}
                 <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-2xl">
                     <h1 className="text-2xl font-bold text-slate-800 dark:text-white mb-2 text-center">
-                        Crie sua Senha
+                        {isAnjoFlow ? '💗 Criar Conta Anjo' : 'Crie sua Senha'}
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400 text-center mb-6">
-                        Configure o acesso ao seu Portal do Cliente
+                        {isAnjoFlow
+                            ? 'Crie sua conta para acessar a sessão e os recursos do portal'
+                            : 'Configure o acesso ao seu Portal do Cliente'}
                     </p>
 
                     <form onSubmit={handleSubmit} className="space-y-5">
+                        {/* Nome - só aparece no fluxo Anjo */}
+                        {isAnjoFlow && (
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                                    Seu Nome
+                                </label>
+                                <input
+                                    type="text"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    placeholder="Nome completo"
+                                    required={isAnjoFlow}
+                                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+                                />
+                            </div>
+                        )}
+
                         {/* Email */}
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">

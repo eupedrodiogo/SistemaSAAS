@@ -10,7 +10,7 @@ export interface ChatMessage {
 
 interface UseVideoCallProps {
     myId: string;
-    targetId: string;
+    targetId: string | string[]; // Can be a single ID or an array of IDs to try calling
     isInitiator: boolean; // Therapist initiates, Client answers
     localStream: MediaStream | null;
 }
@@ -43,15 +43,19 @@ export const useVideoCall = ({ myId, targetId, isInitiator, localStream }: UseVi
     const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
     const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
     const [messages, setMessages] = useState<ChatMessage[]>([]);
+    // Wrapping with `_ts` guarantees React detects every update, even with same payload
+    const [syncData, setSyncData] = useState<{ data: any; _ts: number } | null>(null);
 
     const peerRef = useRef<Peer | null>(null);
-    const callRef = useRef<any>(null);
+    const callRef = useRef<any>(null); // For single active call
+    const callsRef = useRef<any[]>([]); // For tracking all outgoing calls
     const dataConnectionRef = useRef<any>(null);
     const localStreamRef = useRef<MediaStream | null>(null);
     const remoteStreamRef = useRef<MediaStream | null>(null);
     const connectionStatusRef = useRef<string>('disconnected');
     const isUnmountedRef = useRef(false);
     const retryIntervalRef = useRef<any>(null);
+    const lastSyncPayloadRef = useRef<any>(null);
 
     // Keep refs in sync
     useEffect(() => { localStreamRef.current = localStream; }, [localStream]);
@@ -67,10 +71,21 @@ export const useVideoCall = ({ myId, targetId, isInitiator, localStream }: UseVi
         setMessages(prev => [...prev, { id: Date.now().toString(), sender: 'me', text, timestamp: Date.now() }]);
     }, []);
 
+    const sendSyncData = useCallback((payload: any) => {
+        lastSyncPayloadRef.current = payload;
+        if (!dataConnectionRef.current?.open) return;
+        dataConnectionRef.current.send({ type: 'sync', payload });
+    }, []);
+
     // ─── Initiator (Therapist): make & retry calls ───────────────────────────
+    const targetIdStr = Array.isArray(targetId) ? targetId.join(',') : targetId;
+    
     const makeCall = useCallback(() => {
         const peer = peerRef.current;
-        if (!peer || peer.destroyed || !targetId) return;
+        const targets = targetIdStr ? targetIdStr.split(',') : [];
+        const validTargets = targets.filter(t => t);
+        
+        if (!peer || peer.destroyed || validTargets.length === 0) return;
         if (!localStreamRef.current) {
             console.log('[Initiator] Local stream not ready, skipping makeCall');
             return;
@@ -80,49 +95,68 @@ export const useVideoCall = ({ myId, targetId, isInitiator, localStream }: UseVi
         if (connectionStatusRef.current === 'connected' && remoteStreamRef.current) return;
 
         // Ensure data channel
-        if (!dataConnectionRef.current?.open) {
-            const conn = peer.connect(targetId, { reliable: true });
-            dataConnectionRef.current = conn;
-            conn.on('data', (data: any) => {
-                if (data.type === 'chat') {
-                    setMessages(prev => [...prev, { id: Date.now().toString(), sender: 'remote', text: data.text, timestamp: Date.now() }]);
-                }
+        if (!dataConnectionRef.current && validTargets.length > 0) {
+            // For data channel, we just try to connect to all of them
+            validTargets.forEach(tId => {
+                if (dataConnectionRef.current) return; // If one opened or is opening, skip others
+                const conn = peer.connect(tId, { reliable: true });
+                dataConnectionRef.current = conn;
+                conn.on('open', () => {
+                    if (lastSyncPayloadRef.current) {
+                        conn.send({ type: 'sync', payload: lastSyncPayloadRef.current });
+                    }
+                });
+                conn.on('data', (data: any) => {
+                    if (data.type === 'chat') {
+                        setMessages(prev => [...prev, { id: Date.now().toString(), sender: 'remote', text: data.text, timestamp: Date.now() }]);
+                    } else if (data.type === 'sync') {
+                        setSyncData({ data: data.payload, _ts: Date.now() });
+                    }
+                });
+                conn.on('close', () => { if (dataConnectionRef.current === conn) dataConnectionRef.current = null; });
             });
-            conn.on('close', () => { dataConnectionRef.current = null; });
         }
 
-        // Close stale call
-        if (callRef.current) {
-            try { callRef.current.close(); } catch (_) {}
-            callRef.current = null;
+        // Close stale calls
+        if (callsRef.current.length > 0) {
+            callsRef.current.forEach(c => { try { c.close(); } catch (_) {} });
+            callsRef.current = [];
         }
 
-        console.log(`[Initiator] Calling ${targetId}…`);
         setConnectionStatus('connecting');
 
-        const call = peer.call(targetId, localStreamRef.current!);
-        callRef.current = call;
+        validTargets.forEach(tId => {
+            console.log(`[Initiator] Calling ${tId}…`);
+            const call = peer.call(tId, localStreamRef.current!);
+            callsRef.current.push(call);
 
-        call.on('stream', (rStream: MediaStream) => {
-            if (isUnmountedRef.current) return;
-            console.log('[Initiator] Remote stream received');
-            setRemoteStream(rStream);
-            setConnectionStatus('connected');
-        });
+            call.on('stream', (rStream: MediaStream) => {
+                if (isUnmountedRef.current) return;
+                if (connectionStatusRef.current === 'connected') return; // Ignore if already connected
+                console.log(`[Initiator] Remote stream received from ${tId}`);
+                setRemoteStream(rStream);
+                setConnectionStatus('connected');
+                callRef.current = call; // Save the successful call
+            });
 
-        call.on('close', () => {
-            if (isUnmountedRef.current) return;
-            setConnectionStatus('disconnected');
-            setRemoteStream(null);
-            callRef.current = null;
-        });
+            call.on('close', () => {
+                if (isUnmountedRef.current) return;
+                if (callRef.current === call) { // Only handle if it's the active call
+                    setConnectionStatus('disconnected');
+                    setRemoteStream(null);
+                    callRef.current = null;
+                }
+            });
 
-        call.on('error', (err: any) => {
-            console.error('[Initiator] Call error:', err);
-            if (!isUnmountedRef.current) setConnectionStatus('disconnected');
-            callRef.current = null;
+            call.on('error', (err: any) => {
+                console.error(`[Initiator] Call error for ${tId}:`, err);
+                if (!isUnmountedRef.current && callRef.current === call) {
+                    setConnectionStatus('disconnected');
+                    callRef.current = null;
+                }
+            });
         });
-    }, [targetId]);
+    }, [targetIdStr]);
 
     // ─── Single unified Peer lifecycle ───────────────────────────────────────
     useEffect(() => {
@@ -201,9 +235,16 @@ export const useVideoCall = ({ myId, targetId, isInitiator, localStream }: UseVi
             peer.on('connection', (conn) => {
                 if (isUnmountedRef.current) return;
                 dataConnectionRef.current = conn;
+                conn.on('open', () => {
+                    if (lastSyncPayloadRef.current) {
+                        conn.send({ type: 'sync', payload: lastSyncPayloadRef.current });
+                    }
+                });
                 conn.on('data', (data: any) => {
                     if (data.type === 'chat') {
                         setMessages(prev => [...prev, { id: Date.now().toString(), sender: 'remote', text: data.text, timestamp: Date.now() }]);
+                    } else if (data.type === 'sync') {
+                        setSyncData({ data: data.payload, _ts: Date.now() });
                     }
                 });
                 conn.on('close', () => { dataConnectionRef.current = null; });
@@ -237,6 +278,7 @@ export const useVideoCall = ({ myId, targetId, isInitiator, localStream }: UseVi
             isUnmountedRef.current = true;
             if (retryIntervalRef.current) clearInterval(retryIntervalRef.current);
             if (retryAvailableId) clearTimeout(retryAvailableId);
+            if (callsRef.current) { callsRef.current.forEach(c => { try { c.close(); } catch (_) {} }); callsRef.current = []; }
             if (callRef.current) { try { callRef.current.close(); } catch (_) {} callRef.current = null; }
             if (peer) { try { peer.destroy(); } catch (_) {} }
             peerRef.current = null;
@@ -256,12 +298,14 @@ export const useVideoCall = ({ myId, targetId, isInitiator, localStream }: UseVi
     }, [localStream, isInitiator, makeCall]);
 
     const connect = useCallback(() => {
-        if (!peerRef.current || !targetId || !localStreamRef.current) {
+        const targets = targetIdStr ? targetIdStr.split(',') : [];
+        const validTargets = targets.filter(t => t);
+        if (!peerRef.current || validTargets.length === 0 || !localStreamRef.current) {
             console.warn('Cannot connect: missing peer, targetId or localStream');
             return;
         }
         makeCall();
-    }, [targetId, makeCall]);
+    }, [targetIdStr, makeCall]);
 
-    return { remoteStream, connectionStatus, connect, messages, sendMessage };
+    return { remoteStream, connectionStatus, connect, messages, sendMessage, syncData, sendSyncData };
 };

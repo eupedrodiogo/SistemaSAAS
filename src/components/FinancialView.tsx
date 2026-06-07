@@ -121,6 +121,9 @@ const FinancialView: React.FC = () => {
         setLoading(true);
         const currentYear = new Date().getFullYear();
 
+        // Sync de possíveis sessões pagas que não geraram transações no BD (fallback)
+        await api.transactions.syncMissing();
+
         // SSoT: busca transações reais + resumo anual em paralelo
         const [txList, annualSummary] = await Promise.all([
           api.transactions.list({ year: selectedYear }),

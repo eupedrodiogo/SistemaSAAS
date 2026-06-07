@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Brain, Activity, FileText, Save, RotateCcw, AlertCircle, ChevronRight } from 'lucide-react';
+import { Brain, Activity, FileText, Save, RotateCcw, AlertCircle, ChevronRight, BookOpen } from 'lucide-react';
 import { AgeRangeController } from './AgeRangeController';
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
@@ -8,27 +8,37 @@ import { AgeRangeController } from './AgeRangeController';
 interface SudGridProps {
     value: number;
     onChange: (v: number) => void;
-    /** 'distress' = verde→vermelho | 'positive' = cinza→verde */
-    scaleType?: 'distress' | 'positive';
 }
 
 interface CockpitPanelProps {
-    // Faixa etária (fase cronológica)
-    ageRanges: string[];
-    selectedAgeRange: string;
-    onAgeRangeChange: (range: string) => void;
+    mode?: 'dual' | 'single';
+    phaseLabel?: string;
+    
+    // Faixa etária (fase cronológica apenas)
+    ageRanges?: string[];
+    selectedAgeRange?: string;
+    onAgeRangeChange?: (range: string) => void;
+    selectedCycle?: number;
+    onCycleChange?: (cycle: number) => void;
 
-    // Escala Mental/Filme
-    mentalSud: number;
-    onMentalSudChange: (v: number) => void;
-    onRegisterMentalSud: () => void;
-    mentalHistory: number[];
+    // Escala Mental/Filme (dual mode)
+    mentalSud?: number;
+    onMentalSudChange?: (v: number) => void;
+    onRegisterMentalSud?: () => void;
+    mentalHistory?: number[];
 
-    // Escala Física
-    physicalSud: number;
-    onPhysicalSudChange: (v: number) => void;
-    onRegisterPhysicalSud: () => void;
-    physicalHistory: number[];
+    // Escala Física (dual mode)
+    physicalSud?: number;
+    onPhysicalSudChange?: (v: number) => void;
+    onRegisterPhysicalSud?: () => void;
+    physicalHistory?: number[];
+
+    // Escala Única (single mode para outras fases)
+    singleSud?: number;
+    onSingleSudChange?: (v: number) => void;
+    onRegisterSingleSud?: () => void;
+    singleHistory?: number[];
+    isPositiveScale?: boolean;
 
     // Notas clínicas
     clinicalNotes: string;
@@ -38,6 +48,8 @@ interface CockpitPanelProps {
     // Ação: concluir fase
     onAdvancePhase: () => void;
 }
+
+// (Scripts removidos a pedido)
 
 // ─── Sub: Grid de botões SUD (0-10) compactos ────────────────────────────────
 
@@ -111,7 +123,7 @@ const SudFeedback: React.FC<{ history: number[] }> = ({ history }) => {
             <span>
                 {isZeroed
                     ? <><strong>Zerado!</strong> Confirme a limpeza e avance.</>
-                    : <><strong>SUD = {last}.</strong> Continue o reprocessamento.</>
+                    : <><strong>Intensidade = {last}.</strong> Continue o reprocessamento.</>
                 }
                 {' '}
                 <span className="opacity-60">({history.length} reg.)</span>
@@ -132,22 +144,32 @@ const SectionHeader: React.FC<{ icon: React.ReactNode; label: string }> = ({ ico
 // ─── Componente Principal ─────────────────────────────────────────────────────
 
 export const CockpitPanel: React.FC<CockpitPanelProps> = ({
-    ageRanges,
-    selectedAgeRange,
+    mode = 'dual',
+    phaseLabel = 'Fase Cronológica',
+    ageRanges = [],
+    selectedAgeRange = '',
     onAgeRangeChange,
-    mentalSud,
+    selectedCycle,
+    onCycleChange,
+    mentalSud = 0,
     onMentalSudChange,
     onRegisterMentalSud,
-    mentalHistory,
-    physicalSud,
+    mentalHistory = [],
+    physicalSud = 0,
     onPhysicalSudChange,
     onRegisterPhysicalSud,
-    physicalHistory,
+    physicalHistory = [],
+    singleSud = 0,
+    onSingleSudChange,
+    onRegisterSingleSud,
+    singleHistory = [],
+    isPositiveScale = false,
     clinicalNotes,
     onClinicalNotesChange,
     onSaveClinicalNotes,
     onAdvancePhase,
 }) => {
+    // (Aviso: script do terapeuta foi removido do painel)
     return (
         /*
          * Coluna direita: altura total e scroll no Desktop (lg).
@@ -164,115 +186,193 @@ export const CockpitPanel: React.FC<CockpitPanelProps> = ({
                 <p className="text-[10px] font-extrabold text-indigo-400 uppercase tracking-widest">
                     Painel de Controle
                 </p>
-                <p className="text-xs text-slate-500 mt-0.5">Fase Cronológica</p>
+                <p className="text-xs text-slate-500 mt-0.5">{phaseLabel}</p>
             </div>
 
             {/* ── Área com scroll (Apenas no Desktop) ───────────────────── */}
-            <div className="flex-1 lg:overflow-y-auto custom-scrollbar px-3 py-3 space-y-4">
+            <div className="flex-1 flex flex-col lg:overflow-y-auto custom-scrollbar px-3 py-3 space-y-4">
 
-                {/* ── A) Controlador de Faixa Etária ─────────────────────── */}
-                <div>
-                    <SectionHeader icon={<RotateCcw size={13} />} label="Faixa Etária" />
-                    <div className="rounded-xl overflow-hidden border border-slate-700/60">
-                        <AgeRangeController
-                            ranges={ageRanges}
-                            selectedRange={selectedAgeRange}
-                            onRangeChange={onAgeRangeChange}
-                        />
+                {/* MODO DUAL: Cronológico */}
+                {mode === 'dual' && (
+                    <>
+                        {/* ── A) Controlador de Faixa Etária ─────────────────────── */}
+                        <div>
+                            <SectionHeader icon={<RotateCcw size={13} />} label="Faixa Etária" />
+                            <div className="rounded-xl overflow-hidden border border-slate-700/60 mb-2">
+                                {onAgeRangeChange && (
+                                    <AgeRangeController
+                                        ranges={ageRanges}
+                                        selectedRange={selectedAgeRange}
+                                        onRangeChange={onAgeRangeChange}
+                                    />
+                                )}
+                            </div>
+                            
+                            {/* ── B) Seletor de Ciclos ─────────────────────── */}
+                            <div className="flex items-center justify-between bg-slate-800/80 rounded-xl p-1 border border-slate-700/60 shadow-inner">
+                                <button 
+                                    onClick={() => onCycleChange?.(Math.max(1, (selectedCycle || 1) - 1))}
+                                    disabled={(selectedCycle || 1) <= 1}
+                                    className="p-1.5 text-slate-400 hover:text-white disabled:opacity-20 disabled:hover:text-slate-400 transition-colors"
+                                    title="Ciclo Anterior"
+                                >
+                                    <ChevronRight className="w-4 h-4 rotate-180" />
+                                </button>
+                                <span className="text-xs font-bold text-slate-300">Ciclo {selectedCycle || 1}</span>
+                                <button 
+                                    onClick={() => onCycleChange?.((selectedCycle || 1) + 1)}
+                                    className="p-1.5 text-slate-400 hover:text-white transition-colors"
+                                    title="Próximo Ciclo"
+                                >
+                                    <ChevronRight className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* ── C) Escala Mental / Filme ────────────────────────────── */}
+                        <div className="space-y-2.5">
+                            <SectionHeader icon={<Brain size={13} />} label="Desconforto Emocional / Filme" />
+
+                            <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs text-slate-500">Valor selecionado:</span>
+                                <span className={`
+                                    text-lg font-extrabold tabular-nums leading-none
+                                    ${mentalSud <= 3 ? 'text-emerald-400' : mentalSud <= 6 ? 'text-amber-400' : 'text-rose-400'}
+                                `}>
+                                    {mentalSud}<span className="text-xs font-normal text-slate-500">/10</span>
+                                </span>
+                            </div>
+
+                            {onMentalSudChange && <SudGrid value={mentalSud} onChange={onMentalSudChange} />}
+
+                            <SudFeedback history={mentalHistory} />
+
+                            {onRegisterMentalSud && (
+                                <button
+                                    onClick={onRegisterMentalSud}
+                                    className={`
+                                        w-full flex items-center justify-center gap-2
+                                        py-2.5 rounded-xl text-xs font-bold
+                                        transition-all duration-150 active:scale-[0.97] shadow-md
+                                        ${mentalSud === 0
+                                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/40'
+                                            : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-900/40'
+                                        }
+                                    `}
+                                >
+                                    <Save size={13} />
+                                    {mentalSud === 0 ? 'Registrar "Zerado" (0)' : `Registrar Nota Emocional (${mentalSud})`}
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Divisor */}
+                        <div className="h-px bg-slate-700/50 my-1" />
+
+                        {/* ── D) Escala Física ─────────────────────────────────────── */}
+                        <div className="space-y-2.5">
+                            <SectionHeader icon={<Activity size={13} />} label="Desconforto Físico" />
+
+                            <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs text-slate-500">Valor selecionado:</span>
+                                <span className={`
+                                    text-lg font-extrabold tabular-nums leading-none
+                                    ${physicalSud <= 3 ? 'text-emerald-400' : physicalSud <= 6 ? 'text-amber-400' : 'text-rose-400'}
+                                `}>
+                                    {physicalSud}<span className="text-xs font-normal text-slate-500">/10</span>
+                                </span>
+                            </div>
+
+                            {onPhysicalSudChange && <SudGrid value={physicalSud} onChange={onPhysicalSudChange} />}
+
+                            <SudFeedback history={physicalHistory} />
+
+                            {onRegisterPhysicalSud && (
+                                <button
+                                    onClick={onRegisterPhysicalSud}
+                                    className={`
+                                        w-full flex items-center justify-center gap-2
+                                        py-2.5 rounded-xl text-xs font-bold
+                                        transition-all duration-150 active:scale-[0.97] shadow-md
+                                        ${physicalSud === 0
+                                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/40'
+                                            : 'bg-violet-600 hover:bg-violet-500 text-white shadow-violet-900/40'
+                                        }
+                                    `}
+                                >
+                                    <Save size={13} />
+                                    {physicalSud === 0 ? 'Registrar "Zerado" (0)' : `Registrar Nota Física (${physicalSud})`}
+                                </button>
+                            )}
+                        </div>
+                    </>
+                )}
+
+                {/* MODO SINGLE: Outras fases */}
+                {mode === 'single' && (
+                    <div className="space-y-2.5">
+                        <SectionHeader icon={<Activity size={13} />} label={isPositiveScale ? "Nível de Fortalecimento" : "Escala de Intensidade do Desconforto"} />
+
+                        <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs text-slate-500">Valor selecionado:</span>
+                            <span className={`
+                                text-lg font-extrabold tabular-nums leading-none
+                                ${isPositiveScale
+                                    ? (singleSud >= 8 ? 'text-emerald-400' : singleSud >= 5 ? 'text-amber-400' : 'text-slate-400')
+                                    : (singleSud <= 3 ? 'text-emerald-400' : singleSud <= 6 ? 'text-amber-400' : 'text-rose-400')}
+                            `}>
+                                {singleSud}<span className="text-xs font-normal text-slate-500">/10</span>
+                            </span>
+                        </div>
+
+                        {onSingleSudChange && <SudGrid value={singleSud} onChange={onSingleSudChange} />}
+
+                        <SudFeedback history={singleHistory} />
+
+                        {onRegisterSingleSud && (
+                            <button
+                                onClick={onRegisterSingleSud}
+                                className={`
+                                    w-full flex items-center justify-center gap-2
+                                    py-2.5 rounded-xl text-xs font-bold
+                                    transition-all duration-150 active:scale-[0.97] shadow-md
+                                    ${isPositiveScale
+                                        ? (singleSud === 10 ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/40' : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/40')
+                                        : (singleSud === 0 ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/40' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-900/40')
+                                    }
+                                `}
+                            >
+                                <Save size={13} />
+                                {isPositiveScale
+                                    ? (singleSud === 10 ? 'Registrar Máximo (10)' : `Registrar Nível (${singleSud})`)
+                                    : (singleSud === 0 ? 'Registrar "Zerado" (0)' : `Registrar Nível (${singleSud})`)
+                                }
+                            </button>
+                        )}
                     </div>
-                </div>
+                )}
 
                 {/* Divisor */}
                 <div className="h-px bg-slate-700/50" />
 
-                {/* ── B) Escala Mental / Filme ────────────────────────────── */}
-                <div className="space-y-2.5">
-                    <SectionHeader icon={<Brain size={13} />} label="Desconforto Mental / Filme" />
-
-                    {/* Valor atual destacado */}
-                    <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-slate-500">Valor selecionado:</span>
-                        <span className={`
-                            text-lg font-extrabold tabular-nums leading-none
-                            ${mentalSud <= 3 ? 'text-emerald-400' : mentalSud <= 6 ? 'text-amber-400' : 'text-rose-400'}
-                        `}>
-                            {mentalSud}<span className="text-xs font-normal text-slate-500">/10</span>
-                        </span>
+                {/* ── E) Anotações Clínicas ─────────────────────────────────── */}
+                <div className="space-y-2 flex-1 flex flex-col min-h-0">
+                    <div className="flex items-center justify-between">
+                        <SectionHeader icon={<FileText size={13} />} label={`Anotações Clínicas (Ciclo ${selectedCycle || 1})`} />
+                        <button 
+                            onClick={() => onCycleChange?.((selectedCycle || 1) + 1)}
+                            className="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors"
+                        >
+                            Ciclo {(selectedCycle || 1) + 1} <ChevronRight className="w-3 h-3" />
+                        </button>
                     </div>
-
-                    <SudGrid value={mentalSud} onChange={onMentalSudChange} />
-
-                    <SudFeedback history={mentalHistory} />
-
-                    <button
-                        onClick={onRegisterMentalSud}
-                        className={`
-                            w-full flex items-center justify-center gap-2
-                            py-2.5 rounded-xl text-xs font-bold
-                            transition-all duration-150 active:scale-[0.97] shadow-md
-                            ${mentalSud === 0
-                                ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/40'
-                                : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-900/40'
-                            }
-                        `}
-                    >
-                        <Save size={13} />
-                        {mentalSud === 0 ? 'Registrar "Zerado" (0)' : `Registrar Nota Mental (${mentalSud})`}
-                    </button>
-                </div>
-
-                {/* Divisor com respiro extra para não confundir os cliques entre B e C */}
-                <div className="h-px bg-slate-700/50 my-1" />
-
-                {/* ── C) Escala Física ─────────────────────────────────────── */}
-                <div className="space-y-2.5">
-                    <SectionHeader icon={<Activity size={13} />} label="Desconforto Físico" />
-
-                    <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-slate-500">Valor selecionado:</span>
-                        <span className={`
-                            text-lg font-extrabold tabular-nums leading-none
-                            ${physicalSud <= 3 ? 'text-emerald-400' : physicalSud <= 6 ? 'text-amber-400' : 'text-rose-400'}
-                        `}>
-                            {physicalSud}<span className="text-xs font-normal text-slate-500">/10</span>
-                        </span>
-                    </div>
-
-                    <SudGrid value={physicalSud} onChange={onPhysicalSudChange} />
-
-                    <SudFeedback history={physicalHistory} />
-
-                    <button
-                        onClick={onRegisterPhysicalSud}
-                        className={`
-                            w-full flex items-center justify-center gap-2
-                            py-2.5 rounded-xl text-xs font-bold
-                            transition-all duration-150 active:scale-[0.97] shadow-md
-                            ${physicalSud === 0
-                                ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/40'
-                                : 'bg-violet-600 hover:bg-violet-500 text-white shadow-violet-900/40'
-                            }
-                        `}
-                    >
-                        <Save size={13} />
-                        {physicalSud === 0 ? 'Registrar "Zerado" (0)' : `Registrar Nota Física (${physicalSud})`}
-                    </button>
-                </div>
-
-                {/* Divisor */}
-                <div className="h-px bg-slate-700/50" />
-
-                {/* ── D) Anotações Clínicas ─────────────────────────────────── */}
-                <div className="space-y-2">
-                    <SectionHeader icon={<FileText size={13} />} label="Anotações Clínicas" />
                     <textarea
                         value={clinicalNotes}
                         onChange={(e) => onClinicalNotesChange(e.target.value)}
                         onBlur={onSaveClinicalNotes}
                         placeholder="Observações, reações, insights do cliente..."
-                        rows={4}
                         className="
-                            w-full bg-slate-800 border border-slate-700 rounded-xl
+                            flex-1 w-full min-h-[120px] bg-slate-800 border border-slate-700 rounded-xl
                             px-3 py-2.5 text-xs text-slate-300
                             placeholder:text-slate-600
                             resize-none
@@ -281,36 +381,10 @@ export const CockpitPanel: React.FC<CockpitPanelProps> = ({
                             custom-scrollbar
                         "
                     />
-                    <button
-                        onClick={onSaveClinicalNotes}
-                        className="
-                            w-full flex items-center justify-center gap-2
-                            py-2 rounded-xl text-xs font-bold text-slate-400
-                            bg-slate-800 hover:bg-slate-700 border border-slate-700
-                            transition-all active:scale-[0.97]
-                        "
-                    >
-                        <Save size={12} /> Salvar Anotações
-                    </button>
                 </div>
 
-                {/* ── Ação: Avançar Fase ─────────────────────────────────────── */}
-                <button
-                    onClick={onAdvancePhase}
-                    className="
-                        w-full flex items-center justify-center gap-2
-                        py-3 rounded-xl text-sm font-bold text-white
-                        bg-gradient-to-r from-indigo-600 to-violet-600
-                        hover:from-indigo-500 hover:to-violet-500
-                        shadow-lg shadow-indigo-900/40
-                        transition-all active:scale-[0.97]
-                    "
-                >
-                    Concluir Fase <ChevronRight size={15} />
-                </button>
-
                 {/* Espaço extra no fundo para conforto de scroll */}
-                <div className="h-2" />
+                <div className="h-2 shrink-0" />
             </div>
         </aside>
     );

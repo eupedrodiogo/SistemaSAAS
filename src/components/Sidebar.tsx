@@ -12,6 +12,7 @@ import {
   Wallet,
   Moon,
   Sun,
+  Monitor,
   Megaphone,
   Eye,
   EyeOff,
@@ -34,6 +35,8 @@ interface SidebarProps {
   onChangeView: (view: AppView) => void;
   isDarkMode: boolean;
   toggleTheme: () => void;
+  themeMode?: 'light' | 'dark' | 'system';
+  setThemeMode?: (mode: 'light' | 'dark' | 'system') => void;
   isPrivacyMode?: boolean;
   togglePrivacy?: () => void;
   onLogout?: () => void;
@@ -49,6 +52,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   onChangeView,
   isDarkMode,
   toggleTheme,
+  themeMode,
+  setThemeMode,
   isPrivacyMode,
   togglePrivacy,
   onLogout,
@@ -222,13 +227,31 @@ const Sidebar: React.FC<SidebarProps> = ({
                   {isPrivacyMode ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               )}
-              <button
-                onClick={toggleTheme}
-                className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 dark:hover:bg-slate-800 transition-colors"
-                title={isDarkMode ? "Mudar para Claro" : "Mudar para Escuro"}
-              >
-                {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
-              </button>
+              
+              {/* 3-Way Theme Toggle */}
+              <div className="flex bg-slate-700/50 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-600/50 dark:border-slate-700 ml-1">
+                <button
+                  onClick={() => setThemeMode ? setThemeMode('light') : toggleTheme()}
+                  className={`p-1 rounded-md transition-colors ${themeMode === 'light' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                  title="Modo Claro"
+                >
+                  <Sun size={14} />
+                </button>
+                <button
+                  onClick={() => setThemeMode ? setThemeMode('system') : toggleTheme()}
+                  className={`p-1 rounded-md transition-colors ${themeMode === 'system' ? 'bg-primary-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                  title="Modo do Sistema"
+                >
+                  <Monitor size={14} />
+                </button>
+                <button
+                  onClick={() => setThemeMode ? setThemeMode('dark') : toggleTheme()}
+                  className={`p-1 rounded-md transition-colors ${themeMode === 'dark' ? 'bg-slate-900 text-slate-100 shadow-sm border border-slate-700' : 'text-slate-400 hover:text-white'}`}
+                  title="Modo Escuro"
+                >
+                  <Moon size={14} />
+                </button>
+              </div>
             </div>
           </div>
 

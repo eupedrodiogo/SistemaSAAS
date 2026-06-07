@@ -1,9 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { Download, X } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 
 const InstallPrompt: React.FC = () => {
     const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
     const [isVisible, setIsVisible] = useState(false);
+    const location = useLocation();
+
+    // Determine context based on URL path or localStorage
+    const isPatientContext = location.pathname.startsWith('/cliente') || 
+                             location.pathname.startsWith('/portal-paciente') ||
+                             location.pathname.startsWith('/agendar') ||
+                             location.pathname.startsWith('/sessao-cliente') ||
+                             location.pathname.startsWith('/t/') ||
+                             localStorage.getItem('teranexus_app_type') === 'patient';
+                             
+    const appName = isPatientContext ? "Portal do Paciente" : "TeraNexus";
+    const description = isPatientContext 
+        ? <>Adicione o Portal do Paciente à tela inicial para acessar suas <strong>sessões e agendamentos</strong> de forma muito mais rápida.</>
+        : <>Adicione o TeraNexus à sua tela inicial para um acesso <span className="text-white font-bold underline decoration-primary-500 underline-offset-4">muito mais rápido</span> e performance otimizada.</>;
 
     useEffect(() => {
         const handler = (e: any) => {
@@ -53,7 +68,7 @@ const InstallPrompt: React.FC = () => {
                             <img src="/logo-new.jpg" alt="App Icon" className="w-8 h-8 object-contain" />
                         </div>
                         <div>
-                            <h3 className="font-bold text-white text-lg leading-tight tracking-tight">TeraNexus</h3>
+                            <h3 className="font-bold text-white text-lg leading-tight tracking-tight">{appName}</h3>
                             <div className="flex items-center gap-1.5 mt-0.5">
                                 <div className="w-1.5 h-1.5 bg-primary-300 rounded-full animate-pulse shadow-[0_0_8px_rgba(125,211,252,0.8)]"></div>
                                 <p className="text-[11px] font-black text-white/90 tracking-[0.1em] uppercase leading-none">
@@ -75,7 +90,7 @@ const InstallPrompt: React.FC = () => {
                 {/* Body */}
                 <div className="p-6 pt-5 bg-gradient-to-b from-slate-900 to-slate-950">
                     <p className="text-slate-300 text-[15px] leading-relaxed mb-8 font-medium">
-                        Adicione o TeraNexus à sua tela inicial para um acesso <span className="text-white font-bold underline decoration-primary-500 underline-offset-4">muito mais rápido</span> e performance otimizada.
+                        {description}
                     </p>
 
                     <div className="flex flex-col gap-3">

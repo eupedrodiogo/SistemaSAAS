@@ -8,9 +8,8 @@ import NotificationBell from '../NotificationBell';
 const ClientDashboard: React.FC = () => {
     const { patient, appointments, error } = useClientData();
 
-    // Get next upcoming appointment
-    const nextAppointment = appointments.find(appt => appt.status === 'Agendado');
-    const completedCount = appointments.filter(appt => appt.status === 'Concluído').length;
+    const nextAppointment = appointments.find(appt => ['agendado', 'scheduled', 'pending_payment', 'active', 'ativo'].includes(appt.status?.toLowerCase() || ''));
+    const completedCount = appointments.filter(appt => ['concluído', 'completed'].includes(appt.status?.toLowerCase() || '')).length;
 
     return (
         <ClientLayout activePage="dashboard">
@@ -63,7 +62,7 @@ const ClientDashboard: React.FC = () => {
                                 </div>
                                 <h3 className="text-3xl font-bold text-slate-800 dark:text-white mb-1">{nextAppointment.time}</h3>
                                 <p className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4">
-                                    {new Date(nextAppointment.date).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                                    {new Date(nextAppointment.date + (nextAppointment.date.includes('T') ? '' : 'T12:00:00')).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
                                 </p>
 
                                 <div className="flex items-center justify-between mt-6">
@@ -127,11 +126,65 @@ const ClientDashboard: React.FC = () => {
 
                 {/* Recent Activity / Placeholder for future content */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm lg:col-span-2">
-                        <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-4">Sua Jornada</h3>
-                        <div className="h-[200px] w-full flex flex-col items-center justify-center text-slate-400 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
-                            <PlayCircle size={48} className="mb-2 opacity-20" />
-                            <p className="text-sm">Seu histórico de evolução aparecerá aqui.</p>
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm lg:col-span-2 flex flex-col max-h-[500px]">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-bold text-lg text-slate-800 dark:text-white">Sua Jornada (Histórico de Sessões)</h3>
+                            <span className="text-xs bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 px-2.5 py-1 rounded-full font-bold">
+                                {appointments.filter(a => ['concluído', 'completed'].includes(a.status?.toLowerCase() || '') && a.sessionData?.clinicalRecord).length} registros
+                            </span>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-3">
+                            {appointments.filter(a => ['concluído', 'completed'].includes(a.status?.toLowerCase() || '') && a.sessionData?.clinicalRecord).length === 0 ? (
+                                <div className="h-[200px] w-full flex flex-col items-center justify-center text-slate-400 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+                                    <PlayCircle size={48} className="mb-2 opacity-20" />
+                                    <p className="text-sm">Seu histórico de evolução aparecerá aqui após as sessões.</p>
+                                </div>
+                            ) : (
+                                appointments
+                                    .filter(a => ['concluído', 'completed'].includes(a.status?.toLowerCase() || '') && a.sessionData?.clinicalRecord)
+                                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                                    .map(appt => {
+                                        const record = appt.sessionData.clinicalRecord;
+                                        const fmt = (s: number) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
+                                        const sudEntries = Object.entries(record.sudLevels || {}).filter(([,v]) => (v as number) > 0);
+                                        
+                                        return (
+                                            <div key={appt.id} className="bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-700/50 rounded-xl p-4">
+                                                <div className="flex justify-between items-start mb-3">
+                                                    <div>
+                                                        <h4 className="font-bold text-slate-700 dark:text-slate-200">Sessão #{record.sessionNumber || 'N/A'}</h4>
+                                                        <p className="text-xs text-slate-500 mt-0.5">
+                                                            {new Date(appt.date + (appt.date.includes('T') ? '' : 'T12:00:00')).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                                                        </p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="text-xs font-semibold text-slate-500 flex items-center gap-1 justify-end">
+                                                            <Clock size={12} /> {fmt(record.durationSeconds || 0)}
+                                                        </span>
+                                                        {record.ageRange && (
+                                                            <span className="text-xs text-primary-500 font-medium block mt-1">{record.ageRange}</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                
+                                                {sudEntries.length > 0 && (
+                                                    <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700/50">
+                                                        <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Seus Indicadores SUD</p>
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            {sudEntries.map(([fase, val]) => (
+                                                                <div key={fase} className="flex justify-between items-center bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-700">
+                                                                    <span className="text-xs text-slate-500 capitalize">{fase.replace('Cronologico', ' Cronológico').replace('fisico', 'Físico').replace('mental', 'Mental')}</span>
+                                                                    <span className={`text-sm font-bold ${(val as number) >= 7 ? 'text-red-500' : (val as number) >= 4 ? 'text-amber-500' : 'text-emerald-500'}`}>{val as number}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })
+                            )}
                         </div>
                     </div>
 

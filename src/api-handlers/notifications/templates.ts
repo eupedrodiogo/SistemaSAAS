@@ -77,6 +77,19 @@ export const WHATSAPP_TEMPLATES = {
                 ]
             }
         ]
+    }),
+    ANAMNESE_REQUEST: (patientName: string, link: string): WhatsAppTemplate => ({
+        name: 'solicitacao_anamnese',
+        language: { code: 'pt_BR' },
+        components: [
+            {
+                type: 'body',
+                parameters: [
+                    { type: 'text', text: patientName },
+                    { type: 'text', text: link }
+                ]
+            }
+        ]
     })
 };
 

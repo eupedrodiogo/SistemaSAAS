@@ -27,7 +27,7 @@ create table public.patients (
   name text not null,
   email text,
   phone text,
-  status text default 'active',
+  status text default 'Ativo',
   notes text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );

@@ -82,9 +82,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             if (aError) throw aError;
 
+            // Mapeia a coluna snake_case do banco para o padrão camelCase do frontend
+            const mappedAppointments = (appointments || []).map((appt: any) => ({
+                ...appt,
+                sessionData: appt.session_data || {}
+            }));
+
             return res.status(200).json({
                 patient: patientData,
-                appointments: appointments || []
+                appointments: mappedAppointments
             });
         }
 

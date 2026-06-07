@@ -18,9 +18,6 @@ export const SessionNotes: React.FC<SessionNotesProps> = ({ intakeData, observat
         if (!text) return "Não informada.";
         // Legacy format might be "Queixa: ... | Histórico: ..."
         let clean = text;
-        if (clean.includes('|')) {
-            clean = clean.split('|')[0].trim();
-        }
         // Remove common prefixes case-insensitive
         clean = clean.replace(/^(Queixa Principal|Queixa|Motivo):/i, '').trim();
         return clean || "Não informada.";
@@ -150,45 +147,40 @@ export const SessionNotes: React.FC<SessionNotesProps> = ({ intakeData, observat
                         <Users size={16} /> Contexto Pessoal
                     </h3>
                     <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3 text-sm">
-                        <div className="grid grid-cols-[100px_1fr] gap-2">
-                            <span className="text-slate-400">Estado Civil:</span>
-                            <span className="font-medium">{intakeData?.estadoCivil || '-'}</span>
+                        <div className="grid grid-cols-[130px_1fr] gap-2">
+                            <span className="text-slate-400">Nome:</span>
+                            <span className="font-medium">{intakeData?.nome || intakeData?.name || '-'}</span>
                         </div>
-                        <div className="grid grid-cols-[100px_1fr] gap-2">
+                        <div className="grid grid-cols-[130px_1fr] gap-2">
+                            <span className="text-slate-400">Data Nasc.:</span>
+                            <span className="font-medium">{intakeData?.dataNascimento || '-'}</span>
+                        </div>
+                        <div className="grid grid-cols-[130px_1fr] gap-2">
+                            <span className="text-slate-400">Celular:</span>
+                            <span className="font-medium">{intakeData?.celular || intakeData?.phone || '-'}</span>
+                        </div>
+                        <div className="grid grid-cols-[130px_1fr] gap-2">
                             <span className="text-slate-400">Profissão:</span>
                             <span className="font-medium">{intakeData?.profissao || '-'}</span>
-                        </div>
-                        <div className="grid grid-cols-[100px_1fr] gap-2">
-                            <span className="text-slate-400">Religião:</span>
-                            <span className="font-medium">{intakeData?.religiao || '-'}</span>
-                        </div>
-                        <div className="grid grid-cols-[100px_1fr] gap-2">
-                            <span className="text-slate-400">Medicação:</span>
-                            <span className="font-medium text-amber-600 dark:text-amber-400">{intakeData?.medications || 'Nenhuma'}</span>
                         </div>
                     </div>
                 </div>
 
-                <div className="space-y-4">
-                    <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                        <Target size={16} /> Objetivos & Visão
-                    </h3>
-                    <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3 text-sm">
-
-                        {intakeData?.visaoFuturo && (
+                {intakeData?.visaoFuturo && (
+                    <div className="space-y-4">
+                        <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                            <Target size={16} /> Objetivos & Visão
+                        </h3>
+                        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3 text-sm">
                             <div className="mb-3">
                                 <span className="block text-slate-400 text-xs uppercase tracking-wider mb-1">Visão de Futuro</span>
                                 <p className="text-slate-700 dark:text-slate-300 leading-relaxed italic">
                                     "{intakeData.visaoFuturo}"
                                 </p>
                             </div>
-                        )}
-
-                        {!intakeData?.visaoFuturo && (
-                            <p className="text-slate-400 italic">Nenhum objetivo registrado.</p>
-                        )}
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
             {/* 4. Therapist Observations (Input) */}

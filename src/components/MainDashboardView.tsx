@@ -10,7 +10,8 @@ import {
   Clock,
   Activity,
   Loader2,
-  Link
+  Link,
+  Heart
 } from 'lucide-react';
 import {
   LineChart,
@@ -190,7 +191,7 @@ const MainDashboardView: React.FC<MainDashboardViewProps> = ({ onChangeView, the
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {/* Date Selectors */}
           <div className="flex bg-white dark:bg-slate-800 rounded-lg p-1 border border-slate-200 dark:border-slate-700 shadow-sm">
             <select
@@ -224,14 +225,66 @@ const MainDashboardView: React.FC<MainDashboardViewProps> = ({ onChangeView, the
           <button
             onClick={() => {
               const url = `${window.location.origin}/agendar/u/${therapist?.id}`;
-              navigator.clipboard.writeText(url);
-              alert('Link de agendamento copiado para a área de transferência!\n' + url);
+              if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(url)
+                  .then(() => alert('Link de agendamento (Pagantes) copiado para a área de transferência!\n' + url))
+                  .catch(() => alert('Não foi possível copiar. Copie manualmente:\n' + url));
+              } else {
+                // Fallback para HTTP (ex: 192.168.1.29)
+                const textArea = document.createElement("textarea");
+                textArea.value = url;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                  document.execCommand('copy');
+                  alert('Link de agendamento (Pagantes) copiado para a área de transferência!\n' + url);
+                } catch (err) {
+                  alert('Copie este link manualmente:\n' + url);
+                }
+                textArea.remove();
+              }
             }}
             className="bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 dark:hover:bg-indigo-800 text-indigo-700 dark:text-indigo-300 px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 border border-indigo-200 dark:border-indigo-700"
-            title="Link direto para pacientes agendarem com você"
+            title="Link direto para pacientes pagantes agendarem com você"
           >
             <Link size={16} />
-            <span className="hidden sm:inline">Copiar Meu Link</span>
+            <span className="hidden sm:inline">Copiar Link Pagantes</span>
+            <span className="sm:hidden">Pagantes</span>
+          </button>
+
+          <button
+            onClick={() => {
+              const url = `${window.location.origin}/convite-anjo/${therapist?.id}`;
+              if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(url)
+                  .then(() => alert('Link Anjo (Atendimento Gratuito) copiado para a área de transferência!\n' + url))
+                  .catch(() => alert('Não foi possível copiar. Copie manualmente:\n' + url));
+              } else {
+                const textArea = document.createElement("textarea");
+                textArea.value = url;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                  document.execCommand('copy');
+                  alert('Link Anjo copiado para a área de transferência!\n' + url);
+                } catch (err) {
+                  alert('Copie este link manualmente:\n' + url);
+                }
+                textArea.remove();
+              }
+            }}
+            className="bg-rose-100 dark:bg-rose-900/30 hover:bg-rose-200 dark:hover:bg-rose-800 text-rose-700 dark:text-rose-300 px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 border border-rose-200 dark:border-rose-700"
+            title="Link para Atendimento Gratuito (Anjo)"
+          >
+            <Heart size={16} />
+            <span className="hidden sm:inline">Copiar Link Anjo</span>
+            <span className="sm:hidden">Anjo</span>
           </button>
 
           <button

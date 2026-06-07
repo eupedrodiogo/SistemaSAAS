@@ -42,9 +42,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const patientId = Array.isArray(id) ? id[0] : id;
             if (req.method === 'PUT') {
                 const { name, email, phone, status, notes } = req.body;
+                const cleanEmail = email ? email.trim() : email;
                 const { data, error } = await supabase
                     .from('patients')
-                    .update({ name, email, phone, status, notes })
+                    .update({ name, email: cleanEmail, phone, status, notes })
                     .eq('id', patientId)
                     .eq('therapist_id', user.id) // Ensure ownership
                     .select()
@@ -95,10 +96,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
             else if (req.method === 'POST') {
                 const { name, email, phone, status, notes } = req.body;
+                const cleanEmail = email ? email.trim() : email;
                 const { data, error } = await supabase
                     .from('patients')
                     .insert([{
-                        name, email, phone, status, notes,
+                        name, email: cleanEmail, phone, status, notes,
                         therapist_id: user.id
                     }])
                     .select()

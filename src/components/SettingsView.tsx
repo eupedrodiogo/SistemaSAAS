@@ -77,6 +77,7 @@ const ToggleSwitch = ({ checked, onChange }: { checked: boolean; onChange: () =>
 
 const SettingsView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'profile' | 'clinic' | 'financial' | 'integrations' | 'schedule' | 'security' | 'notifications' | 'help' | 'network'>('profile');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const [uploading, setUploading] = useState(false);
   const [showToast, setShowToast] = useState(false);
@@ -139,6 +140,9 @@ const SettingsView: React.FC = () => {
       // Merge but prefer DB values for critical fields if we just loaded them? 
       // Actually simply merging non-conflicting keys:
       setFormData(prev => ({ ...prev, ...parsed, ...prev }));
+      if (parsed.availability) {
+        setAvailability(parsed.availability);
+      }
     }
   }, []);
 
@@ -192,7 +196,7 @@ const SettingsView: React.FC = () => {
 
       // 2. Save Preferences to LocalStorage
       localStorage.setItem('TRG_BLOCKED_TIMES', JSON.stringify(blockedTimes));
-      localStorage.setItem('TRG_SETTINGS', JSON.stringify(formData));
+      localStorage.setItem('TRG_SETTINGS', JSON.stringify({ ...formData, availability }));
       triggerToast('Alterações salvas com sucesso!', 'success');
 
     } catch (e) {
@@ -269,6 +273,16 @@ const SettingsView: React.FC = () => {
     { id: 2, dayOfWeek: 'qua', startTime: '08:00', endTime: '10:00', label: 'Reunião Clínica' }
   ]);
 
+  const [availability, setAvailability] = useState([
+    { dayOfWeek: 'seg', isActive: true, startTime: '08:00', endTime: '18:00' },
+    { dayOfWeek: 'ter', isActive: true, startTime: '08:00', endTime: '18:00' },
+    { dayOfWeek: 'qua', isActive: true, startTime: '08:00', endTime: '18:00' },
+    { dayOfWeek: 'qui', isActive: true, startTime: '08:00', endTime: '18:00' },
+    { dayOfWeek: 'sex', isActive: true, startTime: '08:00', endTime: '18:00' },
+    { dayOfWeek: 'sab', isActive: false, startTime: '08:00', endTime: '12:00' },
+    { dayOfWeek: 'dom', isActive: false, startTime: '08:00', endTime: '12:00' },
+  ]);
+
   const [newBlock, setNewBlock] = useState({ day: 'seg', start: '', end: '', label: '' });
 
   const addBlockedTime = () => {
@@ -287,47 +301,67 @@ const SettingsView: React.FC = () => {
     try {
       setUploading(true);
       if (!event.target.files || event.target.files.length === 0) {
+        setUploading(false);
         return; // User cancelled
       }
       const file = event.target.files[0];
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}.${fileExt}`; // Use timestamp for uniqueness
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
-      // Path: userId/filename (Organized by user)
-      const filePath = `${user.id}/${fileName}`;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = async () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 400;
+          const MAX_HEIGHT = 400;
+          let width = img.width;
+          let height = img.height;
 
-      let { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file, { upsert: true });
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
 
-      if (uploadError) {
-        throw uploadError;
-      }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
 
-      // Get Public URL
-      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
-      // Add timestamp to force refresh
-      const publicUrl = `${data.publicUrl}?t=${Date.now()}`;
+          // Pega base64 em JPEG com qualidade otimizada para salvar no banco
+          const base64Photo = canvas.toDataURL('image/jpeg', 0.8);
+          
+          setFormData(prev => ({ ...prev, photo_url: base64Photo }));
 
-      setFormData(prev => ({ ...prev, photo_url: publicUrl }));
+          // Immediate DB Update for Photo
+          const { error: dbError } = await supabase
+            .from('therapists')
+            .update({ photo_url: base64Photo })
+            .eq('id', user.id);
 
-      // Immediate DB Update for Photo
-      const { error: dbError } = await supabase
-        .from('therapists')
-        .update({ photo_url: publicUrl })
-        .eq('id', user.id);
-
-      if (dbError) throw dbError;
-
-      showNotification('Foto de perfil atualizada!');
+          if (dbError) {
+             console.error(dbError);
+             showNotification('Erro ao salvar no banco!', 'error');
+          } else {
+             showNotification('Foto de perfil atualizada!');
+          }
+          setUploading(false);
+        };
+        img.src = e.target?.result as string;
+      };
+      reader.readAsDataURL(file);
 
     } catch (error: any) {
       console.error(error);
-      showNotification(error.message || 'Erro ao fazer upload da imagem!', 'error');
-    } finally {
+      showNotification(error.message || 'Erro ao processar imagem!', 'error');
       setUploading(false);
     }
   };
@@ -394,8 +428,8 @@ const SettingsView: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row gap-6">
-        {/* Settings Sidebar */}
-        <div className="w-full md:w-64 shrink-0 space-y-2">
+        {/* Settings Sidebar - Desktop */}
+        <div className="hidden md:flex w-64 shrink-0 flex-col gap-2">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -417,8 +451,57 @@ const SettingsView: React.FC = () => {
           })}
         </div>
 
+        {/* Settings Sidebar - Mobile Dropdown */}
+        <div className="md:hidden relative w-full z-20">
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all"
+          >
+            <div className="flex items-center gap-3">
+              {(() => {
+                const activeItem = menuItems.find(item => item.id === activeTab);
+                const Icon = activeItem?.icon || User;
+                return (
+                  <>
+                    <div className="p-2 rounded-lg bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400">
+                      <Icon size={18} />
+                    </div>
+                    <span>{activeItem?.label}</span>
+                  </>
+                );
+              })()}
+            </div>
+            {isMobileMenuOpen ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
+          </button>
+
+          {isMobileMenuOpen && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden z-30 max-h-[60vh] overflow-y-auto animate-in slide-in-from-top-2 fade-in duration-200">
+              {menuItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveTab(item.id as any);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3.5 font-medium transition-all text-left border-b border-slate-50 dark:border-slate-700/50 last:border-0 ${isActive
+                      ? 'bg-slate-50 dark:bg-slate-800/80 text-primary-600 dark:text-primary-400'
+                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50'
+                      }`}
+                  >
+                    <Icon size={18} className={isActive ? 'text-primary-600 dark:text-primary-400' : 'text-slate-400'} />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         {/* Content Area */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 pb-32">
           {activeTab === 'profile' && (
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden animate-fade-in">
               <div className="p-6 border-b border-slate-100 dark:border-slate-800">
@@ -510,14 +593,34 @@ const SettingsView: React.FC = () => {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Duração (minutos)</label>
-                        <input
-                          type="number"
-                          placeholder="Ex: 50"
-                          className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 dark:text-white outline-none"
-                          value={formData.session_duration}
-                          onChange={(e) => setFormData({ ...formData, session_duration: parseInt(e.target.value) || 50 })}
-                        />
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase flex items-center gap-1">
+                          <Clock size={14} className="text-primary-500" /> Duração da Sessão
+                        </label>
+                        <div className="grid grid-cols-4 gap-2 mb-2">
+                          {[30, 50, 60, 90].map(duration => (
+                            <button
+                              key={duration}
+                              type="button"
+                              onClick={() => setFormData({ ...formData, session_duration: duration })}
+                              className={`py-2 px-1 text-xs font-semibold rounded-xl border transition-all ${formData.session_duration === duration 
+                                  ? 'bg-primary-500 border-primary-500 text-white shadow-md scale-[1.02]' 
+                                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-primary-300 dark:hover:border-primary-600'
+                                }`}
+                            >
+                              {duration} min
+                            </button>
+                          ))}
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            placeholder="Outro valor (min)"
+                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 dark:text-white outline-none transition-shadow"
+                            value={formData.session_duration || ''}
+                            onChange={(e) => setFormData({ ...formData, session_duration: parseInt(e.target.value) || 0 })}
+                          />
+                          <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        </div>
                       </div>
                     </div>
                     <div>
@@ -597,29 +700,32 @@ const SettingsView: React.FC = () => {
 
                               try {
                                 setUploading(true);
-                                const fileExt = file.name.split('.').pop();
-                                const filePath = `documents/${(await supabase.auth.getUser()).data.user?.id}/${Date.now()}_cert.${fileExt}`;
+                                
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                  const base64Url = event.target?.result as string;
+                                  
+                                  const newCert = {
+                                    name: file.name,
+                                    url: base64Url,
+                                    status: 'pending' // pending, verified, rejected
+                                  };
 
-                                const { error: uploadError } = await supabase.storage
-                                  .from('documents') // Assuming 'documents' bucket exists, user requested file upload
-                                  .upload(filePath, file);
-
-                                if (uploadError) throw uploadError;
-
-                                const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(filePath);
-
-                                const newCert = {
-                                  name: file.name,
-                                  url: publicUrl,
-                                  status: 'pending' // pending, verified, rejected
+                                  setFormData({ ...formData, certificates: [...(formData.certificates || []), newCert] });
+                                  triggerToast('Certificado enviado para validação!', 'success');
+                                  setUploading(false);
                                 };
-
-                                setFormData({ ...formData, certificates: [...(formData.certificates || []), newCert] });
-                                triggerToast('Certificado enviado para validação!', 'success');
+                                
+                                reader.onerror = (err) => {
+                                  console.error(err);
+                                  triggerToast('Erro ao ler certificado.', 'error');
+                                  setUploading(false);
+                                };
+                                
+                                reader.readAsDataURL(file);
                               } catch (err) {
                                 console.error(err);
-                                triggerToast('Erro ao enviar certificado.', 'error');
-                              } finally {
+                                triggerToast('Erro ao processar certificado.', 'error');
                                 setUploading(false);
                               }
                             }
@@ -980,6 +1086,66 @@ const SettingsView: React.FC = () => {
           {
             activeTab === 'schedule' && (
               <div className="space-y-6 animate-fade-in">
+                {/* HORÁRIOS DE ATENDIMENTO */}
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
+                  <div className="p-6 border-b border-slate-100 dark:border-slate-800">
+                    <h3 className="font-bold text-lg text-slate-800 dark:text-white">Horários de Atendimento</h3>
+                    <p className="text-sm text-slate-500">Defina seus dias e horários padrão de trabalho.</p>
+                  </div>
+                  <div className="p-6 divide-y divide-slate-100 dark:divide-slate-800">
+                    {availability.map((avail, index) => {
+                      const dayName = weekDays.find(d => d.val === avail.dayOfWeek)?.label;
+                      return (
+                        <div key={avail.dayOfWeek} className="py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 first:pt-0 last:pb-0">
+                          <div className="flex items-center gap-4 w-full md:w-1/3">
+                            <ToggleSwitch 
+                              checked={avail.isActive} 
+                              onChange={() => {
+                                const newAvail = [...availability];
+                                newAvail[index].isActive = !newAvail[index].isActive;
+                                setAvailability(newAvail);
+                              }} 
+                            />
+                            <span className={`font-medium ${avail.isActive ? 'text-slate-800 dark:text-white' : 'text-slate-400'}`}>
+                              {dayName}
+                            </span>
+                          </div>
+                          
+                          <div className={`flex items-center gap-3 transition-opacity ${avail.isActive ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase mb-1">Início</span>
+                              <input
+                                type="time"
+                                className="p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm dark:text-white outline-none"
+                                value={avail.startTime}
+                                onChange={(e) => {
+                                  const newAvail = [...availability];
+                                  newAvail[index].startTime = e.target.value;
+                                  setAvailability(newAvail);
+                                }}
+                              />
+                            </div>
+                            <span className="text-slate-400 mt-5">até</span>
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase mb-1">Fim</span>
+                              <input
+                                type="time"
+                                className="p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm dark:text-white outline-none"
+                                value={avail.endTime}
+                                onChange={(e) => {
+                                  const newAvail = [...availability];
+                                  newAvail[index].endTime = e.target.value;
+                                  setAvailability(newAvail);
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
                   <div className="p-6 border-b border-slate-100 dark:border-slate-800">
                     <h3 className="font-bold text-lg text-slate-800 dark:text-white">Bloqueios de Agenda</h3>
@@ -1454,11 +1620,11 @@ const SettingsView: React.FC = () => {
       {/* Floating Save Button */}
       {
         ['profile', 'clinic', 'network', 'financial', 'schedule', 'notifications', 'security'].includes(activeTab) && (
-          <div className="fixed bottom-6 right-28 z-50 animate-slide-up">
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-28 z-50 animate-slide-up">
             <button
               onClick={handleSave}
               disabled={saving}
-              className="bg-primary-600 text-white px-6 py-4 rounded-full shadow-2xl hover:bg-primary-700 transition-all font-bold flex items-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed hover:scale-105 active:scale-95"
+              className="bg-primary-600 text-white px-6 py-4 rounded-full shadow-2xl hover:bg-primary-700 transition-all font-bold flex items-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed hover:scale-105 active:scale-95 whitespace-nowrap"
             >
               {saving ? (
                 <>

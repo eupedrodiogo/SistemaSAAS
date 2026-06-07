@@ -3,10 +3,11 @@ import {
     VideoIcon, VideoOff, Mic, MicOff, Radio, Square, Save, Users, PlayCircle, MessageSquare, Send, X,
     Maximize2,
     Minimize2,
-    ChevronUp,
-    ChevronDown
+    ChevronDown,
+    ChevronUp
 } from 'lucide-react';
 import { useAdaptiveVideo } from '../../hooks/useAdaptiveVideo';
+import { DraggablePip } from './DraggablePip';
 
 interface SessionRecording {
     id: string;
@@ -76,9 +77,35 @@ export const SessionVideo: React.FC<SessionVideoProps> = ({
     const chatContainerRef = useRef<HTMLDivElement>(null);
     const videoContainerRef = useRef<HTMLDivElement>(null);
     const [isFullScreen, setIsFullScreen] = useState(false);
+    const [showControls, setShowControls] = useState(true);
+    const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Adaptive video: detects remote aspect ratio and adjusts layout automatically
     const adaptiveRemote = useAdaptiveVideo(remoteVideoRef as React.RefObject<HTMLVideoElement | null>, remoteStream);
+
+    const resetControlsTimeout = () => {
+        setShowControls(true);
+        if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+        controlsTimeoutRef.current = setTimeout(() => {
+            setShowControls(false);
+        }, 5000);
+    };
+
+    useEffect(() => {
+        resetControlsTimeout();
+        return () => {
+            if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+        };
+    }, []);
+
+    const handleVideoContainerClick = () => {
+        if (!showControls) {
+            resetControlsTimeout();
+        } else {
+            setShowControls(false);
+            if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+        }
+    };
 
     React.useEffect(() => {
         if (chatContainerRef.current) {
@@ -113,13 +140,9 @@ export const SessionVideo: React.FC<SessionVideoProps> = ({
     return (
         <div 
             ref={videoContainerRef} 
-            className={`bg-slate-900 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-slate-700 relative shrink-0 flex flex-col transition-all duration-300 ${
-                isFullScreen 
-                    ? 'fixed inset-0 z-[100] w-screen h-screen rounded-none ring-0' 
-                    : isProtocolCollapsed 
-                        ? 'w-full aspect-video md:aspect-auto md:flex-1 md:w-full md:h-full md:min-h-[400px]' 
-                        : 'mb-4 animate-slide-up w-full aspect-video md:aspect-auto md:max-h-[50vh] min-h-[250px] md:min-h-[300px]'
-            }`}
+            onClick={handleVideoContainerClick}
+            onMouseMove={() => showControls || resetControlsTimeout()}
+            className={`bg-slate-900 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-slate-700 relative flex flex-col transition-all duration-300 w-full min-h-[45vh] sm:aspect-video lg:min-h-0 lg:aspect-auto lg:flex-1 cursor-pointer`}
         >
             <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/60 to-transparent z-20 flex justify-between pointer-events-none">
                 <div className="flex items-center gap-2 px-3 py-1 bg-black/40 backdrop-blur-sm rounded-lg border border-white/10 pointer-events-auto">
@@ -134,7 +157,10 @@ export const SessionVideo: React.FC<SessionVideoProps> = ({
                 )}
             </div>
 
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-slate-950/80 backdrop-blur-md p-2 rounded-2xl border border-white/10 shadow-lg">
+            <div 
+                onClick={(e) => { e.stopPropagation(); resetControlsTimeout(); }}
+                className={`absolute bottom-4 w-[95%] max-w-fit left-1/2 -translate-x-1/2 z-20 flex items-center justify-center gap-2 sm:gap-3 bg-slate-950/80 backdrop-blur-md p-2 sm:p-2 rounded-2xl border border-white/10 shadow-lg transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            >
                 <button onClick={onToggleMic} className={`p-3 rounded-xl transition-all ${isMicMuted ? 'bg-red-500 text-white' : 'bg-slate-800 text-white hover:bg-slate-700'}`}>
                     {isMicMuted ? <MicOff size={20} /> : <Mic size={20} />}
                 </button>
@@ -292,17 +318,15 @@ export const SessionVideo: React.FC<SessionVideoProps> = ({
                 </div>
 
                 {/* PIP View: Local (Therapist) */}
-                <div className={`absolute bottom-20 right-4 md:bottom-6 md:right-6 aspect-video bg-black rounded-xl overflow-hidden shadow-2xl border border-slate-700/50 z-10 transition-transform duration-300 hover:scale-105 hover:shadow-black/50 ${isFullScreen ? 'w-40 md:w-64' : 'w-32 md:w-48'}`}>
+                <DraggablePip 
+                    containerRef={videoContainerRef}
+                    className={`absolute z-10 aspect-[3/4] md:aspect-video bg-black rounded-xl overflow-hidden shadow-2xl border border-slate-700/50 transition-shadow duration-300 hover:shadow-black/50 ${isFullScreen ? 'w-32 md:w-64' : 'w-24 sm:w-28 md:w-48'}`}
+                    defaultPosition={{ top: '1rem', right: '1rem' }}
+                >
                     <video ref={videoRef} autoPlay playsInline muted className={`w-full h-full object-cover transform scale-x-[-1] transition-opacity duration-300 ${isVideoMuted ? 'opacity-0' : 'opacity-100'}`} />
                     {isVideoMuted && <div className="absolute inset-0 flex items-center justify-center text-slate-500 bg-slate-900"><VideoOff size={24} /></div>}
                     <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-0.5 rounded text-[10px] font-bold text-white backdrop-blur-sm pointer-events-none">Você</div>
-                </div>
-
-                {/* Debug Info (Hover only) */}
-                <div className="absolute top-4 right-4 bg-black/60 text-[10px] text-slate-300 p-2 rounded-lg font-mono opacity-0 group-hover:opacity-100 transition-opacity duration-300 border border-white/10 backdrop-blur-md z-30 pointer-events-none text-right shadow-xl">
-                    My: therapist-{currentAppointmentId?.slice(0, 8) || 'empty'}...<br />
-                    Target: client-{currentAppointmentId?.slice(0, 8) || 'empty'}...
-                </div>
+                </DraggablePip>
             </div>
         </div>
     );

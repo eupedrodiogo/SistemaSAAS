@@ -21,6 +21,10 @@ const PatientLandingPage: React.FC<PatientLandingPageProps> = ({ isDarkMode, tog
 
     const [showVideoModal, setShowVideoModal] = React.useState(false);
 
+    React.useEffect(() => {
+        localStorage.setItem('teranexus_app_type', 'patient');
+    }, []);
+
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100">

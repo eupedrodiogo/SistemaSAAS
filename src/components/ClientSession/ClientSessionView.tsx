@@ -23,8 +23,12 @@ import { useClientData } from '../ClientPortal/ClientContext';
 import ClientLayout from '../ClientPortal/ClientLayout';
 import { useVideoCall } from '../../hooks/useVideoCall';
 import { useAdaptiveVideo } from '../../hooks/useAdaptiveVideo';
+import { DraggablePip } from '../Session/DraggablePip';
+import { ChronologicalPhase } from '../Session/ChronologicalPhase';
 
 const ClientSessionView: React.FC = () => {
+    const AGE_RANGES = ['0-10 anos', '11-20 anos', '21-30 anos', '31-40 anos', '41-50 anos', '51-60 anos', '61+ anos'];
+    const [selectedAgeRange, setSelectedAgeRange] = useState(AGE_RANGES[0]);
     const { patient, appointments: rawAppointments } = useClientData();
     const appointments = Array.isArray(rawAppointments) ? rawAppointments : [];
     const [appointmentId, setAppointmentId] = useState('');
@@ -52,6 +56,8 @@ const ClientSessionView: React.FC = () => {
     // Find the current appointment details
     const currentAppointment = appointments.find(appt => appt.id === appointmentId) || appointments.find(appt => appt.status === 'Agendado');
 
+    const [realtimeSessionData, setRealtimeSessionData] = useState<any>(null);
+
     // PeerJS Integration
     // Standardized IDs:
     // My: client-{roomKey}
@@ -68,6 +74,34 @@ const ClientSessionView: React.FC = () => {
         return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
     }, []);
 
+    const [showControls, setShowControls] = useState(true);
+    const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    const resetControlsTimeout = () => {
+        setShowControls(true);
+        if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+        controlsTimeoutRef.current = setTimeout(() => {
+            setShowControls(false);
+        }, 5000);
+    };
+
+    useEffect(() => {
+        resetControlsTimeout();
+        return () => {
+            if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+        };
+    }, []);
+
+    const handleVideoContainerClick = () => {
+        if (!showControls) {
+            resetControlsTimeout();
+        } else {
+            setShowControls(false);
+            if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+        }
+    };
+
+
     const toggleFullScreen = () => {
         if (!document.fullscreenElement) {
             videoContainerRef.current?.requestFullscreen?.().catch(console.error);
@@ -76,12 +110,18 @@ const ClientSessionView: React.FC = () => {
         }
     };
 
-    const { remoteStream, connectionStatus, messages, sendMessage } = useVideoCall({
+    const { remoteStream, connectionStatus, messages, sendMessage, syncData } = useVideoCall({
         myId: roomKey ? `client-${roomKey}` : '',
         targetId: roomKey ? `therapist-${roomKey}` : '',
         isInitiator: false,
         localStream: stream
     });
+
+    useEffect(() => {
+        if (syncData?.data?.type === 'SESSION_DATA_UPDATE') {
+            setRealtimeSessionData(syncData.data.payload);
+        }
+    }, [syncData]);
 
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [chatText, setChatText] = useState('');
@@ -106,9 +146,20 @@ const ClientSessionView: React.FC = () => {
             // Fallback: use the ID of the active/scheduled appointment
             setAppointmentId(currentAppointment.id);
         }
-        // Auto-start camera for client convenience
-        startCamera();
     }, [currentAppointment]);
+
+    // Auto-start camera ONCE on mount
+    useEffect(() => {
+        startCamera();
+        return () => {
+            // Cleanup stream on unmount
+            setStream(prev => {
+                prev?.getTracks().forEach(t => t.stop());
+                return null;
+            });
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     useEffect(() => {
         const el = videoRef.current;
@@ -155,23 +206,35 @@ const ClientSessionView: React.FC = () => {
     }, []);
 
     const startCamera = async () => {
+        // Guard: don't re-initialize if stream is already active
+        if (stream && stream.active) return;
+
         setCameraError(null);
         try {
-            if (navigator.mediaDevices) {
-                const isMobile = window.innerWidth < 768;
-                const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: isMobile 
-                        ? { aspectRatio: 9 / 16, facingMode: "user" } 
-                        : { aspectRatio: 16 / 9, facingMode: "user" }, 
-                    audio: true 
-                });
-                setStream(mediaStream);
-                setIsVideoActive(true);
-            } else {
+            if (!navigator.mediaDevices?.getUserMedia) {
                 setCameraError("Seu navegador não suporta acesso à câmera.");
+                return;
             }
-        } catch (err) {
-            setCameraError("Não foi possível acessar a câmera. Verifique se você permitiu o acesso.");
+            const isMobile = window.innerWidth < 768;
+            const mediaStream = await navigator.mediaDevices.getUserMedia({
+                video: isMobile
+                    ? { facingMode: "user", width: { ideal: 720 }, height: { ideal: 1280 } }
+                    : { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+                audio: true
+            });
+            setStream(mediaStream);
+            setIsVideoActive(true);
+        } catch (err: any) {
+            console.error('[Camera] getUserMedia error:', err.name, err.message);
+            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                setCameraError("Acesso à câmera negado. Toque no ícone 🔒 na barra do navegador e permita câmera e microfone.");
+            } else if (err.name === 'NotFoundError') {
+                setCameraError("Nenhuma câmera encontrada neste dispositivo.");
+            } else if (err.name === 'NotReadableError') {
+                setCameraError("Câmera em uso por outro aplicativo. Feche outros apps e tente novamente.");
+            } else {
+                setCameraError("Não foi possível acessar a câmera. Verifique as permissões.");
+            }
         }
     };
 
@@ -416,10 +479,12 @@ const ClientSessionView: React.FC = () => {
                     {/* Video Area */}
                     <div 
                         ref={videoContainerRef}
-                        className={`bg-slate-900 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-slate-800 flex flex-col group/container ${
+                        onClick={handleVideoContainerClick}
+                        onMouseMove={() => showControls && resetControlsTimeout()}
+                        className={`bg-slate-900 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-slate-800 flex flex-col group/container cursor-pointer ${
                             isFullScreen 
                                 ? 'fixed inset-0 z-[100] w-screen h-screen rounded-none ring-0' 
-                                : 'relative w-full aspect-video md:aspect-auto md:flex-1 md:min-h-[400px]'
+                                : 'relative w-full min-h-[45vh] sm:aspect-video md:aspect-auto md:flex-1 md:min-h-[400px]'
                         }`}
                     >
 
@@ -538,7 +603,11 @@ const ClientSessionView: React.FC = () => {
                         )}
 
                         {/* Client Self-View (Picture-in-Picture) */}
-                        <div className={`absolute bottom-24 right-4 md:bottom-6 md:right-6 aspect-video bg-black rounded-xl overflow-hidden shadow-2xl border border-slate-700/50 z-10 transition-transform duration-300 hover:scale-105 hover:shadow-black/50 ${isFullScreen ? 'w-40 md:w-64' : 'w-28 md:w-48'}`}>
+                        <DraggablePip 
+                            containerRef={videoContainerRef}
+                            className={`absolute z-10 aspect-[3/4] md:aspect-video bg-black rounded-xl overflow-hidden shadow-2xl border border-slate-700/50 transition-shadow duration-300 hover:shadow-black/50 ${isFullScreen ? 'w-32 md:w-64' : 'w-24 sm:w-28 md:w-48'}`}
+                            defaultPosition={{ top: '1rem', right: '1rem' }}
+                        >
                             {isVideoActive ? (
                                 <video
                                     ref={videoRef}
@@ -554,16 +623,13 @@ const ClientSessionView: React.FC = () => {
                             )}
                             {isVideoMuted && <div className="absolute inset-0 flex items-center justify-center text-slate-500 bg-slate-900"><VideoOff size={24} /></div>}
                             <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-0.5 rounded text-[10px] font-bold text-white backdrop-blur-sm pointer-events-none">Você</div>
-                        </div>
-                        
-                        {/* Debug Info (Hover only) */}
-                        <div className="absolute top-4 right-4 bg-black/60 text-[10px] text-slate-300 p-2 rounded-lg font-mono opacity-0 group-hover:opacity-100 transition-opacity duration-300 border border-white/10 backdrop-blur-md z-30 pointer-events-none text-right shadow-xl">
-                            My: client-{appointmentId?.slice(0, 8)}...<br />
-                            Target: therapist-{appointmentId?.slice(0, 8)}...
-                        </div>
+                        </DraggablePip>
 
                         {/* Controls Overlay */}
-                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 md:gap-4 bg-slate-950/90 backdrop-blur-xl p-2 md:p-3 rounded-2xl border border-white/10 shadow-2xl w-[90%] md:w-auto justify-center">
+                        <div 
+                            onClick={(e) => { e.stopPropagation(); resetControlsTimeout(); }}
+                            className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 md:gap-4 bg-slate-950/90 backdrop-blur-xl p-2 md:p-3 rounded-2xl border border-white/10 shadow-2xl w-[90%] md:w-auto justify-center transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                        >
                             <button
                                 onClick={toggleMic}
                                 className={`p-3 md:p-4 rounded-xl transition-all duration-200 ${isMicMuted ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-slate-800 text-white hover:bg-slate-700'}`}
@@ -689,20 +755,23 @@ const ClientSessionView: React.FC = () => {
                                 )}
                             </div>
 
-                            {/* Chat / Support Placeholder */}
-                            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 flex flex-col justify-between">
-                                <div>
-                                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                        <MessageSquare size={14} /> Chat com Terapeuta
-                                    </h4>
-                                    <div className="h-24 flex items-center justify-center text-slate-600 text-sm italic border border-dashed border-slate-800 rounded-lg">
-                                        Nenhuma mensagem
-                                    </div>
+                            {/* SUD Progress */}
+                            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-0 overflow-hidden flex flex-col justify-between relative">
+                                <div className="absolute top-2 right-2 z-10">
+                                    <select 
+                                        value={selectedAgeRange}
+                                        onChange={(e) => setSelectedAgeRange(e.target.value)}
+                                        className="bg-slate-800 text-xs text-slate-300 border border-slate-700 rounded px-2 py-1 outline-none"
+                                    >
+                                        {AGE_RANGES.map(r => <option key={r} value={r}>{r}</option>)}
+                                    </select>
                                 </div>
-                                <input
-                                    type="text"
-                                    placeholder="Digite uma mensagem..."
-                                    className="w-full mt-3 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary-500 transition-colors"
+                                <ChronologicalPhase 
+                                    selectedRange={selectedAgeRange}
+                                    onRangeChange={setSelectedAgeRange}
+                                    ranges={AGE_RANGES}
+                                    mentalHistory={realtimeSessionData?.mentalHistory || currentAppointment?.sessionData?.mentalHistory || {}}
+                                    physicalHistory={realtimeSessionData?.physicalHistory || currentAppointment?.sessionData?.physicalHistory || {}}
                                 />
                             </div>
                         </div>

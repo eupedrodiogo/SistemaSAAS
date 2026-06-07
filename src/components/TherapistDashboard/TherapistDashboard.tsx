@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import Sidebar from '../Sidebar';
@@ -79,10 +79,11 @@ const TherapistDashboard: React.FC = () => {
         return AppView.DASHBOARD;
     });
 
-    // Sync state to URL
+    // Sync state → URL (sentido único, sem escutar searchParams de volta)
     useEffect(() => {
-        setSearchParams({ view: currentView });
-    }, [currentView, setSearchParams]);
+        setSearchParams({ view: currentView }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentView]);
 
     // Protect against direct URL access to restricted views
     useEffect(() => {
@@ -103,10 +104,21 @@ const TherapistDashboard: React.FC = () => {
         }
     }, [currentView, hasAccess]);
 
+    const location = useLocation();
     const [isMobileOpen, setIsMobileOpen] = useState(false);
     const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
+    const [isTherapySessionActive, setIsTherapySessionActive] = useState(false);
     // const [isDarkMode, setIsDarkMode] = useState(false); // Managed by Context
-    const { isDarkMode, toggleTheme } = useTheme();
+    const { isDarkMode, toggleTheme, themeMode, setThemeMode } = useTheme();
+
+    // Captura o estado de navegação (ex: ao encerrar sessão, fechar o menu lateral)
+    useEffect(() => {
+        if (location.state && location.state.sidebarCollapsed !== undefined) {
+            setIsDesktopCollapsed(location.state.sidebarCollapsed);
+            // Limpa o state para não persistir em re-renders
+            window.history.replaceState({}, '');
+        }
+    }, [location.state]);
 
     const [therapist, setTherapist] = useState<any>(null);
     const [viewParams, setViewParams] = useState<any>(null);
@@ -223,22 +235,39 @@ const TherapistDashboard: React.FC = () => {
             case AppView.DASHBOARD:
                 return <MainDashboardView onChangeView={handleDashboardChangeView} therapist={therapist} />;
             case AppView.PATIENTS:
-                return <PatientsList onNavigateToSession={() => setCurrentView(AppView.THERAPY)} />;
+                return <PatientsList 
+                    onNavigateToSession={() => setCurrentView(AppView.THERAPY)} 
+                    onNavigateToAgenda={(patientId, patientName) => {
+                        setViewParams({ action: 'create', patientId, patientName });
+                        setCurrentView(AppView.AGENDA);
+                    }}
+                />;
             case AppView.AGENDA:
                 return <CalendarView
                     onNavigateToPatient={handleNavigateToPatient}
                     onNavigateToSession={() => setCurrentView(AppView.THERAPY)}
                     initialAction={viewParams?.action}
+                    initialPatientId={viewParams?.patientId}
+                    initialPatientName={viewParams?.patientName}
                     onActionConsumed={() => setViewParams(null)}
                 />;
             case AppView.THERAPY:
-                return <SessionView />;
+                return <SessionView
+                    onSessionActiveChange={setIsTherapySessionActive}
+                    onNavigateToReports={(patientId) => {
+                        setViewParams({ patientId });
+                        setCurrentView(AppView.REPORTS);
+                    }}
+                />;
             case AppView.FINANCIAL:
                 return <FinancialView />;
             case AppView.MARKETING:
                 return <MarketingView />;
             case AppView.REPORTS:
-                return <ReportsView />;
+                return <ReportsView
+                    initialPatientId={viewParams?.patientId}
+                    onParamsConsumed={() => setViewParams(null)}
+                />;
             case AppView.SETTINGS:
                 return <SettingsView />;
             case AppView.SITE_BUILDER:
@@ -260,40 +289,48 @@ const TherapistDashboard: React.FC = () => {
     };
 
     return (
-        <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
-            <Sidebar
-                isMobileOpen={isMobileOpen}
-                toggleMobile={() => setIsMobileOpen(!isMobileOpen)}
-                isDesktopCollapsed={isDesktopCollapsed}
-                toggleDesktop={() => setIsDesktopCollapsed(!isDesktopCollapsed)}
-                currentView={currentView}
-                onChangeView={(view) => {
-                    setCurrentView(view);
-                    setIsMobileOpen(false);
-                }}
-                isDarkMode={isDarkMode}
-                toggleTheme={toggleTheme}
-                onLogout={handleLogout}
-                hasAccess={hasAccess}
-            />
+        <div className={`flex min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300`}>
+            {/* Sidebar global — ocultada APENAS durante a Sessão ATIVA */}
+            {(currentView !== AppView.THERAPY || !isTherapySessionActive) && (
+                <Sidebar
+                    isMobileOpen={isMobileOpen}
+                    toggleMobile={() => setIsMobileOpen(!isMobileOpen)}
+                    isDesktopCollapsed={isDesktopCollapsed}
+                    toggleDesktop={() => setIsDesktopCollapsed(!isDesktopCollapsed)}
+                    currentView={currentView}
+                    onChangeView={(view) => {
+                        setCurrentView(view);
+                        setViewParams(null); // Clear params when using the sidebar
+                        setIsMobileOpen(false);
+                    }}
+                    isDarkMode={isDarkMode}
+                    toggleTheme={toggleTheme}
+                    themeMode={themeMode}
+                    setThemeMode={setThemeMode}
+                    onLogout={handleLogout}
+                    hasAccess={hasAccess}
+                />
+            )}
 
             <main className="flex-1 transition-all duration-300 ease-in-out overflow-x-hidden">
                 {/* Mobile Header Spacer */}
-                <div className="md:hidden h-16" />
+                {(currentView !== AppView.THERAPY || !isTherapySessionActive) && <div className="md:hidden h-16" />}
 
                 {/* Mobile Header */}
-                <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 z-40">
-                    <button onClick={() => setIsMobileOpen(true)} className="p-2 text-slate-600 dark:text-slate-300">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-                    </button>
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden shadow-lg shadow-primary-500/20">
-                            <img src="/logo-new.jpg" alt="TeraNexus" className="w-full h-full object-cover" />
+                {(currentView !== AppView.THERAPY || !isTherapySessionActive) && (
+                    <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 z-40">
+                        <button onClick={() => setIsMobileOpen(true)} className="p-2 text-slate-600 dark:text-slate-300">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                        </button>
+                        <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden shadow-lg shadow-primary-500/20">
+                                <img src="/logo-new.jpg" alt="TeraNexus" className="w-full h-full object-cover" />
+                            </div>
+                            <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white">Tera<span className="text-primary-600">Nexus</span></span>
                         </div>
-                        <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white">Tera<span className="text-primary-600">Nexus</span></span>
-                    </div>
-                    <div className="w-8" />
-                </header>
+                        <div className="w-8" />
+                    </header>
+                )}
 
                 <div className={currentView === AppView.THERAPY ? "w-full h-full md:h-screen" : "p-4 md:p-8 max-w-[1600px] mx-auto"}>
                     {renderView()}
@@ -301,7 +338,7 @@ const TherapistDashboard: React.FC = () => {
             </main>
 
             {/* Mobile Overlay */}
-            {isMobileOpen && (
+            {isMobileOpen && (currentView !== AppView.THERAPY || !isTherapySessionActive) && (
                 <div
                     className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm"
                     onClick={() => setIsMobileOpen(false)}

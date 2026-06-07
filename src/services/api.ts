@@ -165,7 +165,8 @@ export const api = {
       if (!therapistId) return MOCK_PATIENTS.map(p => ({ ...p, total_invested: 0, pending_amount: 0 }));
 
       try {
-        const [patientsRes, summaryRes] = await Promise.all([
+        const todayStr = new Date().toISOString().split('T')[0];
+        const [patientsRes, summaryRes, appointmentsRes] = await Promise.all([
           supabase
             .from('patients')
             .select('*')
@@ -175,6 +176,14 @@ export const api = {
             .from('patient_financial_summary')
             .select('patient_id, total_invested, pending_amount')
             .eq('therapist_id', therapistId),
+          supabase
+            .from('appointments')
+            .select('patient_id, date, time')
+            .eq('therapist_id', therapistId)
+            .gte('date', todayStr)
+            .in('status', ['scheduled', 'Agendado'])
+            .order('date', { ascending: true })
+            .order('time', { ascending: true })
         ]);
 
         if (patientsRes.error) throw patientsRes.error;
@@ -186,10 +195,20 @@ export const api = {
           ])
         );
 
+        const nextSessionMap = new Map<string, string>();
+        (appointmentsRes.data ?? []).forEach((apt: any) => {
+           if (!nextSessionMap.has(apt.patient_id)) {
+              // Ensure time format is correct. Postgres time might be '14:00' or '14:00:00'
+              const timeStr = apt.time && apt.time.split(':').length === 2 ? `${apt.time}:00` : apt.time;
+              nextSessionMap.set(apt.patient_id, `${apt.date}T${timeStr}`);
+           }
+        });
+
         return (patientsRes.data ?? []).map((p: Patient) => ({
           ...p,
           total_invested: financialMap.get(p.id)?.total_invested ?? 0,
           pending_amount: financialMap.get(p.id)?.pending_amount ?? 0,
+          nextSession: nextSessionMap.get(p.id) || p.nextSession || undefined,
         }));
       } catch (err: any) {
         console.error('listWithFinancials error:', err);
@@ -260,7 +279,7 @@ export const api = {
             date: a.date,
             title: `Sessão — ${a.type || 'TRG'}`,
             desc: a.notes || a.session_data?.notes || 'Sem anotações',
-            sessionData: a,
+            sessionData: a.session_data || {},
           })),
           ...transactions
             .filter((t: Transaction) => t.type === 'income')
@@ -316,7 +335,7 @@ export const api = {
       try {
         const { data, error } = await supabase
           .from('appointments')
-          .select('*, patients(name)')
+          .select('*, patients(name, email, phone)')
           .eq('therapist_id', therapistId)
           .order('date', { ascending: true });
         
@@ -324,11 +343,33 @@ export const api = {
         
         return (data || []).map((row: any) => ({
           ...row,
-          patientName: row.patients?.name || row.patient_name || 'Desconhecido',
-          patientId: row.patient_id
+          patientName: row.patients?.name || row.session_data?.patientName || row.patient_name || 'Desconhecido',
+          patientEmail: row.patients?.email || row.session_data?.patientEmail,
+          patientPhone: row.patients?.phone || row.session_data?.patientPhone,
+          patientId: row.patient_id || 'unregistered',
+          sessionData: row.session_data || {}
         })) ?? MOCK_APPOINTMENTS;
       } catch (err: any) {
         return MOCK_APPOINTMENTS;
+      }
+    },
+    get: async (id: string) => {
+      try {
+        const { data, error } = await supabase
+          .from('appointments')
+          .select('*, patients(*)')
+          .eq('id', id)
+          .single();
+        if (error) throw error;
+        return {
+          ...data,
+          patientName: data.patients?.name || data.session_data?.patientName || data.patient_name || 'Desconhecido',
+          patientId: data.patient_id || 'unregistered',
+          patient: data.patients,
+          sessionData: data.session_data || {}
+        };
+      } catch (err) {
+        return null;
       }
     },
     create: async (apt: Partial<Appointment>) => {
@@ -336,41 +377,121 @@ export const api = {
       if (!therapistId) throw new Error('Not authenticated');
       
       const payload: any = { ...apt, therapist_id: therapistId };
-      if (payload.patientId) { payload.patient_id = payload.patientId; delete payload.patientId; }
+      
+      // Se não tiver um patientId definido ou for 'unregistered', o Supabase rejeitaria por violar a restrição NOT NULL em patient_id (uuid).
+      // Então, criamos um paciente temporário na tabela patients.
+      if (!payload.patientId || payload.patientId === 'unregistered') {
+         const { data: newPatient, error: pError } = await supabase
+           .from('patients')
+           .insert({
+              therapist_id: therapistId,
+              name: payload.patientName || apt.patientName || 'Cliente Anjo (Pendente)',
+              email: payload.patientEmail || apt.patientEmail || null,
+              phone: payload.patientPhone || apt.patientPhone || null,
+              status: 'active'
+           })
+           .select()
+           .single();
+           
+         if (pError) throw new Error('Falha ao criar paciente temporário: ' + pError.message);
+         payload.patient_id = newPatient.id;
+      } else {
+         payload.patient_id = payload.patientId;
+      }
+      
+      delete payload.patientId;
+      
       if (payload.patientName) { delete payload.patientName; }
-      if (payload.sessionData) { payload.session_data = payload.sessionData; delete payload.sessionData; }
+      if (payload.patientEmail) { delete payload.patientEmail; }
+      if (payload.patientPhone) { delete payload.patientPhone; }
+      
+      if (payload.sessionData) { 
+          if (!payload.session_data) payload.session_data = payload.sessionData;
+          delete payload.sessionData; 
+      }
 
       const { data, error } = await supabase
         .from('appointments')
         .insert(payload)
-        .select('*, patients(name)')
+        .select('*, patients(name, email, phone)')
         .single();
       if (error) throw error;
+
+      if (payload.status === 'Concluído' || data.status === 'Concluído') {
+        try {
+          await supabase.from('transactions').insert({
+            therapist_id: data.therapist_id,
+            patient_id: data.patient_id,
+            appointment_id: data.id,
+            amount: Number(data.session_data?.price || 0),
+            type: 'income',
+            status: 'paid',
+            category: 'Sessão TRG',
+            description: 'Sessão registrada via agenda',
+            date: data.date
+          });
+        } catch (e) { }
+      }
       
       return {
         ...data,
-        patientName: data.patients?.name || apt.patientName || 'Desconhecido',
-        patientId: data.patient_id
+        patientName: data.patients?.name || data.session_data?.patientName || apt.patientName || 'Desconhecido',
+        patientEmail: data.patients?.email || data.session_data?.patientEmail,
+        patientPhone: data.patients?.phone || data.session_data?.patientPhone,
+        patientId: data.patient_id || 'unregistered'
       };
     },
     update: async (id: string, aptData: Partial<Appointment>) => {
       const payload: any = { ...aptData };
-      if (payload.patientId) { payload.patient_id = payload.patientId; delete payload.patientId; }
+      
+      if (payload.patientId) { 
+          // Similar handling could be added here if needed, but normally updates already have a patientId
+          payload.patient_id = payload.patientId === 'unregistered' ? null : payload.patientId; 
+          delete payload.patientId; 
+      }
+      
       if (payload.patientName) { delete payload.patientName; }
-      if (payload.sessionData) { payload.session_data = payload.sessionData; delete payload.sessionData; }
+      if (payload.patientEmail) { delete payload.patientEmail; }
+      if (payload.patientPhone) { delete payload.patientPhone; }
+      
+      if (payload.sessionData) { 
+          payload.session_data = payload.sessionData; 
+          delete payload.sessionData; 
+      }
 
       const { data: updated, error } = await supabase
         .from('appointments')
         .update(payload)
         .eq('id', id)
-        .select('*, patients(name)')
+        .select('*, patients(name, email, phone)')
         .single();
       if (error) throw error;
       
+      // Auto-sync para contornar falha de trigger no BD com status 'Concluído'
+      if (payload.status === 'Concluído' || updated.status === 'Concluído') {
+        try {
+          await supabase.from('transactions').insert({
+            therapist_id: updated.therapist_id,
+            patient_id: updated.patient_id,
+            appointment_id: updated.id,
+            amount: Number(updated.session_data?.price || 0),
+            type: 'income',
+            status: 'paid',
+            category: 'Sessão TRG',
+            description: 'Sessão registrada via agenda',
+            date: updated.date
+          });
+        } catch (e) {
+          // Ignora se já existir
+        }
+      }
+      
       return {
         ...updated,
-        patientName: updated.patients?.name || aptData.patientName || 'Desconhecido',
-        patientId: updated.patient_id
+        patientName: updated.patients?.name || updated.session_data?.patientName || aptData.patientName || 'Desconhecido',
+        patientEmail: updated.patients?.email || updated.session_data?.patientEmail,
+        patientPhone: updated.patients?.phone || updated.session_data?.patientPhone,
+        patientId: updated.patient_id || 'unregistered'
       };
     },
     delete: async (id: string) => {
@@ -506,6 +627,50 @@ export const api = {
         return null;
       }
     },
+
+    /**
+     * Sincroniza sessões pagas/concluídas que não geraram transação (Fallback para falha na trigger do DB)
+     */
+    syncMissing: async (): Promise<void> => {
+      const therapistId = await getTherapistId();
+      if (!therapistId) return;
+
+      try {
+        const { data: appointments } = await supabase
+          .from('appointments')
+          .select('*')
+          .eq('therapist_id', therapistId)
+          .in('status', ['Concluído', 'Concluída', 'completed', 'Realizada']);
+
+        if (!appointments || appointments.length === 0) return;
+
+        const { data: existingTx } = await supabase
+          .from('transactions')
+          .select('appointment_id')
+          .eq('therapist_id', therapistId)
+          .not('appointment_id', 'is', null);
+
+        const existingIds = new Set(existingTx?.map((t: any) => t.appointment_id) || []);
+        const missing = appointments.filter((a: any) => !existingIds.has(a.id) && a.patient_id);
+
+        if (missing.length > 0) {
+          const inserts = missing.map((a: any) => ({
+            therapist_id: a.therapist_id,
+            patient_id: a.patient_id,
+            appointment_id: a.id,
+            amount: Number(a.session_data?.price || 0),
+            type: 'income',
+            status: 'paid',
+            category: 'Sessão TRG',
+            description: 'Sessão registrada via agenda (sincronizada)',
+            date: a.date
+          }));
+          await supabase.from('transactions').insert(inserts);
+        }
+      } catch (err) {
+        console.error('Error syncing missing transactions:', err);
+      }
+    },
   },
 
   blockedTimes: {
@@ -518,10 +683,29 @@ export const api = {
       return saved ? JSON.parse(saved) : [];
     },
     create: async (data: any) => {
-      return await apiFetch('/api/blocked-slots', { method: 'POST', body: JSON.stringify(data) });
+      let created = await apiFetch('/api/blocked-slots', { method: 'POST', body: JSON.stringify(data) });
+      if (!created) {
+         const newBlock = { id: crypto.randomUUID(), ...data };
+         const saved = localStorage.getItem('TRG_BLOCKED_TIMES');
+         const list = saved ? JSON.parse(saved) : [];
+         list.push(newBlock);
+         localStorage.setItem('TRG_BLOCKED_TIMES', JSON.stringify(list));
+         created = newBlock;
+      }
+      return created;
     },
     delete: async (id: string) => {
-      return await apiFetch(`/api/blocked-slots?id=${id}`, { method: 'DELETE' });
+      let result = await apiFetch(`/api/blocked-slots?id=${id}`, { method: 'DELETE' });
+      if (!result) {
+         const saved = localStorage.getItem('TRG_BLOCKED_TIMES');
+         if (saved) {
+             let list = JSON.parse(saved);
+             list = list.filter((b: any) => b.id !== id);
+             localStorage.setItem('TRG_BLOCKED_TIMES', JSON.stringify(list));
+         }
+         result = true;
+      }
+      return result;
     }
   },
 

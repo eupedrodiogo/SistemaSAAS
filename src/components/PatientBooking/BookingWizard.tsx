@@ -31,6 +31,7 @@ const BookingWizard: React.FC = () => {
         therapistId: '',
         price: 0,
         therapistName: '',
+        isAnjo: false,
         transtornos: [],
         doresFisicas: [],
         temasFuturo: []
@@ -60,7 +61,7 @@ const BookingWizard: React.FC = () => {
                 if (therapist) {
                     setFormData(prev => ({
                         ...prev,
-                        price: therapist.price || 100, // Default to 100 if not set
+                        price: prev.isAnjo ? 0 : (therapist.price || 100), // Default to 100 if not set
                         therapistName: therapist.name
                     }));
                 }
@@ -89,8 +90,10 @@ const BookingWizard: React.FC = () => {
         }
 
         // Initialize from URL params
+        const isAnjoParam = new URLSearchParams(window.location.search).get('anjo') === 'true';
+
         if (therapistId) {
-            setFormData(prev => ({ ...prev, therapistId }));
+            setFormData(prev => ({ ...prev, therapistId, isAnjo: isAnjoParam, price: isAnjoParam ? 0 : prev.price }));
             setSkipTherapistSelection(true);
             setCurrentStep(2);
         } else if (step) {
@@ -182,7 +185,7 @@ const BookingWizard: React.FC = () => {
             const response = await fetch('/api/booking', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...formData, status: 'pending_payment' })
+                body: JSON.stringify({ ...formData, status: (formData as any).isAnjo ? 'scheduled' : 'pending_payment' })
             });
             const data = await response.json();
             if (response.ok) {
@@ -208,14 +211,14 @@ const BookingWizard: React.FC = () => {
 
     // Auto-redirect effect
     useEffect(() => {
-        if (isCompleted) {
+        if (isCompleted && !(formData as any).isAnjo) {
             const timer = setTimeout(() => {
                 // Redirect to login page so client can set up credentials
                 window.location.href = '/portal-paciente/cadastro';
             }, 6000); // 6 seconds
             return () => clearTimeout(timer);
         }
-    }, [isCompleted]);
+    }, [isCompleted, (formData as any).isAnjo]);
 
     if (isCompleted) {
         return (
@@ -224,12 +227,14 @@ const BookingWizard: React.FC = () => {
                     <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-6 text-green-600 dark:text-green-400">
                         <Check size={40} strokeWidth={3} />
                     </div>
-                    <h2 className="text-3xl font-bold text-slate-800 dark:text-white mb-2">Pagamento Confirmado!</h2>
+                    <h2 className="text-3xl font-bold text-slate-800 dark:text-white mb-2">
+                        {(formData as any).isAnjo ? 'Sessão Agendada!' : 'Pagamento Confirmado!'}
+                    </h2>
                     <p className="text-slate-600 dark:text-slate-300 mb-6">
                         Sua sessão foi agendada com sucesso. A confirmação será enviada automaticamente para seu WhatsApp.
                     </p>
 
-                    <div className="mb-4 flex flex-col items-center gap-4">
+                    <div className="mb-6 flex flex-col items-center gap-4">
                         <AddToCalendar
                             title="Sessão TRG - TeraNexus"
                             date={formData.date}
@@ -239,17 +244,44 @@ const BookingWizard: React.FC = () => {
                         />
                     </div>
 
-                    <div className="mb-8 p-4 bg-primary-50 dark:bg-primary-900/20 rounded-xl border border-primary-100 dark:border-primary-900/30 flex flex-col items-center gap-2">
-                        <div className="w-6 h-6 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
-                        <p className="text-sm font-bold text-primary-700 dark:text-primary-300">Sincronizando... Redirecionando em breve</p>
-                    </div>
+                    {(formData as any).isAnjo ? (
+                        <div className="space-y-4">
+                            <div className="p-4 bg-primary-50 dark:bg-primary-900/20 rounded-2xl border border-primary-100 dark:border-primary-900/30 text-left">
+                                <h4 className="font-bold text-primary-800 dark:text-primary-400 text-sm mb-1">Deseja acessar o Portal do Paciente?</h4>
+                                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                                    Crie seu acesso rápido e gratuito para utilizar seu diário de emoções, materiais compartilhados pelo terapeuta e assistir as gravações das sessões.
+                                </p>
+                            </div>
+                            
+                            <a
+                                href="/portal-paciente/cadastro"
+                                className="block w-full py-4 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-primary-500/30 hover:shadow-primary-500/40"
+                            >
+                                Sim, criar conta e acessar recursos
+                            </a>
 
-                    <a
-                        href="/portal-paciente/cadastro"
-                        className="block w-full py-4 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-primary-500/30 mb-3"
-                    >
-                        Acessar Portal Agora
-                    </a>
+                            <a
+                                href={`/sessao-cliente/${appointmentId}`}
+                                className="block w-full py-3.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-all border border-slate-200 dark:border-slate-700"
+                            >
+                                Não, apenas ir para sala de atendimento
+                            </a>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="mb-8 p-4 bg-primary-50 dark:bg-primary-900/20 rounded-xl border border-primary-100 dark:border-primary-900/30 flex flex-col items-center gap-2">
+                                <div className="w-6 h-6 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
+                                <p className="text-sm font-bold text-primary-700 dark:text-primary-300">Sincronizando... Redirecionando em breve</p>
+                            </div>
+
+                            <a
+                                href="/portal-paciente/cadastro"
+                                className="block w-full py-4 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-primary-500/30 mb-3"
+                            >
+                                Acessar Portal Agora
+                            </a>
+                        </>
+                    )}
                 </div>
             </div>
         );
@@ -264,7 +296,11 @@ const BookingWizard: React.FC = () => {
         const success = await createPendingBooking();
         setIsLoading(false);
         if (success) {
-            nextStep();
+            if ((formData as any).isAnjo) {
+                handleCompletion();
+            } else {
+                nextStep();
+            }
         } else {
             alert('Erro ao criar agendamento. Por favor, tente novamente.');
         }

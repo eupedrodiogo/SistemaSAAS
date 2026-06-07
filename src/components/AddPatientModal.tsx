@@ -32,7 +32,7 @@ const AddPatientModal: React.FC<AddPatientModalProps> = ({ isOpen, onClose, onSu
                     email,
                     phone,
                     therapist_id: therapistId,
-                    status: 'Ativo', // Default status
+                    status: 'active', // Default status
                     created_at: new Date().toISOString()
                 }]);
 

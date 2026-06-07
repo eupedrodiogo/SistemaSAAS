@@ -26,6 +26,8 @@ export interface Appointment {
   id: string;
   patientId: string;
   patientName: string;
+  patientEmail?: string;
+  patientPhone?: string;
   date: string;
   time: string;
   status: 'Agendado' | 'Concluído' | 'Cancelado' | 'scheduled' | 'pending_payment' | 'completed' | 'cancelled';
@@ -35,11 +37,15 @@ export interface Appointment {
 
 export interface SessionData {
   price?: number; // Valor cobrado na sessão
-  chronologicalHistory?: Record<string, number[]>;
-  somaticSud?: number;
-  thematicSud?: number;
-  futureSud?: number; // Positive SUD
-  potentializationSud?: number; // Positive SUD
+  // Fases Dual (Emocional / Físico)
+  somaticMentalHistory?: number[];
+  somaticPhysicalHistory?: number[];
+  thematicMentalHistory?: number[];
+  thematicPhysicalHistory?: number[];
+  futureMentalHistory?: number[];
+  futurePhysicalHistory?: number[];
+  potentializationMentalHistory?: number[];
+  potentializationPhysicalHistory?: number[]; // Positive SUD
   notes?: string;
   [key: string]: any;
 }
@@ -78,6 +84,7 @@ export interface NavItem {
 export interface ClientIntakeData {
   // Dados Pessoais
   nome?: string;
+  name?: string;
   dataNascimento?: string;
   rg?: string;
   cpf?: string;
@@ -88,6 +95,7 @@ export interface ClientIntakeData {
   uf?: string;
   telefone?: string;
   celular?: string;
+  phone?: string;
   email?: string;
   profissao?: string;
   empresa?: string;

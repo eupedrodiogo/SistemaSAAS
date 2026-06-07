@@ -13,7 +13,15 @@ import {
   VideoOff,
   Mic,
   ChevronDown,
-  FileText
+  FileText,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Maximize2,
+  Minimize2,
+  Play,
+  Power,
+  HelpCircle,
+  Sparkles,
 } from 'lucide-react';
 import { useSessionMedia } from '../hooks/useSessionMedia';
 import { ClientIntakeData } from 'types';
@@ -59,21 +67,53 @@ const DEFAULT_PHASES: ProtocolPhase[] = [
   { id: 'potencializacao', label: '5. Potencialização', isSystem: true },
 ];
 
-const SessionView: React.FC = () => {
+interface SessionViewProps {
+  onSessionActiveChange?: (isActive: boolean) => void;
+  onNavigateToReports?: (patientId: string) => void;
+}
+
+const PipVideoPlayer = ({ stream, isLocal }: { stream: MediaStream | null, isLocal: boolean }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      if (videoRef.current.srcObject !== stream) {
+        videoRef.current.srcObject = stream;
+      }
+    }
+  }, [stream]);
+
+  return (
+    <video
+      ref={videoRef}
+      autoPlay
+      playsInline
+      muted={isLocal}
+      className={`absolute inset-0 w-full h-full object-cover z-10 ${isLocal ? '-scale-x-100' : ''}`}
+    />
+  );
+};
+
+const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavigateToReports }) => {
   const { session } = useAuth();
   const [patients, setPatients] = useState<any[]>([]);
   const [selectedPatientId, setSelectedPatientId] = useState('');
+
+  // Session Lifecycle State
+  const [isSessionStarted, setIsSessionStarted] = useState(false);
 
   // Timer State
   const [timer, setTimer] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [sessionNumber, setSessionNumber] = useState(1);
+  const [isAnamneseModalOpen, setIsAnamneseModalOpen] = useState(false);
 
   // Protocol & Phase State
   const [phase, setPhase] = useState('anamnese');
   const [phases, setPhases] = useState<ProtocolPhase[]>(DEFAULT_PHASES);
   const [isEditingProtocol, setIsEditingProtocol] = useState(false);
   const [isProtocolCollapsed, setIsProtocolCollapsed] = useState(false);
+  const [isFasesOpen, setIsFasesOpen] = useState(true);
   const [customPhaseName, setCustomPhaseName] = useState('');
   const [isSafetyOpen, setIsSafetyOpen] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
@@ -100,15 +140,81 @@ const SessionView: React.FC = () => {
   // ── Cockpit State (Fase Cronológica) ──────────────────────────────
   const AGE_RANGES = ['0-10 anos', '11-20 anos', '21-30 anos', '31-40 anos', '41-50 anos', '51-60 anos', '61+ anos'];
   const [selectedAgeRange, setSelectedAgeRange] = useState(AGE_RANGES[0]);
+  const [selectedCycle, setSelectedCycle] = useState(1);
   const [mentalSud, setMentalSud]     = useState(0);
   const [physicalSud, setPhysicalSud] = useState(0);
   // Histórico de notas por faixa etária: { 'mentalHistory': {...}, 'physicalHistory': {...} }
   // Armazenado dentro de sessionData para persistência automática
 
+  // Fullscreen State
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Onboarding Modal State
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+
+  // Initialize data on component mount
+  useEffect(() => {
+    // Check onboarding
+    const hasSeenOnboarding = localStorage.getItem('TRG_HAS_SEEN_ONBOARDING');
+    if (!hasSeenOnboarding) {
+      setShowOnboardingModal(true);
+    }
+
+    const savedData = localStorage.getItem('TRG_SESSION_DRAFT');
+    if (savedData) {
+      const parsed = JSON.parse(savedData);
+    }
+  }, []);
+
   // Sync ref
   useEffect(() => {
     sessionDataRef.current = sessionData;
   }, [sessionData]);
+
+  // ── AUTO-RESUME: efeito dedicado, roda após o appointment ser carregado ─────
+  // Separado do fetchPatients para evitar race condition com operações async.
+  // Verifica se havia uma sessão ativa gravada no localStorage e retoma.
+  useEffect(() => {
+    if (!appointmentObj) return;              // Ainda carregando
+    if (isSessionStarted) return;             // Sessão já ativa, não fazer nada
+
+    const flag = localStorage.getItem('TRG_SESSION_ACTIVE_APP_ID');
+    const appId = appointmentObj.id;
+    if (!flag || flag !== appId) return;      // Não havia sessão ativa para este appointment
+
+    // Sessão deve ser retomada
+    setIsSessionStarted(true);
+    onSessionActiveChange?.(true);
+
+    // Restaurar a fase em progresso (se existir)
+    const lastPhase = sessionDataRef.current?.lastPhaseInProgress;
+    if (lastPhase) setPhase(lastPhase);
+    else setPhase('cronologico');
+
+    // ── Restaurar o timer: calcula o tempo decorrido desde o início da sessão
+    const startTs = parseInt(localStorage.getItem('TRG_SESSION_START_TS') || '0', 10);
+    if (startTs > 0) {
+      const elapsed = Math.floor((Date.now() - startTs) / 1000);
+      setTimer(elapsed > 0 ? elapsed : 0);
+    }
+
+    // Iniciar câmera automaticamente
+    startCamera();
+
+    // Iniciar timer
+    setIsTimerRunning(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appointmentObj]);
+
+  // Fullscreen Listener
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
 
   // AI & Video State
   const { currentAppointmentId: paramAppId } = useParams();
@@ -151,30 +257,74 @@ const SessionView: React.FC = () => {
     return roomKey ? `therapist-${roomKey}` : '';
   }, [roomKey]);
 
-  const { remoteStream, connectionStatus, messages, sendMessage } = useVideoCall({
+  const { remoteStream, connectionStatus, messages, sendMessage, sendSyncData } = useVideoCall({
     myId: myPeerId,
-    targetId: roomKey ? `client-${roomKey}` : '',
+    targetId: [
+      roomKey ? `client-${roomKey}` : '',
+      user?.id ? `client-${user.id}` : ''
+    ].filter(Boolean),
     isInitiator: true,
     localStream
   });
 
-  const saveSessionData = async (newData: any) => {
+  const saveSessionData = async (newData: any, isEndingSession: boolean = false) => {
     setSessionData(newData);
+    // Real-time sync of SUD and session progress to the client
+    if (sendSyncData) {
+      sendSyncData({ type: 'SESSION_DATA_UPDATE', payload: newData });
+    }
+
+    // ── Cache local: garante que os dados sobrevivam mesmo se o save no DB falhar
+    if (activeAppId) {
+      localStorage.setItem(`TRG_SESSION_DATA_${activeAppId}`, JSON.stringify(newData));
+    }
+    
     try {
       if (!activeAppId || !selectedPatientId) return;
 
-      await fetch(`/api/appointments?id=${activeAppId}`, {
+      // Obter o token de autenticação para enviar na requisição
+      const token = session?.access_token;
+      if (!token) {
+        console.warn('[saveSessionData] Sem token de auth — dados não serão persistidos no DB.');
+        return;
+      }
+
+      const payload = {
+        ...appointmentObj,
+        sessionData: newData
+      };
+
+      if (isEndingSession) {
+        payload.status = 'Concluído';
+      }
+
+      const response = await fetch(`/api/appointments?id=${activeAppId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...appointmentObj,
-          sessionData: newData
-        })
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
       });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        console.error('[saveSessionData] Erro ao salvar:', response.status, errData);
+      }
     } catch (e) {
       console.error("Failed to save session data", e);
     }
   };
+
+  // When client connects, immediately send the current session snapshot
+  // so they don't have to wait for the next update
+  React.useEffect(() => {
+
+    if (connectionStatus === 'connected' && sessionData && sendSyncData) {
+      sendSyncData({ type: 'SESSION_DATA_UPDATE', payload: sessionData });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectionStatus]);
 
   // Load SUD when phase changes
   useEffect(() => {
@@ -207,109 +357,155 @@ const SessionView: React.FC = () => {
         const data = await api.patients.list();
         setPatients(data);
 
+        // Helper to parse legacy pipe-separated notes
+        const parseLegacyNotes = (notes: string): Partial<ClientIntakeData> => {
+          if (!notes) return {};
+          const parts = notes.split('|').map(s => s.trim());
+          
+          let complaint = notes;
+          const transtornos: {name: string, level: number}[] = [];
+          const doresFisicas: {name: string, level: number}[] = [];
+          const temasFuturo: {name: string, level: number}[] = [];
+
+          parts.forEach(part => {
+            if (part.toLowerCase().startsWith('queixa:')) {
+              complaint = part.replace(/^queixa:\s*/i, '');
+            }
+            // "Transtornos: Abandono (10), Aborto (5)"
+            else if (part.toLowerCase().startsWith('transtornos:')) {
+              const itemsStr = part.replace(/^transtornos:\s*/i, '');
+              itemsStr.split(',').forEach(item => {
+                const match = item.match(/(.+?)\s*\((\d+)\)/);
+                if (match) {
+                  transtornos.push({ name: match[1].trim(), level: parseInt(match[2]) });
+                }
+              });
+            }
+            else if (part.toLowerCase().startsWith('dores físicas:') || part.toLowerCase().startsWith('dores:') || part.toLowerCase().startsWith('doenças físicas:')) {
+              const itemsStr = part.replace(/^(dores físicas|dores|doenças físicas):\s*/i, '');
+              itemsStr.split(',').forEach(item => {
+                const match = item.match(/(.+?)\s*\((\d+)\)/);
+                if (match) {
+                  doresFisicas.push({ name: match[1].trim(), level: parseInt(match[2]) });
+                }
+              });
+            }
+            else if (part.toLowerCase().startsWith('temas:') || part.toLowerCase().startsWith('futuro:')) {
+              const itemsStr = part.replace(/^(temas|futuro):\s*/i, '');
+              itemsStr.split(',').forEach(item => {
+                const match = item.match(/(.+?)\s*\((\d+)\)/);
+                if (match) {
+                  temasFuturo.push({ name: match[1].trim(), level: parseInt(match[2]) });
+                }
+              });
+            }
+          });
+
+          return {
+            complaint: parts.length > 1 ? complaint : notes,
+            transtornos: transtornos.length > 0 ? transtornos : undefined,
+            doresFisicas: doresFisicas.length > 0 ? doresFisicas : undefined,
+            temasFuturo: temasFuturo.length > 0 ? temasFuturo : undefined,
+          };
+        };
+
         // Determine which appointment to load: Route param > LocalStorage
         const localAppId = localStorage.getItem('TRG_CURRENT_APPOINTMENT_ID');
         const targetAppointmentId = paramAppId || localAppId;
 
+        const loadFallbackPatient = (pId: string) => {
+          setSelectedPatientId(pId);
+          const p = data.find((pat: any) => pat.id === pId);
+          if (p) {
+            const parsedLegacy = parseLegacyNotes(p.notes || '');
+            setIntakeData({
+              nome: p.name,
+              email: p.email,
+              complaint: parsedLegacy.complaint || p.notes,
+              transtornos: parsedLegacy.transtornos || [],
+              doresFisicas: parsedLegacy.doresFisicas || [],
+              temasFuturo: parsedLegacy.temasFuturo || [],
+            } as any);
+          }
+        };
+
         if (targetAppointmentId) {
-          const appResponse = await fetch(`/api/appointments/${targetAppointmentId}`, {
-            headers: {
-              'Authorization': `Bearer ${session?.access_token}`
-            }
-          });
-          if (appResponse.ok) {
-            const appointment = await appResponse.json();
-            if (appointment) {
-              setAppointmentObj(appointment); // Save full object
-              if (appointment.patientId) setSelectedPatientId(appointment.patientId);
+          const appointment = await api.appointments.get(targetAppointmentId);
+          
+          if (appointment) {
+            setAppointmentObj(appointment); // Save full object
+            if (appointment.patientId) setSelectedPatientId(appointment.patientId);
 
-              // Load session data
-              if (appointment.sessionData) {
-                setSessionData(appointment.sessionData);
+            // Load session data — prefer DB, fallback to localStorage cache
+            const lsKey = `TRG_SESSION_DATA_${targetAppointmentId}`;
+            if (appointment.sessionData && Object.keys(appointment.sessionData).length > 0) {
+              setSessionData(appointment.sessionData);
+              // Mantém o cache local atualizado
+              localStorage.setItem(lsKey, JSON.stringify(appointment.sessionData));
+            } else {
+              // DB vazio: tenta restaurar do cache local (caso o save ainda não chegou ao servidor)
+              const cached = localStorage.getItem(lsKey);
+              if (cached) {
+                try { setSessionData(JSON.parse(cached)); } catch (_) {}
               }
+            }
 
-              // Mock intake data for demo if not found
-
-              // Attempt to load intake data from appointment notes (where it acts as anamnesis storage)
-              // Attempt to load intake data from appointment notes (where it acts as anamnesis storage)
-              if (appointment.notes) {
-                try {
-                  let parsedNotes = appointment.notes;
-                  if (typeof parsedNotes === 'string') {
-                    // Only parse if it looks like a JSON object/array
-                    if (parsedNotes.trim().startsWith('{') || parsedNotes.trim().startsWith('[')) {
-                      parsedNotes = JSON.parse(parsedNotes);
-                    }
-                  }
-
-                  // Basic validation to see if it's anamnesis data (has at least one expected key or is object)
-                  if (typeof parsedNotes === 'object' && parsedNotes !== null) {
-                    setIntakeData({
-                      ...parsedNotes,
-                      // Ensure arrays exist even if empty in JSON
-                      transtornos: parsedNotes.transtornos || [],
-                      doresFisicas: parsedNotes.doresFisicas || [],
-                      temasFuturo: parsedNotes.temasFuturo || []
-                    } as ClientIntakeData);
-                  } else {
-                    // String legacy note case
-                    throw new Error("Legacy string note");
-                  }
-                } catch (e) {
-                  // Not JSON, assume simple string notes or legacy data
-                  // We might still want to populate complaint if it's a simple string
-                  if (!intakeData) {
-                    setIntakeData({
-                      nome: appointment.patientName,
-                      email: 'cliente@exemplo.com',
-                      complaint: typeof appointment.notes === 'string' ? appointment.notes : "Notas legadas",
-                      transtornos: [],
-                      doresFisicas: [],
-                      temasFuturo: []
-                    } as ClientIntakeData);
+            // Attempt to load intake data from appointment notes (where it acts as anamnesis storage)
+            if (appointment.notes) {
+              try {
+                let parsedNotes = appointment.notes;
+                if (typeof parsedNotes === 'string') {
+                  // Only parse if it looks like a JSON object/array
+                  if (parsedNotes.trim().startsWith('{') || parsedNotes.trim().startsWith('[')) {
+                    parsedNotes = JSON.parse(parsedNotes);
                   }
                 }
-              }
 
-              if (!intakeData && !appointment.notes) {
-                const mockIntake: ClientIntakeData = {
-                  nome: appointment.patientName,
-                  email: 'cliente@exemplo.com',
-                  complaint: "Ansiedade generalizada e dificuldade de dormir.",
-                  int_ansiedade: 'Muita',
-                  int_medo: 'Média',
-                  dataNascimento: '1985-05-15',
-                  cidade: 'São Paulo',
-                  uf: 'SP',
-                  estadoCivil: 'Casado(a)',
-                  profissao: 'Advogado(a)',
-                  religiao: 'Católica',
-                  insonia: 'Sim, dificuldade para iniciar',
-                  nivelStress: 'Alto (8/10)',
-                  medications: 'Clonazepam s/n',
-                  maioresMedosHoje: 'Falhar profissionalmente',
-                  sentimentoCulpa: 'Sim, por não dar atenção à família',
-                  visaoFuturo: 'Me vejo mais calmo e organizado'
-                };
-                setIntakeData(mockIntake);
+                // Basic validation to see if it's anamnesis data
+                if (typeof parsedNotes === 'object' && parsedNotes !== null) {
+                  setIntakeData({
+                    ...parsedNotes,
+                    transtornos: parsedNotes.transtornos || [],
+                    doresFisicas: parsedNotes.doresFisicas || [],
+                    temasFuturo: parsedNotes.temasFuturo || []
+                  } as ClientIntakeData);
+                } else {
+                  throw new Error("Legacy string note");
+                }
+              } catch (e) {
+                if (!intakeData) {
+                  const parsedLegacy = parseLegacyNotes(appointment.patient?.notes || appointment.notes || '');
+                  setIntakeData({
+                    nome: appointment.patientName,
+                    email: appointment.patient?.email || 'cliente@exemplo.com',
+                    complaint: parsedLegacy.complaint || "Notas legadas",
+                    transtornos: parsedLegacy.transtornos || [], 
+                    doresFisicas: parsedLegacy.doresFisicas || [], 
+                    temasFuturo: parsedLegacy.temasFuturo || []
+                  } as ClientIntakeData);
+                }
               }
             }
+
+            if (!intakeData && !appointment.notes) {
+              const parsedLegacy = parseLegacyNotes(appointment.patient?.notes || '');
+              const mockIntake: ClientIntakeData = {
+                nome: appointment.patientName,
+                email: appointment.patient?.email || 'cliente@exemplo.com',
+                complaint: parsedLegacy.complaint || appointment.patient?.notes || "Sessão agendada.",
+                transtornos: parsedLegacy.transtornos || [], doresFisicas: parsedLegacy.doresFisicas || [], temasFuturo: parsedLegacy.temasFuturo || []
+              };
+              setIntakeData(mockIntake);
+            }
+          } else {
+            // Target appointment not found, fallback to patient
+            const savedPatientId = localStorage.getItem('TRG_CURRENT_PATIENT_ID');
+            if (savedPatientId) loadFallbackPatient(savedPatientId);
           }
         } else {
           // Fallback: If no specific appointment, try to load just the patient from LS
           const savedPatientId = localStorage.getItem('TRG_CURRENT_PATIENT_ID');
-          if (savedPatientId) {
-            setSelectedPatientId(savedPatientId);
-            // Try to load basic info for this patient
-            const p = data.find((pat: any) => pat.id === savedPatientId);
-            if (p) {
-              setIntakeData({
-                nome: p.name,
-                email: p.email,
-                complaint: p.notes,
-              } as any);
-            }
-          }
+          if (savedPatientId) loadFallbackPatient(savedPatientId);
         }
       } catch (error) {
         console.error("Error fetching patients:", error);
@@ -317,6 +513,27 @@ const SessionView: React.FC = () => {
     };
     fetchPatients();
   }, [paramAppId, session]);
+
+  // Sincroniza o sessionNumber sempre que um paciente é carregado (via hook ou manual)
+  useEffect(() => {
+    if (selectedPatientId) {
+      api.appointments.list().then(apps => {
+        const completed = apps.filter(a =>
+          a.patientId === selectedPatientId &&
+          (a.status === 'Concluído' || a.status === 'completed') &&
+          a.sessionData?.clinicalRecord &&
+          // Não contar o appointment atual (em progresso) como concluído
+          a.id !== activeAppId
+        );
+        setSessionNumber(completed.length + 1);
+      }).catch(err => {
+        console.error("Erro ao buscar agendamentos", err);
+        setSessionNumber(1);
+      });
+    }
+  // activeAppId deriva de appointmentObj que muda depois do fetch inicial
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPatientId, activeAppId]);
 
   // Handle manual patient selection
   const handleManualPatientSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -336,6 +553,16 @@ const SessionView: React.FC = () => {
         complaint: p.notes || '', // Use notes as complaint
         // ... defaults
       } as ClientIntakeData);
+    }
+    
+    // Atualizar número da sessão
+    if (pId) {
+      api.appointments.list().then(apps => {
+        const completed = apps.filter(a => a.patientId === pId && (a.status === 'Concluído' || a.status === 'completed') && a.sessionData?.clinicalRecord);
+        setSessionNumber(completed.length + 1);
+      }).catch(err => {
+        setSessionNumber(1);
+      });
     }
   };
 
@@ -434,6 +661,134 @@ const SessionView: React.FC = () => {
 
   const toggleTimer = () => setIsTimerRunning(!isTimerRunning);
 
+  const handleStartSession = async () => {
+    setIsSessionStarted(true);
+    onSessionActiveChange?.(true);
+
+    // Marca esta sessão como ativa no localStorage para que um reload a retome automaticamente
+    if (activeAppId) {
+      localStorage.setItem('TRG_SESSION_ACTIVE_APP_ID', activeAppId);
+      // Salva o epoch do início da sessão para recuperar o timer após reload
+      // Ajusta pelo tempo já decorrido (caso seja uma retomada com timer != 0)
+      const adjustedStart = Date.now() - (timer * 1000);
+      localStorage.setItem('TRG_SESSION_START_TS', String(adjustedStart));
+    }
+    
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.error(`Erro ao tentar entrar em tela cheia: ${err.message}`);
+      });
+    }
+    
+    // Inicia o timer automaticamente ao iniciar a sessão se ele estiver parado
+    if (!isTimerRunning) {
+      setIsTimerRunning(true);
+    }
+    
+    // Inicia o vídeo automaticamente
+    if (!isVideoActive) {
+      startCamera();
+    }
+    
+    // Determina a fase de entrada:
+    // Se o sessionData atual já tem dados (retomada), vai para a última fase em progresso.
+    // Se é uma sessão nova, vai para cronológico ou baseado no histórico.
+    const savedPhase = sessionData?.lastPhaseInProgress;
+    if (savedPhase) {
+      setPhase(savedPhase);
+      return; // Retomada — não sobrescreve o estado
+    }
+
+    if (selectedPatientId) {
+      try {
+        const apps = await api.appointments.list();
+        const patientApps = apps.filter(a => a.patientId === selectedPatientId && (a.status === 'Concluído' || a.status === 'completed') && a.sessionData?.clinicalRecord);
+        if (patientApps.length === 0) {
+          setPhase('cronologico');
+        } else {
+          patientApps.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          const lastSession = patientApps[0].sessionData.clinicalRecord;
+          setPhase(lastSession?.lastPhase || 'cronologico');
+        }
+      } catch (err) {
+        console.error("Error loading previous sessions for phase", err);
+        setPhase('cronologico');
+      }
+    } else {
+      setPhase('cronologico');
+    }
+  };
+
+  const handleEndSession = () => {
+    // 1. Desativa a sessão e para o timer
+    setIsSessionStarted(false);
+    setIsTimerRunning(false);
+    onSessionActiveChange?.(false);
+
+    // Remove todas as flags da sessão
+    localStorage.removeItem('TRG_SESSION_ACTIVE_APP_ID');
+    localStorage.removeItem('TRG_SESSION_START_TS');
+    if (activeAppId) localStorage.removeItem(`TRG_SESSION_DATA_${activeAppId}`);
+    
+    // 2. Desliga a câmera
+    if (isVideoActive) stopCamera();
+    
+    // 3. Persiste o registro completo desta sessão no banco
+    if (selectedPatientId) {
+      const sessionRecord = {
+        id: `session-${Date.now()}`,
+        sessionNumber,
+        date: new Date().toISOString(),
+        durationSeconds: timer,
+        patientId: selectedPatientId,
+        patientName: patients.find(p => p.id === selectedPatientId)?.name || 'Paciente',
+        observation: observation,
+        cycleNotes: sessionData.cycleNotes || {},
+        transcript,
+        phaseRecords,
+        sudLevels: {
+          somatico: sessionData.somaticSud || 0,
+          tematico: sessionData.thematicSud || 0,
+          futuro: sessionData.futureSud || 0,
+          potencializacao: sessionData.potentializationSud || 0,
+          mentalCronologico: mentalSud,
+          fisicoCronologico: physicalSud,
+        },
+        ageRange: selectedAgeRange,
+        lastPhase: phase,
+      };
+
+      // Ao encerrar, salva o clinicalRecord e marca como Concluído — remove o lastPhaseInProgress
+      const finalData = { ...sessionData, clinicalRecord: sessionRecord };
+      delete finalData.lastPhaseInProgress;
+      saveSessionData(finalData, true);
+      localStorage.removeItem(`TRG_SESSIONS_${selectedPatientId}`);
+    }
+    
+    // 4. Sair da tela cheia
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(err => console.error(err));
+    }
+    
+    // 5. Zera a sessão para preparar a próxima
+    setTimer(0);
+    setSessionNumber(prev => prev + 1);
+    setPhase('anamnese');
+    setSessionData({});
+    setPhaseRecords({});
+    setObservation('');
+    setSudLevel(0);
+    setMentalSud(0);
+    setPhysicalSud(0);
+    setSelectedAgeRange(AGE_RANGES[0]);
+    setSelectedCycle(1);
+    setTranscript('');
+    setAiSuggestions([]);
+    
+    // 6. Redirecionar
+    navigate('.', { state: { sidebarCollapsed: true }, replace: true });
+  };
+
   const saveRecordingToGallery = async () => {
     // Mock saving to gallery
     // For now, simpler feedback
@@ -481,6 +836,7 @@ const SessionView: React.FC = () => {
   // ── Cockpit Handlers ────────────────────────────────────────────────
   const handleAgeRangeChange = (range: string) => {
     setSelectedAgeRange(range);
+    setSelectedCycle(1);
     setMentalSud(0);
     setPhysicalSud(0);
   };
@@ -499,8 +855,28 @@ const SessionView: React.FC = () => {
 
   const handleAdvancePhase = () => {
     const idx = phases.findIndex(p => p.id === phase);
-    if (idx < phases.length - 1) setPhase(phases[idx + 1].id);
+    if (idx < phases.length - 1) {
+      const nextPhase = phases[idx + 1].id;
+      setPhase(nextPhase);
+      // Persiste a fase atual no banco para que um reload retome do ponto correto
+      if (isSessionStarted) {
+        saveSessionData({ ...sessionData, lastPhaseInProgress: nextPhase });
+      }
+    }
   };
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.error(`Erro ao tentar entrar em tela cheia: ${err.message}`);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
+
 
   // ── Render: Conteúdo central por fase ────────────────────────────────
   const renderPhaseContent = () => {
@@ -509,141 +885,143 @@ const SessionView: React.FC = () => {
         return <SessionNotes intakeData={intakeData} observation={observation} onObservationChange={setObservation} />;
 
       case 'cronologico':
-        // No Cockpit Mode, o centro mostra apenas script + gráfico.
-        // Os controles de SUD ficam no CockpitPanel à direita.
+        // No Cockpit Mode, o centro mostra apenas o gráfico dual.
+        // Script e controles de SUD ficam no CockpitPanel à direita.
         return (
           <ChronologicalPhase
             selectedRange={selectedAgeRange}
             onRangeChange={handleAgeRangeChange}
             ranges={AGE_RANGES}
             mentalHistory={sessionData.mentalHistory || {}}
+            physicalHistory={sessionData.physicalHistory || {}}
           />
         );
 
       default:
         const currentPhaseObj = phases.find(p => p.id === phase);
         return (
-          <div className="p-6 space-y-6 animate-fade-in">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                <span className="p-2 bg-primary-100 dark:bg-primary-900/30 text-primary-600 rounded-lg">
-                  {phase === 'somatico'        && <Target size={20} />}
-                  {phase === 'tematico'        && <Waves  size={20} />}
-                  {phase === 'futuro'          && <Zap    size={20} />}
-                  {phase === 'potencializacao' && <Smile  size={20} />}
-                  {!['somatico','tematico','futuro','potencializacao'].includes(phase) && <Flag size={20} />}
-                </span>
-                {currentPhaseObj?.label}
-              </h2>
-              <span className={`px-3 py-1 rounded-full text-xs font-bold border
-                ${['potencializacao'].includes(phase)
-                  ? (sudLevel > 7 ? 'bg-green-50 text-green-600 border-green-200' : 'bg-slate-50 text-slate-600 border-slate-200')
-                  : (sudLevel > 7 ? 'bg-red-50 text-red-600 border-red-200'       : 'bg-green-50 text-green-600 border-green-200')
-                }`}>
-                {['potencializacao'].includes(phase) ? 'Nível Positivo' : 'SUD Atual'}: {sudLevel}
-              </span>
-            </div>
-
-            <SudScale
-              value={sudLevel}
-              onChange={handleSudChange}
-              scaleType={['potencializacao'].includes(phase) ? 'positive' : 'distress'}
-              label={['potencializacao'].includes(phase) ? 'Nível de Fortalecimento (0-10)' : undefined}
-            />
+          <div className="p-0 sm:p-3 h-full animate-fade-in flex flex-col">
 
             {phase === 'somatico' && (
               <StandardPhase
-                currentValue={sudLevel}
-                onRegister={() => saveSessionData({ ...sessionData, somaticHistory: [...(sessionData.somaticHistory||[]), sudLevel] })}
-                history={sessionData.somaticHistory || []}
+                mentalHistory={sessionData.somaticMentalHistory || []}
+                physicalHistory={sessionData.somaticPhysicalHistory || []}
                 type="distress"
-                scriptTitle="Foco Somático"
-                scriptContent="Concentre-se apenas na sensação física. Onde ela está localizada? Qual o tamanho? Tem cor? Temperatura? Apenas observe essa sensação, sem julgar, sem tentar mudar. Deixe que o seu cérebro faça o processamento..."
-                customScriptContent={currentPhaseObj?.customScript}
-                onUpdateScript={(val) => updateCustomScript(phase, val)}
               />
             )}
             {phase === 'tematico' && (
               <StandardPhase
-                currentValue={sudLevel}
-                onRegister={() => saveSessionData({ ...sessionData, thematicHistory: [...(sessionData.thematicHistory||[]), sudLevel] })}
-                history={sessionData.thematicHistory || []}
+                mentalHistory={sessionData.thematicMentalHistory || []}
+                physicalHistory={sessionData.thematicPhysicalHistory || []}
                 type="distress"
-                scriptTitle="Foco Temático"
-                scriptContent="Concentre-se no tema que estamos trabalhando. O que vem à mente agora? Qual a pior parte disso?"
-                customScriptContent={currentPhaseObj?.customScript}
-                onUpdateScript={(val) => updateCustomScript(phase, val)}
               />
             )}
             {phase === 'futuro' && (
               <StandardPhase
-                currentValue={sudLevel}
-                onRegister={() => saveSessionData({ ...sessionData, futureHistory: [...(sessionData.futureHistory||[]), sudLevel] })}
-                history={sessionData.futureHistory || []}
+                mentalHistory={sessionData.futureMentalHistory || []}
+                physicalHistory={sessionData.futurePhysicalHistory || []}
                 type="distress"
-                scriptTitle="Foco no Futuro"
-                scriptContent="Imagine a situação futura que te preocupa. Rode esse filme mentalmente. O que você sente ao imaginar isso?"
-                customScriptContent={currentPhaseObj?.customScript}
-                onUpdateScript={(val) => updateCustomScript(phase, val)}
               />
             )}
             {phase === 'potencializacao' && (
               <StandardPhase
-                currentValue={sudLevel}
-                onRegister={() => saveSessionData({ ...sessionData, potentializationHistory: [...(sessionData.potentializationHistory||[]), sudLevel] })}
-                history={sessionData.potentializationHistory || []}
+                mentalHistory={sessionData.potentializationMentalHistory || []}
+                physicalHistory={sessionData.potentializationPhysicalHistory || []}
                 type="positive"
-                scriptTitle="Potencialização"
-                scriptContent="Conecte-se com essa sensação de vitória, de força. Sinta isso crescer dentro de você. De 0 a 10, quão forte é essa sensação boa?"
-                customScriptContent={currentPhaseObj?.customScript}
-                onUpdateScript={(val) => updateCustomScript(phase, val)}
               />
             )}
-            {!['somatico','tematico','futuro','potencializacao'].includes(phase) && !currentPhaseObj?.customScript && (
-              <TherapistScript title="Script Padrão" editable onEdit={(val) => updateCustomScript(phase, val)}>
-                "Concentre-se no desconforto remanescente. O que vem agora?"
-              </TherapistScript>
-            )}
-            {!['somatico','tematico','futuro','potencializacao'].includes(phase) && currentPhaseObj?.customScript && (
-              <TherapistScript title="Script Personalizado" editable onEdit={(val) => updateCustomScript(phase, val)}>
-                {currentPhaseObj.customScript}
-              </TherapistScript>
-            )}
-
-            <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
-              <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
-                <FileText size={16} /> Notas da Sessão
-              </h3>
-              <textarea
-                value={sessionData.notes || ''}
-                onChange={(e) => setSessionData({ ...sessionData, notes: e.target.value })}
-                onBlur={() => saveSessionData(sessionData)}
-                className="w-full h-32 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none transition-all"
-                placeholder="Registre observações importantes, insights ou reações do cliente..."
+            {!['somatico','tematico','futuro','potencializacao'].includes(phase) && (
+              <StandardPhase
+                mentalHistory={[]}
+                physicalHistory={[]}
+                type="distress"
               />
-            </div>
-
-            <div className="flex justify-end pt-4">
-              <button
-                onClick={handleAdvancePhase}
-                className="flex items-center gap-2 px-6 py-3 bg-slate-900 dark:bg-primary-600 text-white rounded-xl shadow-lg hover:bg-slate-800 dark:hover:bg-primary-500 transition-all font-bold"
-              >
-                Concluir Fase <ArrowRight size={18} />
-              </button>
-            </div>
+            )}
           </div>
         );
     }
   };
 
 
+  const renderCockpitContent = () => (
+    <CockpitPanel
+      mode="dual"
+      phaseLabel={phases.find(p => p.id === phase)?.label || 'Fase'}
+      
+      // Cronológico e outras Fases agora usam a mesma mecânica dual, mas gravam em propriedades diferentes
+      ageRanges={AGE_RANGES}
+      selectedAgeRange={selectedAgeRange}
+      onAgeRangeChange={handleAgeRangeChange}
+      selectedCycle={selectedCycle}
+      onCycleChange={setSelectedCycle}
+      
+      mentalSud={mentalSud}
+      onMentalSudChange={setMentalSud}
+      onRegisterMentalSud={() => {
+          if (phase === 'cronologico') handleRegisterMentalSud();
+          else if (phase === 'somatico') saveSessionData({ ...sessionData, somaticMentalHistory: [...(sessionData.somaticMentalHistory||[]), mentalSud] });
+          else if (phase === 'tematico') saveSessionData({ ...sessionData, thematicMentalHistory: [...(sessionData.thematicMentalHistory||[]), mentalSud] });
+          else if (phase === 'futuro') saveSessionData({ ...sessionData, futureMentalHistory: [...(sessionData.futureMentalHistory||[]), mentalSud] });
+          else if (phase === 'potencializacao') saveSessionData({ ...sessionData, potentializationMentalHistory: [...(sessionData.potentializationMentalHistory||[]), mentalSud] });
+          else saveSessionData({ ...sessionData, [phase + 'MentalHistory']: [...(sessionData[phase + 'MentalHistory']||[]), mentalSud] });
+      }}
+      mentalHistory={
+          phase === 'cronologico' ? ((sessionData.mentalHistory || {})[selectedAgeRange] || []) :
+          phase === 'somatico' ? (sessionData.somaticMentalHistory || []) :
+          phase === 'tematico' ? (sessionData.thematicMentalHistory || []) :
+          phase === 'futuro' ? (sessionData.futureMentalHistory || []) :
+          phase === 'potencializacao' ? (sessionData.potentializationMentalHistory || []) :
+          (sessionData[phase + 'MentalHistory'] || [])
+      }
+
+      physicalSud={physicalSud}
+      onPhysicalSudChange={setPhysicalSud}
+      onRegisterPhysicalSud={() => {
+          if (phase === 'cronologico') handleRegisterPhysicalSud();
+          else if (phase === 'somatico') saveSessionData({ ...sessionData, somaticPhysicalHistory: [...(sessionData.somaticPhysicalHistory||[]), physicalSud] });
+          else if (phase === 'tematico') saveSessionData({ ...sessionData, thematicPhysicalHistory: [...(sessionData.thematicPhysicalHistory||[]), physicalSud] });
+          else if (phase === 'futuro') saveSessionData({ ...sessionData, futurePhysicalHistory: [...(sessionData.futurePhysicalHistory||[]), physicalSud] });
+          else if (phase === 'potencializacao') saveSessionData({ ...sessionData, potentializationPhysicalHistory: [...(sessionData.potentializationPhysicalHistory||[]), physicalSud] });
+          else saveSessionData({ ...sessionData, [phase + 'PhysicalHistory']: [...(sessionData[phase + 'PhysicalHistory']||[]), physicalSud] });
+      }}
+      physicalHistory={
+          phase === 'cronologico' ? ((sessionData.physicalHistory || {})[selectedAgeRange] || []) :
+          phase === 'somatico' ? (sessionData.somaticPhysicalHistory || []) :
+          phase === 'tematico' ? (sessionData.thematicPhysicalHistory || []) :
+          phase === 'futuro' ? (sessionData.futurePhysicalHistory || []) :
+          phase === 'potencializacao' ? (sessionData.potentializationPhysicalHistory || []) :
+          (sessionData[phase + 'PhysicalHistory'] || [])
+      }
+      
+      // Props legacy ignoradas ou zeradas
+      singleSud={0}
+      onSingleSudChange={() => {}}
+      onRegisterSingleSud={() => {}}
+      singleHistory={[]}
+      isPositiveScale={phase === 'potencializacao'}
+
+      clinicalNotes={(sessionData.cycleNotes && sessionData.cycleNotes[selectedAgeRange] && sessionData.cycleNotes[selectedAgeRange][selectedCycle]) || ''}
+      onClinicalNotesChange={(v) => {
+         const currentAgeNotes = sessionData.cycleNotes?.[selectedAgeRange] || {};
+         const newCycleNotes = { ...sessionData.cycleNotes, [selectedAgeRange]: { ...currentAgeNotes, [selectedCycle]: v } };
+         saveSessionData({ ...sessionData, cycleNotes: newCycleNotes });
+      }}
+      onSaveClinicalNotes={() => {}}
+      onAdvancePhase={handleAdvancePhase}
+    />
+  );
+
   return (
-    <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden font-sans">
+    <div className="h-screen w-full flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden font-sans">
 
       {/* Header */}
       <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-2 sm:px-4 flex items-center justify-between shadow-sm z-30 shrink-0">
         <div className="flex items-center gap-1.5 sm:gap-4">
-          <button onClick={() => navigate(-1)} className="p-1.5 sm:p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500 transition-colors shrink-0">
+          <button
+            onClick={handleEndSession}
+            title="Sair da Sessão (Modo Foco)"
+            className="p-1.5 sm:p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500 transition-colors shrink-0"
+          >
             <ArrowLeft size={18} className="sm:w-5 sm:h-5" />
           </button>
           <div className="flex flex-col min-w-0">
@@ -672,36 +1050,50 @@ const SessionView: React.FC = () => {
 
               <span className="hidden xs:inline text-slate-300 dark:text-slate-700">•</span>
               <span className="hidden xs:inline text-[10px] sm:text-xs text-slate-400">{new Date().toLocaleDateString()}</span>
+              
+              {/* Nexus AI Status Header */}
+              {isSessionStarted && (
+                <div className="hidden lg:flex items-center gap-1.5 ml-2 text-[10px] sm:text-[11px] font-bold text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1 rounded-full border border-indigo-100 dark:border-indigo-800 shadow-sm transition-all">
+                   <Sparkles size={12} className={aiSuggestions.length === 0 ? "animate-pulse" : ""} />
+                   <span>{aiSuggestions.length > 0 ? aiSuggestions[aiSuggestions.length - 1] : "Nexus AI ouvindo e analisando..."}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-4 shrink-0">
           {/* Timer Component */}
-          <SessionTimer
-            seconds={timer}
-            isActive={isTimerRunning}
-            onToggle={toggleTimer}
-            sessionNumber={sessionNumber}
-          />
+          <div className={`transition-opacity duration-300 ${!isSessionStarted ? 'opacity-40 grayscale pointer-events-none' : ''}`}>
+            <SessionTimer
+              seconds={timer}
+              isActive={isTimerRunning}
+              onToggle={toggleTimer}
+              sessionNumber={sessionNumber}
+            />
+          </div>
 
           <div className="hidden xs:block h-8 w-px bg-slate-200 dark:bg-slate-800 mx-1 sm:mx-2 shrink-0"></div>
 
+
           <button
-            onClick={() => setIsNotesOpen(!isNotesOpen)}
-            className={`p-2 sm:px-3 rounded-xl transition-all font-bold flex items-center gap-2 text-sm shrink-0 ${isNotesOpen ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400 shadow-inner' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white shadow-sm'}`}
-            title="Anotações Livres"
+            onClick={toggleFullscreen}
+            className="p-2 sm:px-3 rounded-xl transition-all font-bold flex items-center gap-2 text-sm shrink-0 bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white shadow-sm"
+            title={isFullscreen ? "Sair da Tela Cheia" : "Tela Cheia (Imersão)"}
           >
-            <FileText size={18} className="w-[18px] h-[18px]" /> <span className="hidden md:inline">Anotações</span>
+            {isFullscreen ? <Minimize2 size={18} className="w-[18px] h-[18px]" /> : <Maximize2 size={18} className="w-[18px] h-[18px]" />}
+            <span className="hidden lg:inline">{isFullscreen ? "Sair Tela Cheia" : "Tela Cheia"}</span>
           </button>
 
           <button
-            onClick={() => !isVideoActive ? startCamera() : stopCamera()}
-            className={`p-2 rounded-xl transition-all shrink-0 ${isVideoActive ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400'}`}
-            title={isVideoActive ? "Encerrar Vídeo" : "Iniciar Vídeo"}
+            onClick={() => setShowOnboardingModal(true)}
+            className="p-2 sm:px-3 rounded-xl transition-all font-bold flex items-center gap-2 text-sm shrink-0 bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white shadow-sm"
+            title="Guia da Sessão (Ajuda)"
           >
-            {isVideoActive ? <VideoOff size={18} className="w-[18px] h-[18px]" /> : <VideoIcon size={18} className="w-[18px] h-[18px]" />}
+            <HelpCircle size={18} className="w-[18px] h-[18px]" />
+            <span className="hidden lg:inline">Ajuda</span>
           </button>
+
 
           <button
             onClick={() => setShowAiModal(true)}
@@ -709,6 +1101,16 @@ const SessionView: React.FC = () => {
           >
             <img src="/logo-new.jpg" alt="TeraNexus Logo" className="w-[18px] h-[18px] rounded" /> <span className="hidden md:inline">Nexus AI</span>
           </button>
+
+          {isSessionStarted && (
+            <button
+              onClick={handleEndSession}
+              className="flex items-center gap-2 p-2 sm:px-4 sm:py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-lg shadow-rose-900/20 transition-all font-bold text-sm shrink-0 animate-in fade-in zoom-in duration-300"
+              title="Finalizar Sessão e Voltar ao Dashboard"
+            >
+              <Power size={18} className="w-[18px] h-[18px]" /> <span className="hidden md:inline">Finalizar Sessão</span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -716,91 +1118,268 @@ const SessionView: React.FC = () => {
            MODO COCKPIT — Layout de 3 colunas
            L: Fases | C: Vídeo + Conteúdo | R: Painel
           ══════════════════════════════════════════════════════ */}
-      <div className="flex-1 overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row p-3 gap-3 relative custom-scrollbar">
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col lg:flex-row p-3 pt-0 lg:pt-3 gap-0 lg:gap-3 relative">
 
-        {/* ── COLUNA ESQUERDA: Menu de Fases ────────────────── */}
-        <ProtocolPhases
-          phases={phases}
-          currentPhase={phase}
-          isEditing={isEditingProtocol}
-          isSafetyOpen={isSafetyOpen}
-          aiSuggestions={aiSuggestions}
-          sentiment={sentiment}
-          setPhase={setPhase}
-          toggleEditing={() => setIsEditingProtocol(!isEditingProtocol)}
-          toggleSafety={() => setIsSafetyOpen(!isSafetyOpen)}
-          onMovePhase={handleMovePhase}
-          onRenamePhase={handleRenamePhase}
-          onDeletePhase={handleDeletePhase}
-          onAddCustomPhase={handleAddCustomPhase}
-          hasPhaseData={hasPhaseData}
-        />
-
-        {/* ── COLUNA CENTRAL: Vídeo (topo) + Conteúdo (base) ── */}
-        <div className="flex-1 flex flex-col gap-3 min-w-0 min-h-0">
-
-          {/* Vídeo - Fixo no topo no celular */}
-          <div className="sticky top-0 z-40 lg:relative lg:z-auto shrink-0 shadow-xl lg:shadow-none bg-slate-950 pb-2 lg:pb-0 lg:bg-transparent -mx-3 px-3 lg:mx-0 lg:px-0">
-            <SessionVideo
-              isVideoActive={isVideoActive}
-              videoRef={videoRef}
-              remoteVideoRef={remoteVideoRef}
-              stream={localStream}
-              remoteStream={remoteStream}
-              isMicMuted={isMicMuted}
-              isVideoMuted={isVideoMuted}
-              isRecording={isRecording}
-              recordingTime={recordingTime}
-              recordedChunksCount={recordedChunks.length}
-              connectionStatus={connectionStatus}
-              patientName={intakeData?.nome}
-              currentAppointmentId={activeAppId}
-              messages={messages}
-              onSendMessage={sendMessage}
-              onToggleMic={toggleMic}
-              onToggleVideo={toggleVideo}
-              onStartRecording={startRecording}
-              onStopRecording={stopRecording}
-              onSaveRecording={saveRecordingToGallery}
-              isProtocolCollapsed={isProtocolCollapsed}
-              onToggleProtocol={() => setIsProtocolCollapsed(!isProtocolCollapsed)}
+        {/* ── COLUNA ESQUERDA: Menu de Fases (colapsável - Desktop Apenas) ──── */}
+        <div
+          className={`
+            hidden lg:flex flex-col gap-4
+            transition-all duration-300 ease-in-out shrink-0 h-full
+            ${isFasesOpen 
+               ? 'lg:w-56 xl:w-60 opacity-100' 
+               : 'lg:w-0 opacity-0 pointer-events-none'}
+          `}
+        >
+          <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 pb-1">
+            <ProtocolPhases
+              phases={phases}
+              currentPhase={phase}
+              isEditing={isEditingProtocol}
+              isSafetyOpen={isSafetyOpen}
+              aiSuggestions={[]}
+              sentiment={sentiment}
+              setPhase={(newPhase: string) => {
+                setPhase(newPhase);
+                if (isSessionStarted) {
+                  saveSessionData({ ...sessionDataRef.current, lastPhaseInProgress: newPhase });
+                }
+              }}
+              toggleEditing={() => setIsEditingProtocol(!isEditingProtocol)}
+              toggleSafety={() => setIsSafetyOpen(!isSafetyOpen)}
+              onMovePhase={handleMovePhase}
+              onRenamePhase={handleRenamePhase}
+              onDeletePhase={handleDeletePhase}
+              onAddCustomPhase={handleAddCustomPhase}
+              hasPhaseData={hasPhaseData}
             />
           </div>
 
-          {/* Conteúdo da fase (script + gráfico para cronológico) */}
-          <div className="lg:flex-1 bg-slate-900 rounded-2xl border border-slate-800 shadow-sm lg:overflow-hidden flex flex-col min-h-0">
+          {/* Histórico de Notas SUD */}
+          {phase === 'cronologico' && isSessionStarted && (
+             <div className="bg-slate-900 rounded-2xl border border-slate-800 shadow-sm p-4 shrink-0 overflow-hidden flex flex-col h-[280px]">
+                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3 shrink-0 flex items-center gap-2">
+                   Histórico SUD ({selectedAgeRange})
+                </h4>
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-3">
+                   {/* Mental List */}
+                   <div>
+                      <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1.5">Emocional</p>
+                      <div className="flex flex-wrap gap-1.5">
+                         {((sessionData.mentalHistory || {})[selectedAgeRange] || []).map((val: number, i: number) => (
+                            <span key={`m-${i}`} className={`w-5 h-5 flex items-center justify-center rounded text-[10px] font-bold ${val >= 7 ? 'bg-red-900/40 text-red-400' : val >= 4 ? 'bg-amber-900/40 text-amber-400' : 'bg-emerald-900/40 text-emerald-400'}`}>
+                               {val}
+                            </span>
+                         ))}
+                         {((sessionData.mentalHistory || {})[selectedAgeRange] || []).length === 0 && <span className="text-[10px] text-slate-500">Nenhum</span>}
+                      </div>
+                   </div>
+                   {/* Físico List */}
+                   <div>
+                      <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1.5">Físico</p>
+                      <div className="flex flex-wrap gap-1.5">
+                         {((sessionData.physicalHistory || {})[selectedAgeRange] || []).map((val: number, i: number) => (
+                            <span key={`p-${i}`} className={`w-5 h-5 flex items-center justify-center rounded text-[10px] font-bold ${val >= 7 ? 'bg-red-900/40 text-red-400' : val >= 4 ? 'bg-amber-900/40 text-amber-400' : 'bg-emerald-900/40 text-emerald-400'}`}>
+                               {val}
+                            </span>
+                         ))}
+                         {((sessionData.physicalHistory || {})[selectedAgeRange] || []).length === 0 && <span className="text-[10px] text-slate-500">Nenhum</span>}
+                      </div>
+                   </div>
+                </div>
+             </div>
+          )}
+        </div>
+
+        {/* Botão de toggle — fica grudado na borda esquerda da área central */}
+        <button
+          onClick={() => setIsFasesOpen(v => !v)}
+          title={isFasesOpen ? 'Ocultar menu de fases' : 'Mostrar menu de fases'}
+          className="
+            hidden lg:flex items-center justify-center
+            self-start mt-2 w-6 h-12 -ml-1 shrink-0
+            bg-slate-800 hover:bg-slate-700
+            border border-slate-700 rounded-r-xl
+            text-slate-400 hover:text-white
+            transition-all duration-150 shadow-sm
+          "
+        >
+          {isFasesOpen ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
+        </button>
+
+        {/* ── COLUNA CENTRAL: Vídeo (flex-1, domina) + Gráfico (rodapé fixo) ── */}
+        <div className="flex-1 flex flex-col gap-2 min-w-0 min-h-0 overflow-y-auto lg:overflow-hidden custom-scrollbar">
+
+          {/* Vídeo — cresce para preencher o espaço (desktop) ou sticky no topo (mobile) */}
+          <div className={`sticky top-0 z-40 lg:relative lg:z-auto lg:flex-1 lg:min-h-0 shadow-xl lg:shadow-none bg-slate-950 pb-1 lg:pb-0 lg:bg-transparent -mx-3 px-3 lg:mx-0 lg:px-0 flex-col shrink-0 ${phase === 'anamnese' && isSessionStarted ? 'hidden lg:hidden' : 'flex'}`}>
+            {!isSessionStarted ? (
+              <div className="flex-1 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col items-center justify-center p-6 shadow-inner relative overflow-hidden min-h-[300px]">
+                {/* Backdrop escuro e textura para imersão */}
+                <div className="absolute inset-0 bg-gradient-to-b from-slate-800/20 to-slate-950/80 pointer-events-none"></div>
+                
+                <div className="relative z-10 flex flex-col items-center">
+                  <div className="w-20 h-20 mb-6 rounded-full bg-slate-800 flex items-center justify-center shadow-lg border border-slate-700/50">
+                    <VideoIcon size={32} className="text-slate-500" />
+                  </div>
+                  
+                  <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-2 tracking-tight">Sala de Espera</h2>
+                  <p className="text-slate-400 mb-10 max-w-sm text-center text-sm sm:text-base leading-relaxed">
+                    O ambiente está configurado e seguro. Clique abaixo para iniciar a sessão e revelar os painéis terapêuticos.
+                  </p>
+                  
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full">
+                    <button
+                      onClick={() => setIsAnamneseModalOpen(true)}
+                      className="group bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 text-sm md:text-base font-bold py-3.5 px-6 rounded-full shadow-lg transition-all duration-300 hover:scale-[1.03] active:scale-95 flex items-center gap-2 border border-indigo-500/30"
+                      title="Revisar dados da anamnese preenchida pelo cliente"
+                    >
+                      <FileText className="w-5 h-5" />
+                      Ler Anamnese
+                    </button>
+
+                    <button
+                      onClick={() => onNavigateToReports?.(selectedPatientId)}
+                      className="group bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm md:text-base font-bold py-3.5 px-6 rounded-full shadow-lg transition-all duration-300 hover:scale-[1.03] active:scale-95 flex items-center gap-2 border border-slate-700"
+                      title="Visualizar histórico e dados de sessões anteriores deste paciente"
+                    >
+                      <FileText className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors" />
+                      Sessões Anteriores
+                    </button>
+
+                    <button
+                      onClick={handleStartSession}
+                      className="group bg-emerald-600 hover:bg-emerald-500 text-white text-lg font-bold py-4 px-10 rounded-full shadow-[0_0_25px_rgba(5,150,105,0.4)] transition-all duration-300 hover:scale-[1.03] active:scale-95 flex items-center gap-3 border border-emerald-400/30"
+                    >
+                      <Play className="w-5 h-5 fill-white group-hover:scale-110 transition-transform" />
+                      Iniciar Sessão
+                    </button>
+                  </div>
+                </div>
+
+                {/* Modal de Anamnese */}
+                {isAnamneseModalOpen && (
+                  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
+                    <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl animate-fade-in-up">
+                      <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-800/50 rounded-t-3xl">
+                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                          <FileText className="text-indigo-400" /> Revisão da Anamnese
+                        </h3>
+                        <button onClick={() => setIsAnamneseModalOpen(false)} className="p-2 rounded-full hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+                          <X size={20} />
+                        </button>
+                      </div>
+                      <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-slate-950/50">
+                        <SessionNotes intakeData={intakeData} observation={observation} onObservationChange={setObservation} />
+                      </div>
+                      <div className="p-4 border-t border-slate-800 flex justify-end bg-slate-900 rounded-b-3xl">
+                        <button onClick={() => setIsAnamneseModalOpen(false)} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-lg transition-colors">
+                          Fechar e Voltar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <SessionVideo
+                isVideoActive={isVideoActive}
+                videoRef={videoRef}
+                remoteVideoRef={remoteVideoRef}
+                stream={localStream}
+                remoteStream={remoteStream}
+                isMicMuted={isMicMuted}
+                isVideoMuted={isVideoMuted}
+                isRecording={isRecording}
+                recordingTime={recordingTime}
+                recordedChunksCount={recordedChunks.length}
+                connectionStatus={connectionStatus}
+                patientName={intakeData?.nome}
+                currentAppointmentId={activeAppId}
+                messages={messages}
+                onSendMessage={sendMessage}
+                onToggleMic={toggleMic}
+                onToggleVideo={toggleVideo}
+                onStartRecording={startRecording}
+                onStopRecording={stopRecording}
+                onSaveRecording={saveRecordingToGallery}
+                isProtocolCollapsed={isProtocolCollapsed}
+                onToggleProtocol={() => setIsProtocolCollapsed(!isProtocolCollapsed)}
+              />
+            )}
+          </div>
+
+          {/* Menu de Fases no Mobile (fica logo abaixo do vídeo, preservando a hierarquia do sticky video no topo) */}
+          <div className="block lg:hidden shrink-0 mt-2 w-full mb-2">
+             <ProtocolPhases
+                phases={phases}
+                currentPhase={phase}
+                isEditing={isEditingProtocol}
+                isSafetyOpen={isSafetyOpen}
+                aiSuggestions={aiSuggestions}
+                sentiment={sentiment}
+                setPhase={setPhase}
+                toggleEditing={() => setIsEditingProtocol(!isEditingProtocol)}
+                toggleSafety={() => setIsSafetyOpen(!isSafetyOpen)}
+                onMovePhase={handleMovePhase}
+                onRenamePhase={handleRenamePhase}
+                onDeletePhase={handleDeletePhase}
+                onAddCustomPhase={handleAddCustomPhase}
+                hasPhaseData={hasPhaseData}
+              />
+          </div>
+
+          {/* NOVO: CockpitPanel no Mobile (fica logo abaixo do vídeo) */}
+          {phase !== 'anamnese' && (
+            <div className={`block lg:hidden shrink-0 mt-2 transition-all duration-500 ${!isSessionStarted ? 'opacity-30 blur-[2px] pointer-events-none saturate-50' : ''}`}>
+              {renderCockpitContent()}
+            </div>
+          )}
+
+          {/* Conteúdo da fase — gráfico como rodapé (altura fixa definida dentro do componente) */}
+          <div className={`shrink-0 bg-slate-900 rounded-2xl border border-slate-800 shadow-sm overflow-hidden transition-all duration-500 ${!isSessionStarted ? 'opacity-30 blur-[2px] pointer-events-none saturate-50' : ''}`}>
             <div className="lg:overflow-y-auto custom-scrollbar h-full">
               {renderPhaseContent()}
             </div>
           </div>
         </div>
 
+        {/* ── Picture-in-Picture: aparece apenas na Anamnese para manter contato visual ── */}
+        {phase === 'anamnese' && isSessionStarted && (
+          <div className="fixed top-24 right-6 z-50 flex flex-col gap-1.5 items-end pointer-events-auto animate-fade-in-up">
+            <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider px-2.5 py-1 bg-slate-900/90 rounded-full backdrop-blur-md border border-slate-700/50 shadow-sm flex items-center gap-1.5">
+              {remoteStream ? (
+                <><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Cliente Online</>
+              ) : (
+                <><span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> Seu Vídeo (Aguardando)</>
+              )}
+            </span>
+            <div className="w-48 sm:w-60 aspect-video rounded-xl overflow-hidden border-2 border-indigo-500/30 shadow-2xl shadow-black/80 bg-slate-900 relative">
+              {/* Fallback de UI */}
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
+                <VideoIcon size={24} className="text-slate-600 animate-pulse" />
+              </div>
+              
+              <PipVideoPlayer 
+                stream={remoteStream || localStream} 
+                isLocal={!remoteStream} 
+              />
+              
+              {/* Indicador de câmera ativa */}
+              {isVideoActive && (
+                <span className="absolute top-2 left-2 w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse z-20" />
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── COLUNA DIREITA: CockpitPanel ─────────────────────
-             Visível apenas na fase cronológica.
-             Para outras fases, exibe o painel de notas simples.
+             Visível em todas as fases exceto Anamnese.
           ─────────────────────────────────────────────────── */}
-        {phase === 'cronologico' ? (
-          <div className="lg:w-72 xl:w-80 shrink-0 lg:h-full">
-            <CockpitPanel
-              ageRanges={AGE_RANGES}
-              selectedAgeRange={selectedAgeRange}
-              onAgeRangeChange={handleAgeRangeChange}
-              mentalSud={mentalSud}
-              onMentalSudChange={setMentalSud}
-              onRegisterMentalSud={handleRegisterMentalSud}
-              mentalHistory={(sessionData.mentalHistory || {})[selectedAgeRange] || []}
-              physicalSud={physicalSud}
-              onPhysicalSudChange={setPhysicalSud}
-              onRegisterPhysicalSud={handleRegisterPhysicalSud}
-              physicalHistory={(sessionData.physicalHistory || {})[selectedAgeRange] || []}
-              clinicalNotes={sessionData.notes || ''}
-              onClinicalNotesChange={(v) => setSessionData({ ...sessionData, notes: v })}
-              onSaveClinicalNotes={() => saveSessionData(sessionData)}
-              onAdvancePhase={handleAdvancePhase}
-            />
+        {phase !== 'anamnese' ? (
+          <div className={`hidden lg:block lg:w-72 xl:w-80 shrink-0 lg:h-full transition-all duration-500 ${!isSessionStarted ? 'opacity-30 blur-[2px] pointer-events-none saturate-50' : ''}`}>
+            {renderCockpitContent()}
           </div>
         ) : (
-          /* Painel de notas lateral para outras fases */
+          /* Painel de notas lateral simples apenas para a Anamnese */
           <div
             className={
               isNotesOpen
@@ -832,6 +1411,87 @@ const SessionView: React.FC = () => {
         )}
 
       </div>
+
+      {/* Onboarding Modal */}
+      {showOnboardingModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-fade-in-up">
+            <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/50">
+              <h3 className="text-2xl font-bold text-white flex items-center gap-3">
+                <HelpCircle className="text-indigo-400" size={28} /> 
+                Guia da Sessão TeraNexus
+              </h3>
+              <button 
+                onClick={() => {
+                  setShowOnboardingModal(false);
+                  localStorage.setItem('TRG_HAS_SEEN_ONBOARDING', 'true');
+                }} 
+                className="p-2 rounded-full hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-8 bg-slate-950/50 text-slate-300">
+              
+              <div className="flex gap-4">
+                <div className="w-12 h-12 shrink-0 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center border border-indigo-500/30">
+                  <Target size={24} />
+                </div>
+                <div>
+                  <h4 className="text-lg font-bold text-white mb-1">O que é o SUD?</h4>
+                  <p className="text-sm leading-relaxed">
+                    SUD significa <strong>Unidades Subjetivas de Desconforto</strong>. É uma escala de 0 a 10 usada para medir o desconforto atual do cliente.<br/>
+                    • <strong>0:</strong> Nenhum desconforto (Zerado, objetivo atingido).<br/>
+                    • <strong>10:</strong> Máximo desconforto possível.
+                  </p>
+                  <p className="text-sm mt-2 text-indigo-300 font-medium">Nota: Na fase de Potencialização, a escala se inverte (0 = neutro, 10 = força máxima).</p>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <div className="w-12 h-12 shrink-0 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                  <PanelLeftClose size={24} />
+                </div>
+                <div>
+                  <h4 className="text-lg font-bold text-white mb-1">Como usar o Painel (Cockpit)</h4>
+                  <p className="text-sm leading-relaxed">
+                    A coluna à direita (Painel de Controle) contém os botões numéricos. Durante a sessão, pergunte ao cliente a nota do desconforto, selecione o número correspondente no painel e clique no botão azul <strong>"Registrar"</strong>.
+                  </p>
+                  <p className="text-sm mt-2">
+                    O gráfico no centro da tela desenhará automaticamente o progresso para que você acompanhe a evolução térmica da sessão.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <div className="w-12 h-12 shrink-0 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center border border-rose-500/30">
+                  <VideoIcon size={24} />
+                </div>
+                <div>
+                  <h4 className="text-lg font-bold text-white mb-1">Contato Visual e Vídeo Flutuante</h4>
+                  <p className="text-sm leading-relaxed">
+                    Durante a fase de <strong>Anamnese</strong>, o texto ocupará quase toda a tela. Para garantir que você não perca o contato visual com o paciente, o vídeo dele se transformará em um pequeno quadro flutuante (PiP) no canto inferior direito.
+                  </p>
+                </div>
+              </div>
+
+            </div>
+
+            <div className="p-5 border-t border-slate-800 flex justify-end bg-slate-900">
+              <button 
+                onClick={() => {
+                  setShowOnboardingModal(false);
+                  localStorage.setItem('TRG_HAS_SEEN_ONBOARDING', 'true');
+                }} 
+                className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-indigo-900/40 transition-all text-sm w-full sm:w-auto"
+              >
+                Entendi, vamos lá!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* AI Modal (Simplified for now) */}
       {showAiModal && (

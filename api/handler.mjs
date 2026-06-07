@@ -85,6 +85,19 @@ var init_templates = __esm({
             ]
           }
         ]
+      }),
+      ANAMNESE_REQUEST: (patientName, link) => ({
+        name: "solicitacao_anamnese",
+        language: { code: "pt_BR" },
+        components: [
+          {
+            type: "body",
+            parameters: [
+              { type: "text", text: patientName },
+              { type: "text", text: link }
+            ]
+          }
+        ]
       })
     };
     templates_default = WHATSAPP_TEMPLATES;
@@ -809,9 +822,13 @@ async function handler5(req, res) {
       };
       const { data: appointments, error: aError } = await supabase6.from("appointments").select("*").eq("patient_id", patientId).order("date", { ascending: false }).order("time", { ascending: false });
       if (aError) throw aError;
+      const mappedAppointments = (appointments || []).map((appt) => ({
+        ...appt,
+        sessionData: appt.session_data || {}
+      }));
       return res.status(200).json({
         patient: patientData,
-        appointments: appointments || []
+        appointments: mappedAppointments
       });
     }
     if (req.method === "GET" && action === "recordings") {
@@ -1392,7 +1409,8 @@ async function handler13(req, res) {
       const patientId = Array.isArray(id) ? id[0] : id;
       if (req.method === "PUT") {
         const { name, email, phone, status, notes } = req.body;
-        const { data, error } = await supabase6.from("patients").update({ name, email, phone, status, notes }).eq("id", patientId).eq("therapist_id", user.id).select().single();
+        const cleanEmail = email ? email.trim() : email;
+        const { data, error } = await supabase6.from("patients").update({ name, email: cleanEmail, phone, status, notes }).eq("id", patientId).eq("therapist_id", user.id).select().single();
         if (error || !data) return res.status(404).json({ error: "Patient not found or unauthorized" });
         return res.status(200).json(data);
       } else if (req.method === "DELETE") {
@@ -1418,9 +1436,10 @@ async function handler13(req, res) {
         return res.status(200).json(enrichedData);
       } else if (req.method === "POST") {
         const { name, email, phone, status, notes } = req.body;
+        const cleanEmail = email ? email.trim() : email;
         const { data, error } = await supabase6.from("patients").insert([{
           name,
-          email,
+          email: cleanEmail,
           phone,
           status,
           notes,
@@ -2268,7 +2287,7 @@ async function handler25(req, res) {
     if (!supabaseUrl11 || !supabaseKey) {
       throw new Error("Supabase Configuration missing in environment variables");
     }
-    const supabaseAdmin3 = createClient13(supabaseUrl11, supabaseKey);
+    const supabaseAdmin2 = createClient13(supabaseUrl11, supabaseKey);
     let formattedPhone = phone.replace(/\D/g, "");
     if (!formattedPhone.startsWith("55") && formattedPhone.length <= 11) {
       formattedPhone = "55" + formattedPhone;
@@ -2276,12 +2295,12 @@ async function handler25(req, res) {
     const finalPhone = "+" + formattedPhone;
     if (["pedrodiogo.suporte@gmail.com", "resignificamulher@gmail.com", "pedrodiogo.mello@gmail.com"].includes(email)) {
       console.log(`[Force Reset] Checking existence for test user: ${email}`);
-      const { data: users, error: listError } = await supabaseAdmin3.auth.admin.listUsers();
+      const { data: users, error: listError } = await supabaseAdmin2.auth.admin.listUsers();
       if (!listError && users.users) {
         const target = users.users.find((u) => u.email === email);
         if (target) {
           console.log(`[Force Reset] Deleting test user ${target.id}`);
-          await supabaseAdmin3.auth.admin.deleteUser(target.id);
+          await supabaseAdmin2.auth.admin.deleteUser(target.id);
         }
       }
     }
@@ -2307,7 +2326,7 @@ async function handler25(req, res) {
       return planMap[priceId] || planMap[priceId?.toLowerCase()] || "trial";
     };
     const normalizedPlan = mapPriceToPlan(plan || "trial");
-    const { data: user, error: createError } = await supabaseAdmin3.auth.admin.createUser({
+    const { data: user, error: createError } = await supabaseAdmin2.auth.admin.createUser({
       email,
       phone: finalPhone,
       password,
@@ -2539,10 +2558,6 @@ Se n\xE3o foi voc\xEA, ignore este e-mail.`,
 // src/api-handlers/client-auth/register.ts
 import { createClient as createClient15 } from "@supabase/supabase-js";
 import crypto from "crypto";
-var supabaseAdmin2 = createClient15(
-  process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || ""
-);
 var hashPassword = (password) => {
   return crypto.createHash("sha256").update(password + (process.env.STRIPE_SECRET_KEY || "default_secret")).digest("hex");
 };
@@ -2550,26 +2565,89 @@ async function handler27(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+  const supabaseUrl11 = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "";
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || "";
+  if (!supabaseUrl11 || !supabaseKey) {
+    return res.status(500).json({
+      error: "Erro de configura\xE7\xE3o do banco de dados.",
+      debug: { supabaseUrl: supabaseUrl11 ? "SET" : "MISSING", supabaseKey: supabaseKey ? "SET" : "MISSING" }
+    });
+  }
+  const supabaseAdmin2 = createClient15(supabaseUrl11, supabaseKey);
   try {
-    const { email, password, patientId } = req.body;
+    const { email, password, name, patientId, appointmentId } = req.body;
     if (!email || !password) {
       return res.status(400).json({ error: "Email e senha s\xE3o obrigat\xF3rios." });
     }
+    const cleanEmail = email.trim().toLowerCase();
     const hashedPassword = hashPassword(password);
-    const { data: existingPatients, error: searchError } = await supabaseAdmin2.from("patients").select("id, email").eq("email", email.toLowerCase());
+    if (appointmentId) {
+      const { data: appt, error: apptError } = await supabaseAdmin2.from("appointments").select("id, therapist_id, patient_id, patient_name").eq("id", appointmentId).single();
+      if (apptError || !appt) {
+        return res.status(404).json({ error: "Agendamento n\xE3o encontrado." });
+      }
+      const { data: existingPatients2 } = await supabaseAdmin2.from("patients").select("id, email").ilike("email", `%${cleanEmail}%`);
+      const matchedPatient2 = existingPatients2?.find((p) => p.email?.trim().toLowerCase() === cleanEmail);
+      let finalPatientId;
+      let finalPatientName;
+      if (matchedPatient2) {
+        await supabaseAdmin2.from("patients").update({ password_hash: hashedPassword, email: cleanEmail }).eq("id", matchedPatient2.id);
+        finalPatientId = matchedPatient2.id;
+        finalPatientName = name || cleanEmail.split("@")[0];
+        if (appt.patient_id && appt.patient_id !== matchedPatient2.id) {
+          await supabaseAdmin2.from("patients").delete().eq("id", appt.patient_id);
+        }
+      } else {
+        if (appt.patient_id) {
+          await supabaseAdmin2.from("patients").update({
+            name: name || cleanEmail.split("@")[0],
+            email: cleanEmail,
+            password_hash: hashedPassword,
+            status: "active"
+          }).eq("id", appt.patient_id);
+          finalPatientId = appt.patient_id;
+          finalPatientName = name || cleanEmail.split("@")[0];
+        } else {
+          const { data: newPatient, error: createError } = await supabaseAdmin2.from("patients").insert([{
+            name: name || cleanEmail.split("@")[0],
+            email: cleanEmail,
+            therapist_id: appt.therapist_id,
+            status: "active",
+            password_hash: hashedPassword,
+            created_at: (/* @__PURE__ */ new Date()).toISOString()
+          }]).select("id, name").single();
+          if (createError || !newPatient) {
+            throw new Error(createError?.message || "Erro ao criar paciente.");
+          }
+          finalPatientId = newPatient.id;
+          finalPatientName = newPatient.name;
+        }
+      }
+      await supabaseAdmin2.from("appointments").update({
+        patient_id: finalPatientId,
+        patient_name: finalPatientName,
+        status: "scheduled"
+      }).eq("id", appointmentId);
+      return res.status(200).json({
+        success: true,
+        patientId: finalPatientId,
+        message: "Conta Anjo criada com sucesso!"
+      });
+    }
+    const { data: existingPatients, error: searchError } = await supabaseAdmin2.from("patients").select("id, email").ilike("email", `%${cleanEmail}%`);
     if (searchError) throw searchError;
-    if (existingPatients && existingPatients.length > 0) {
-      const patient = existingPatients[0];
-      const { error: updateError } = await supabaseAdmin2.from("patients").update({ password_hash: hashedPassword }).eq("id", patient.id);
+    const matchedPatient = existingPatients?.find((p) => p.email?.trim().toLowerCase() === cleanEmail);
+    if (matchedPatient) {
+      const { error: updateError } = await supabaseAdmin2.from("patients").update({ password_hash: hashedPassword, email: cleanEmail }).eq("id", matchedPatient.id);
       if (updateError) throw updateError;
       return res.status(200).json({
         success: true,
-        patientId: patient.id,
+        patientId: matchedPatient.id,
         message: "Senha configurada com sucesso."
       });
     }
     if (patientId) {
-      const { error: updateByIdError } = await supabaseAdmin2.from("patients").update({ password_hash: hashedPassword, email: email.toLowerCase() }).eq("id", patientId);
+      const { error: updateByIdError } = await supabaseAdmin2.from("patients").update({ password_hash: hashedPassword, email: cleanEmail }).eq("id", patientId);
       if (updateByIdError) throw updateByIdError;
       return res.status(200).json({
         success: true,
@@ -2577,10 +2655,16 @@ async function handler27(req, res) {
         message: "Conta criada com sucesso."
       });
     }
-    return res.status(404).json({ error: "Paciente n\xE3o encontrado. Complete o agendamento primeiro." });
+    return res.status(404).json({
+      error: "Paciente n\xE3o encontrado. Complete o agendamento primeiro.",
+      debug: {
+        cleanEmailSent: cleanEmail,
+        existingPatientsCount: existingPatients ? existingPatients.length : 0
+      }
+    });
   } catch (error) {
     console.error("Client registration error:", error);
-    return res.status(500).json({ error: "Erro interno do servidor." });
+    return res.status(500).json({ error: "Erro interno do servidor.", details: error.message || error.toString() });
   }
 }
 
@@ -2701,6 +2785,112 @@ async function handler30(req, res) {
     environment: vars,
     api_check: apiStatus
   });
+}
+
+// src/api-handlers/emails/anamnese.ts
+import { Resend } from "resend";
+import nodemailer4 from "nodemailer";
+import { createClient as createClient18 } from "@supabase/supabase-js";
+async function handler31(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+  const authHeader = req.headers["authorization"];
+  if (!authHeader) {
+    return res.status(401).json({ error: "Authorization header missing" });
+  }
+  const supabaseToken = (Array.isArray(authHeader) ? authHeader[0] : authHeader).split(" ")[1];
+  const supabase6 = createClient18(
+    process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+    process.env.VITE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+  );
+  const { data: { user }, error: authError } = await supabase6.auth.getUser(supabaseToken);
+  if (authError || !user) {
+    return res.status(401).json({ error: "Invalid or expired token" });
+  }
+  try {
+    const { email, patientName, therapistName, link, date, time } = req.body;
+    if (!email || !patientName || !link) {
+      return res.status(400).json({ error: "Missing email, patientName or link" });
+    }
+    const primaryColor = "#0f172a";
+    const accentColor = "#3b82f6";
+    const subject = `${patientName}, sua ficha de consulta est\xE1 pronta para preenchimento`;
+    const html = `
+            <!DOCTYPE html>
+            <html>
+            <body style="margin: 0; padding: 20px; background-color: #f8fafc; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+                <div style="max-width: 600px; margin: 0 auto; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; background-color: #ffffff;">
+                    <div style="background-color: ${primaryColor}; padding: 32px; text-align: center;">
+                        <h1 style="color: white; margin: 0; font-size: 24px;">TRG <span style="color: ${accentColor}">Nexus</span></h1>
+                    </div>
+                    <div style="padding: 40px 32px; color: #334155; line-height: 1.6;">
+                        <h2 style="color: ${primaryColor}; margin-top: 0;">Agendamento Confirmado!</h2>
+                        <p style="font-size: 18px;">Ol\xE1, <strong>${patientName}</strong>!</p>
+                        <p>Seu agendamento foi realizado com sucesso.</p>
+                        
+                        ${date && time ? `
+                        <div style="background-color: #f1f5f9; border-left: 4px solid ${accentColor}; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                            <p style="margin: 5px 0;"><strong>Data:</strong> ${date}</p>
+                            <p style="margin: 5px 0;"><strong>Hor\xE1rio:</strong> ${time}</p>
+                            <p style="margin: 5px 0;"><strong>Terapeuta:</strong> ${therapistName || "TRG Nexus"}</p>
+                        </div>
+                        ` : ""}
+
+                        <p>${therapistName ? `O(a) terapeuta <strong>${therapistName}</strong> solicitou o preenchimento da sua ficha` : "Solicitamos o preenchimento da sua ficha"} de anamnese antes da sua consulta.</p>
+                        <p>Por favor, clique no bot\xE3o abaixo para preencher o formul\xE1rio. Leva apenas alguns minutos.</p>
+                        <div style="text-align: center; margin-top: 30px;">
+                            <a href="${link}" style="display: inline-block; background-color: ${accentColor}; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px;">Preencher Anamnese</a>
+                        </div>
+                        <p style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 12px; color: #64748b; text-align: center;">
+                            Enviado por TRG Nexus \xB7 Gest\xE3o Terap\xEAutica
+                        </p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+    const resendKey = process.env.RESEND_API_KEY;
+    if (resendKey) {
+      const resend = new Resend(resendKey);
+      const fromAddress = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+      const { data, error: sendError } = await resend.emails.send({
+        from: `TRG Nexus <${fromAddress}>`,
+        to: [email],
+        subject,
+        html
+      });
+      if (!sendError) {
+        console.log("Email sent via Resend:", data?.id);
+        return res.status(200).json({ message: "Email sent via Resend", id: data?.id });
+      }
+      console.warn("Resend failed, falling back to SMTP:", sendError.message);
+    }
+    const port = Number(process.env.SMTP_PORT) || 587;
+    const host = (process.env.SMTP_HOST || "").trim().replace(/\r?\n/g, "");
+    const smtpUser = (process.env.SMTP_USER || "").trim().replace(/\r?\n/g, "");
+    const pass = (process.env.SMTP_PASS || "").trim().replace(/\r?\n/g, "");
+    if (!host || !smtpUser || !pass) {
+      return res.status(500).json({ error: "Email service not configured. Verify Resend domain or check SMTP settings." });
+    }
+    const transporter = nodemailer4.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: { user: smtpUser, pass }
+    });
+    await transporter.sendMail({
+      from: `"TRG Nexus - Gest\xE3o Terap\xEAutica" <${smtpUser}>`,
+      to: email,
+      subject,
+      html
+    });
+    console.log("Email sent via SMTP fallback");
+    return res.status(200).json({ message: "Email sent via SMTP" });
+  } catch (error) {
+    console.error("Error sending email:", error);
+    return res.status(500).json({ error: error.message || "Unknown server error" });
+  }
 }
 
 // src/api-handlers/emails/templates.ts
@@ -2851,8 +3041,8 @@ var getEmailTemplate2 = (plan, name, magicLink) => {
 var templates_default2 = { getEmailTemplate: getEmailTemplate2 };
 
 // src/api-handlers/emails/welcome.ts
-import nodemailer4 from "nodemailer";
-import { createClient as createClient18 } from "@supabase/supabase-js";
+import nodemailer5 from "nodemailer";
+import { createClient as createClient19 } from "@supabase/supabase-js";
 var getEmailTemplate3 = (plan, name, magicLink) => {
   const primaryColor = "#0f172a";
   const accentColor = "#3b82f6";
@@ -2968,7 +3158,7 @@ var getEmailTemplate3 = (plan, name, magicLink) => {
         `
   };
 };
-async function handler31(req, res) {
+async function handler32(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -2985,7 +3175,7 @@ async function handler31(req, res) {
       console.error("SMTP configuration missing", { host: !!host, user: !!user, pass: !!pass });
       return res.status(500).json({ error: "Server misconfiguration: SMTP variables missing" });
     }
-    const transporter = nodemailer4.createTransport({
+    const transporter = nodemailer5.createTransport({
       host,
       port,
       secure: port === 465,
@@ -2994,13 +3184,13 @@ async function handler31(req, res) {
         pass
       }
     });
-    const supabaseAdmin3 = createClient18(
+    const supabaseAdmin2 = createClient19(
       process.env.VITE_SUPABASE_URL || "https://qyrsr5sa9s.supabase.co",
       process.env.SUPABASE_SERVICE_ROLE_KEY || ""
     );
     let magicLink;
     try {
-      const { data, error: linkError } = await supabaseAdmin3.auth.admin.generateLink({
+      const { data, error: linkError } = await supabaseAdmin2.auth.admin.generateLink({
         type: "magiclink",
         email,
         options: {
@@ -3031,10 +3221,10 @@ async function handler31(req, res) {
 }
 
 // src/api-handlers/network/match.ts
-import { createClient as createClient19 } from "@supabase/supabase-js";
+import { createClient as createClient20 } from "@supabase/supabase-js";
 var supabaseUrl8 = process.env.VITE_SUPABASE_URL;
 var supabaseServiceKey8 = process.env.SUPABASE_SERVICE_ROLE_KEY;
-async function handler32(req, res) {
+async function handler33(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -3042,7 +3232,7 @@ async function handler32(req, res) {
     return res.status(500).json({ error: "Missing Supabase Config" });
   }
   const { sourceTherapistId, patientNeeds } = req.body;
-  const supabase6 = createClient19(supabaseUrl8, supabaseServiceKey8);
+  const supabase6 = createClient20(supabaseUrl8, supabaseServiceKey8);
   try {
     console.log(`\u{1F501} Finding match for source: ${sourceTherapistId}, needs: ${patientNeeds}`);
     let query = supabase6.from("therapists").select("id, name, specialty, rating, phone").eq("is_verified", true).eq("is_overflow_target", true).neq("id", sourceTherapistId);
@@ -3070,10 +3260,10 @@ async function handler32(req, res) {
 
 // src/api-handlers/network/referral.ts
 init_notifications();
-import { createClient as createClient20 } from "@supabase/supabase-js";
+import { createClient as createClient21 } from "@supabase/supabase-js";
 var supabaseUrl9 = process.env.VITE_SUPABASE_URL;
 var supabaseServiceKey9 = process.env.SUPABASE_SERVICE_ROLE_KEY;
-async function handler33(req, res) {
+async function handler34(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -3088,7 +3278,7 @@ async function handler33(req, res) {
     patientNeeds,
     sessionPrice
   } = req.body;
-  const supabase6 = createClient20(supabaseUrl9, supabaseServiceKey9);
+  const supabase6 = createClient21(supabaseUrl9, supabaseServiceKey9);
   try {
     console.log(`Processing Referral: ${sourceTherapistId} -> ${targetTherapistId}`);
     const price = Number(sessionPrice) || 150;
@@ -3131,9 +3321,7 @@ async function handler33(req, res) {
 
 // src/api-handlers/notifications/manual.ts
 init_templates();
-async function handler34(req, res) {
-  const user = verifyAuth3(req, res);
-  if (!user) return;
+async function handler35(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method Not Allowed" });
   }
@@ -3172,12 +3360,18 @@ async function handler34(req, res) {
         return res.status(400).json({ error: "Missing parameters for SESSION_NOTIFICATION_CLIENT" });
       }
       templateConfig = WHATSAPP_TEMPLATES.SESSION_NOTIFICATION_CLIENT(clientName, therapistName, date, time);
+    } else if (templateType === "ANAMNESE_REQUEST") {
+      const { patientName } = templateParams || {};
+      if (!patientName) {
+        return res.status(400).json({ error: "Missing parameters for ANAMNESE_REQUEST" });
+      }
+      templateConfig = WHATSAPP_TEMPLATES.WELCOME(patientName);
     } else {
       return res.status(400).json({ error: `Invalid or unsupported template type: ${templateType}` });
     }
     if (!templateConfig) return res.status(500).json({ error: "Template config failed" });
-    const token = process.env.META_WHATSAPP_TOKEN;
-    const phoneId = process.env.META_PHONE_ID;
+    const token = (process.env.META_WHATSAPP_TOKEN || "").trim().replace(/\r?\n/g, "");
+    const phoneId = (process.env.META_PHONE_ID || "").trim().replace(/\r?\n/g, "");
     if (!token || !phoneId) {
       throw new Error("Meta WhatsApp credentials (META_WHATSAPP_TOKEN, META_PHONE_ID) are missing.");
     }
@@ -3213,7 +3407,7 @@ async function handler34(req, res) {
 
 // src/api-handlers/notifications/register-welcome.ts
 import twilio2 from "twilio";
-async function handler35(req, res) {
+async function handler36(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -3264,12 +3458,12 @@ _Equipe TRG Nexus_`;
 }
 
 // src/api-handlers/notifications/subscribe.ts
-import { createClient as createClient21 } from "@supabase/supabase-js";
-var supabase4 = createClient21(
+import { createClient as createClient22 } from "@supabase/supabase-js";
+var supabase4 = createClient22(
   process.env.VITE_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
-async function handler36(req, res) {
+async function handler37(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -3304,8 +3498,8 @@ init_templates();
 
 // src/api-handlers/notifications/test-push.ts
 import webpush from "web-push";
-import { createClient as createClient22 } from "@supabase/supabase-js";
-var supabase5 = createClient22(
+import { createClient as createClient23 } from "@supabase/supabase-js";
+var supabase5 = createClient23(
   process.env.VITE_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
@@ -3316,7 +3510,7 @@ webpush.setVapidDetails(
   PUBLIC_KEY,
   PRIVATE_KEY
 );
-async function handler37(req, res) {
+async function handler38(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -3359,17 +3553,17 @@ async function handler37(req, res) {
 }
 
 // src/api-handlers/public/therapists.ts
-import { createClient as createClient23 } from "@supabase/supabase-js";
+import { createClient as createClient24 } from "@supabase/supabase-js";
 var supabaseUrl10 = process.env.VITE_SUPABASE_URL;
 var supabaseServiceKey10 = process.env.SUPABASE_SERVICE_ROLE_KEY;
-async function handler38(req, res) {
+async function handler39(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
   if (!supabaseUrl10 || !supabaseServiceKey10) {
     return res.status(500).json({ error: "Server Misconfiguration" });
   }
-  const supabase6 = createClient23(supabaseUrl10, supabaseServiceKey10);
+  const supabase6 = createClient24(supabaseUrl10, supabaseServiceKey10);
   try {
     let query = supabase6.from("therapists").select(`
                 id,
@@ -3403,7 +3597,7 @@ import { Pool as Pool5 } from "pg";
 import dotenv3 from "dotenv";
 import path3 from "path";
 dotenv3.config({ path: path3.resolve(process.cwd(), ".env.local") });
-async function handler39(req, res) {
+async function handler40(req, res) {
   const connectionString4 = process.env.POSTGRES_URL;
   if (!connectionString4) {
     return res.status(500).json({ error: "Database configuration missing" });
@@ -3430,7 +3624,7 @@ async function handler39(req, res) {
 
 // src/api-handlers/system/add_password_hash.ts
 import { Pool as Pool6 } from "pg";
-async function handler40(req, res) {
+async function handler41(req, res) {
   const connectionString4 = "postgresql://postgres:Lebazi802%40.@db.kbuknqfnhgyfywnthgyc.supabase.co:5432/postgres";
   if (!connectionString4) {
     return res.status(500).json({ error: "Database configuration missing" });
@@ -3457,7 +3651,7 @@ async function handler40(req, res) {
 
 // src/api-handlers/system/migrate-reminders.ts
 import pg7 from "pg";
-async function handler41(req, res) {
+async function handler42(req, res) {
   const { Pool: Pool7 } = pg7;
   const connectionString4 = process.env.trgnexus_POSTGRES_URL || process.env.POSTGRES_URL;
   if (!connectionString4) {
@@ -3487,7 +3681,7 @@ async function handler41(req, res) {
 
 // src/api-handlers/system/simple-test.ts
 import twilio3 from "twilio";
-async function handler42(req, res) {
+async function handler43(req, res) {
   if (req.method === "GET" && !req.query.phone) {
     return res.status(200).json({ status: "ok", mode: "read-only", message: "Add ?phone=YOUR_NUMBER to URL to test send" });
   }
@@ -3533,7 +3727,7 @@ async function handler42(req, res) {
 
 // src/api-handlers/system/test-whatsapp.ts
 init_notifications();
-async function handler43(req, res) {
+async function handler44(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -3560,7 +3754,7 @@ async function handler43(req, res) {
 }
 
 // api/index.ts
-async function handler44(req, res) {
+async function handler45(req, res) {
   const url = req.url || "";
   const cleanUrl = url.split("?")[0].replace(/^\/api\//, "").replace(/\/$/, "");
   console.log(`[API Router] Clean URL: ${cleanUrl}`);
@@ -3625,40 +3819,42 @@ async function handler44(req, res) {
       return handler29(req, res);
     case "debug/check-meta":
       return handler30(req, res);
+    case "emails/anamnese":
+      return handler31(req, res);
     case "emails/templates":
       return templates_default2(req, res);
     case "emails/welcome":
-      return handler31(req, res);
-    case "network/match":
       return handler32(req, res);
-    case "network/referral":
+    case "network/match":
       return handler33(req, res);
-    case "notifications/manual":
+    case "network/referral":
       return handler34(req, res);
-    case "notifications/register-welcome":
+    case "notifications/manual":
       return handler35(req, res);
-    case "notifications/subscribe":
+    case "notifications/register-welcome":
       return handler36(req, res);
+    case "notifications/subscribe":
+      return handler37(req, res);
     case "notifications/templates":
       return templates_default(req, res);
     case "notifications/test-push":
-      return handler37(req, res);
-    case "public/therapists":
       return handler38(req, res);
-    case "system/add_session_data_column":
+    case "public/therapists":
       return handler39(req, res);
-    case "system/add_password_hash":
+    case "system/add_session_data_column":
       return handler40(req, res);
-    case "system/migrate-reminders":
+    case "system/add_password_hash":
       return handler41(req, res);
-    case "system/simple-test":
+    case "system/migrate-reminders":
       return handler42(req, res);
-    case "system/test-whatsapp":
+    case "system/simple-test":
       return handler43(req, res);
+    case "system/test-whatsapp":
+      return handler44(req, res);
     default:
       res.status(404).json({ error: `Route not found: /api/${cleanUrl}` });
   }
 }
 export {
-  handler44 as default
+  handler45 as default
 };

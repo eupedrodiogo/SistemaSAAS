@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 
 interface ClientContextType {
     patient: any | null;
@@ -23,9 +23,10 @@ export const ClientProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const [appointments, setAppointments] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    const fetchData = async () => {
-        setLoading(true);
+    const fetchData = useCallback(async (silent = false) => {
+        if (!silent) setLoading(true);
         setError(null);
         const patientId = localStorage.getItem('client_portal_id');
 
@@ -51,16 +52,32 @@ export const ClientProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             console.error(err);
             setError('Erro de conexão.');
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
-    };
-
-    useEffect(() => {
-        fetchData();
     }, []);
 
+    // Carga inicial
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
+
+    // Polling silencioso de 10s apenas na tela de sessão
+    // Garante que os dados do banco apareçam mesmo após reload ou quando P2P cair
+    useEffect(() => {
+        const isSessionPage = window.location.pathname.includes('/session');
+        if (!isSessionPage) return;
+
+        pollingRef.current = setInterval(() => {
+            fetchData(true); // silent = true: não mostra loading spinner
+        }, 10_000);
+
+        return () => {
+            if (pollingRef.current) clearInterval(pollingRef.current);
+        };
+    }, [fetchData]);
+
     return (
-        <ClientContext.Provider value={{ patient, appointments, loading, error, refreshData: fetchData }}>
+        <ClientContext.Provider value={{ patient, appointments, loading, error, refreshData: () => fetchData() }}>
             {children}
         </ClientContext.Provider>
     );
