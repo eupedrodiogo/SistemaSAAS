@@ -82,6 +82,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
    const [isRescheduling, setIsRescheduling] = useState(false);
    const [reschedulingAppointment, setReschedulingAppointment] = useState<Appointment | null>(null);
    const [addModal, setAddModal] = useState<{isOpen: boolean, date: Date, time: string, isAnjo?: boolean, patientName?: string, patientId?: string, patientEmail?: string, patientPhone?: string} | null>(null);
+   const [successPopup, setSuccessPopup] = useState<{isOpen: boolean, date: string, time: string, isAnjo: boolean} | null>(null);
    const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
    const [isAvailabilityModalOpen, setIsAvailabilityModalOpen] = useState(false);
    const [blockForm, setBlockForm] = useState({ type: 'date', date: '', dayOfWeek: 1, startTime: '12:00', endTime: '13:00', label: '' });
@@ -564,12 +565,12 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
              console.error("Erro ao enviar comunicados:", emailError);
          }
 
-         showNotification(
-            isAnjo
-               ? '✅ Sessão Anjo criada! Link copiado e convites enviados.'
-               : ((payload.patientName && payload.patientName !== 'Paciente (A definir)') ? `Agendamento criado para ${payload.patientName}!` : 'Agendamento pré-criado. Edite para vincular um paciente.'),
-            'success'
-         );
+         setSuccessPopup({
+            isOpen: true,
+            date: date.toLocaleDateString('pt-BR', { timeZone: 'UTC' }),
+            time,
+            isAnjo: !!isAnjo
+         });
          setAddModal(null);
          setTimeout(() => setSelectedAppointment(created as Appointment), 100);
          if (onActionConsumed) onActionConsumed();
@@ -1676,8 +1677,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
                            <span className="font-bold flex items-center mb-1">
                               <Heart className="w-4 h-4 mr-2" /> Convite Automático
                            </span>
-                           <p className="text-rose-600/80 dark:text-rose-400/80 leading-relaxed">
-                              O link será copiado automaticamente para a área de transferência. Preencha os campos acima para enviar o convite também por WhatsApp ou E-mail.
+                           <p className="text-rose-600/80 dark:text-rose-400/80 leading-relaxed text-xs uppercase font-bold tracking-wide">
+                              PREENCHA OS CAMPOS ACIMA PARA O ENVIO AUTOMÁTICO DO CONVITE DE ACESSO À SESSÃO POR WHATSAPP E EMAIL, ALÉM DA ANAMNESE PARA PREENCHIMENTO.
                            </p>
                         </div>
                      )}
@@ -1701,8 +1702,32 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
                            <CalendarIcon size={16} /> Confirmar
                         </button>
                      </div>
-
                   </div>
+               </div>
+            </div>
+         )}
+         
+         {/* Modal de Sucesso */}
+         {successPopup?.isOpen && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+               <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6 text-center shadow-2xl border border-slate-100 dark:border-slate-800 animate-in fade-in zoom-in duration-300">
+                  <div className="w-16 h-16 bg-green-100 dark:bg-green-500/20 text-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                     <CheckCircle2 size={32} strokeWidth={2.5} />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">
+                     Agendamento Realizado!
+                  </h3>
+                  <p className="text-slate-600 dark:text-slate-400 mb-6 text-sm">
+                     A sessão foi agendada com sucesso para <strong>{successPopup.date}</strong> às <strong>{successPopup.time}</strong>.
+                     <br/><br/>
+                     {successPopup.isAnjo ? 'O convite de acesso e a ficha de anamnese foram enviados automaticamente ao cliente.' : 'O agendamento foi salvo com sucesso.'}
+                  </p>
+                  <button
+                     onClick={() => setSuccessPopup(null)}
+                     className="w-full bg-slate-800 dark:bg-slate-700 text-white font-bold py-3 rounded-xl hover:bg-slate-900 dark:hover:bg-slate-600 transition-colors"
+                  >
+                     Entendi
+                  </button>
                </div>
             </div>
          )}

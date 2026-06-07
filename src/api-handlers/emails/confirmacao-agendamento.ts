@@ -11,7 +11,7 @@ async function sendEmail(to: string, subject: string, html: string): Promise<voi
         const resend = new Resend(resendKey);
         const fromAddress = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
         const { error: sendError } = await resend.emails.send({
-            from: `TRG Nexus <${fromAddress}>`,
+            from: `TeraNexus <${fromAddress}>`,
             to: [to],
             subject,
             html,
@@ -31,7 +31,7 @@ async function sendEmail(to: string, subject: string, html: string): Promise<voi
     }
 
     const transporter = nodemailer.createTransport({ host, port, secure: port === 465, auth: { user: smtpUser, pass } });
-    await transporter.sendMail({ from: `"TRG Nexus" <${smtpUser}>`, to, subject, html });
+    await transporter.sendMail({ from: `"TeraNexus" <${smtpUser}>`, to, subject, html });
 }
 
 // ─── Template do E-mail para o CLIENTE ────────────────────────────────────────
@@ -42,7 +42,7 @@ function buildClientEmail(patientName: string, therapistName: string, date: stri
         <body style="margin:0;padding:20px;background:#f8fafc;font-family:'Segoe UI',Tahoma,sans-serif;">
             <div style="max-width:600px;margin:0 auto;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;background:#fff;">
                 <div style="background:#0f172a;padding:32px;text-align:center;">
-                    <h1 style="color:white;margin:0;font-size:24px;">TRG <span style="color:#3b82f6">Nexus</span></h1>
+                    <h1 style="color:white;margin:0;font-size:24px;">Tera <span style="color:#3b82f6">Nexus</span></h1>
                 </div>
                 <div style="padding:40px 32px;color:#334155;line-height:1.6;">
                     <h2 style="color:#0f172a;margin-top:0;">✅ Agendamento Confirmado!</h2>
@@ -55,7 +55,7 @@ function buildClientEmail(patientName: string, therapistName: string, date: stri
                     </div>
                     <p>Se precisar remarcar ou cancelar, entre em contato com seu terapeuta.</p>
                     <p style="margin-top:40px;border-top:1px solid #e2e8f0;padding-top:20px;font-size:12px;color:#64748b;text-align:center;">
-                        Enviado por TRG Nexus · Gestão Terapêutica
+                        Enviado por TeraNexus · Gestão Terapêutica
                     </p>
                 </div>
             </div>
@@ -73,7 +73,7 @@ function buildTherapistEmail(therapistName: string, patientName: string, patient
         <body style="margin:0;padding:20px;background:#f8fafc;font-family:'Segoe UI',Tahoma,sans-serif;">
             <div style="max-width:600px;margin:0 auto;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;background:#fff;">
                 <div style="background:#0f172a;padding:32px;text-align:center;">
-                    <h1 style="color:white;margin:0;font-size:24px;">TRG <span style="color:#3b82f6">Nexus</span></h1>
+                    <h1 style="color:white;margin:0;font-size:24px;">Tera <span style="color:#3b82f6">Nexus</span></h1>
                 </div>
                 <div style="padding:40px 32px;color:#334155;line-height:1.6;">
                     <h2 style="color:#0f172a;margin-top:0;">📅 Novo Agendamento na Sua Agenda</h2>
@@ -93,7 +93,7 @@ function buildTherapistEmail(therapistName: string, patientName: string, patient
                         </a>
                     </div>
                     <p style="margin-top:40px;border-top:1px solid #e2e8f0;padding-top:20px;font-size:12px;color:#64748b;text-align:center;">
-                        Enviado por TRG Nexus · Gestão Terapêutica
+                        Enviado por TeraNexus · Gestão Terapêutica
                     </p>
                 </div>
             </div>
