@@ -572,7 +572,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
             isAnjo: !!isAnjo
          });
          setAddModal(null);
-         setTimeout(() => setSelectedAppointment(created as Appointment), 100);
          if (onActionConsumed) onActionConsumed();
       } catch (error) {
          showNotification('Erro ao criar agendamento.', 'error');
