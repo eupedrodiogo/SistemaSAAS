@@ -28,6 +28,7 @@ import ClientResources from './components/ClientPortal/ClientResources';
 import ClientRecordings from './components/ClientPortal/ClientRecordings';
 import ClientProfile from './components/ClientPortal/ClientProfile';
 import ClientRegister from './components/ClientPortal/ClientRegister';
+import ClientAnamnesis from './components/ClientPortal/ClientAnamnesis';
 import ValidatorLayout from './components/Validator/ValidatorLayout';
 import ValidatorLanding from './components/Validator/ValidatorLanding';
 import ValidatorSurvey from './components/Validator/ValidatorSurvey';
@@ -119,6 +120,7 @@ function AppContent() {
         <Route path="/portal-paciente" element={<ClientProvider><Outlet /></ClientProvider>}>
           <Route index element={<ClientDashboard />} />
           <Route path="dashboard" element={<ClientDashboard />} />
+          <Route path="anamnese" element={<ClientAnamnesis />} />
           <Route path="agendamentos" element={<ClientAppointments />} />
           <Route path="recursos" element={<ClientResources />} />
           <Route path="gravacoes" element={<ClientRecordings />} />

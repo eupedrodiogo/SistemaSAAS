@@ -109,6 +109,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(200).json(recordings || []);
         }
 
+        // SAVE ANAMNESIS
+        if (req.method === 'POST' && action === 'save_anamnesis') {
+            if (!patientId) return res.status(400).json({ error: 'Patient ID required' });
+            
+            const anamnesisData = req.body;
+            
+            // Format notes for patient
+            const patientNotes = `Queixa: ${anamnesisData.complaint || 'Não informado'} | Transtornos: ${(anamnesisData.transtornos || []).map((t: any) => `${t.name} (${t.level})`).join(', ')}`;
+
+            // 1. Update patient
+            const { error: pUpdateError } = await supabase
+                .from('patients')
+                .update({ notes: patientNotes })
+                .eq('id', patientId);
+
+            if (pUpdateError) throw pUpdateError;
+
+            // 2. Update the most recent active appointment for this patient
+            const { data: recentAppt, error: recentApptError } = await supabase
+                .from('appointments')
+                .select('id')
+                .eq('patient_id', patientId)
+                .in('status', ['scheduled', 'agendado', 'active', 'ativo', 'pending_payment'])
+                .order('date', { ascending: true })
+                .limit(1)
+                .single();
+
+            if (!recentApptError && recentAppt) {
+                await supabase
+                    .from('appointments')
+                    .update({ notes: JSON.stringify(anamnesisData) })
+                    .eq('id', recentAppt.id);
+            }
+
+            return res.status(200).json({ success: true });
+        }
+
         return res.status(400).json({ error: 'Invalid action or method' });
 
     } catch (error: any) {

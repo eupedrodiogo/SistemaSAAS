@@ -837,6 +837,18 @@ async function handler5(req, res) {
       if (rError) throw rError;
       return res.status(200).json(recordings || []);
     }
+    if (req.method === "POST" && action === "save_anamnesis") {
+      if (!patientId) return res.status(400).json({ error: "Patient ID required" });
+      const anamnesisData = req.body;
+      const patientNotes = `Queixa: ${anamnesisData.complaint || "N\xE3o informado"} | Transtornos: ${(anamnesisData.transtornos || []).map((t) => `${t.name} (${t.level})`).join(", ")}`;
+      const { error: pUpdateError } = await supabase6.from("patients").update({ notes: patientNotes }).eq("id", patientId);
+      if (pUpdateError) throw pUpdateError;
+      const { data: recentAppt, error: recentApptError } = await supabase6.from("appointments").select("id").eq("patient_id", patientId).in("status", ["scheduled", "agendado", "active", "ativo", "pending_payment"]).order("date", { ascending: true }).limit(1).single();
+      if (!recentApptError && recentAppt) {
+        await supabase6.from("appointments").update({ notes: JSON.stringify(anamnesisData) }).eq("id", recentAppt.id);
+      }
+      return res.status(200).json({ success: true });
+    }
     return res.status(400).json({ error: "Invalid action or method" });
   } catch (error) {
     console.error("Client Portal API Error:", error);

@@ -1,18 +1,40 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import ClientLayout from './ClientLayout';
 import { Link } from 'react-router-dom';
 import { Clock, Video, Calendar, ArrowRight, CheckCircle, AlertCircle, PlayCircle } from 'lucide-react';
 import { useClientData } from './ClientContext';
 import NotificationBell from '../NotificationBell';
+import AnamnesisPopup from './AnamnesisPopup';
 
 const ClientDashboard: React.FC = () => {
-    const { patient, appointments, error } = useClientData();
+    const { patient, appointments, error, loading } = useClientData();
+    const [showAnamnesisPopup, setShowAnamnesisPopup] = useState(false);
+
+    useEffect(() => {
+        if (!patient || loading) return;
+        
+        // Verifica se a anamnese já foi preenchida
+        // Lógica: se o paciente tem notas de anamnese preenchidas E o usuário não dispensou o aviso nesta sessão
+        const isCompleted = localStorage.getItem('anamnese_completed') === 'true' || (patient.notes && patient.notes.includes('Transtornos:'));
+        const isDismissedSession = sessionStorage.getItem('anamnese_dismissed_session') === 'true';
+
+        if (!isCompleted && !isDismissedSession) {
+            setShowAnamnesisPopup(true);
+        }
+    }, [patient, loading]);
 
     const nextAppointment = appointments.find(appt => ['agendado', 'scheduled', 'pending_payment', 'active', 'ativo'].includes(appt.status?.toLowerCase() || ''));
     const completedCount = appointments.filter(appt => ['concluído', 'completed'].includes(appt.status?.toLowerCase() || '')).length;
 
     return (
         <ClientLayout activePage="dashboard">
+            <AnamnesisPopup 
+                isOpen={showAnamnesisPopup} 
+                onClose={() => {
+                    sessionStorage.setItem('anamnese_dismissed_session', 'true');
+                    setShowAnamnesisPopup(false);
+                }} 
+            />
             <div className="space-y-6 animate-fade-in pb-20 md:pb-0">
                 {error && (
                     <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 p-4 rounded-xl flex items-center gap-3">
