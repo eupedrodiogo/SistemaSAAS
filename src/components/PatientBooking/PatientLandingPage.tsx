@@ -42,6 +42,12 @@ const PatientLandingPage: React.FC<PatientLandingPageProps> = ({ isDarkMode, tog
                     </div>
                     <div className="flex items-center gap-4">
                         <button
+                            onClick={() => window.location.href = '/'}
+                            className="text-sm font-bold text-slate-600 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors hidden sm:block"
+                        >
+                            Sou Terapeuta
+                        </button>
+                        <button
                             onClick={toggleTheme}
                             className="p-2 rounded-full text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
                         >

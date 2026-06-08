@@ -120,6 +120,53 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                         </button>
                     </div>
                     <p className="text-slate-600 dark:text-slate-500 text-sm mt-5">Sem cartão de crédito · Cancele quando quiser</p>
+
+                    {/* Dual Ecosystem Banner */}
+                    <div className="mt-16 grid md:grid-cols-2 gap-6 max-w-4xl mx-auto text-left">
+                        {/* Therapist Side */}
+                        <div className="p-6 rounded-2xl bg-white/5 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 backdrop-blur-md relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-5 dark:opacity-10 group-hover:opacity-10 dark:group-hover:opacity-20 transition-opacity">
+                                <BrainCircuit size={80} />
+                            </div>
+                            <div className="relative z-10">
+                                <span className="inline-block px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-bold rounded-full mb-4">
+                                    PARA TERAPEUTAS
+                                </span>
+                                <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Gestão Completa</h3>
+                                <p className="text-slate-600 dark:text-slate-400 text-sm mb-6 leading-relaxed">
+                                    Automatize sua agenda, cobranças e prontuários. Assuma o controle da sua carreira com ferramentas projetadas especificamente para a TRG.
+                                </p>
+                                <button
+                                    onClick={() => navigate('/register')}
+                                    className="text-blue-600 dark:text-blue-400 font-bold text-sm flex items-center gap-2 hover:gap-3 transition-all"
+                                >
+                                    Criar minha conta <ArrowRight size={16} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Client Side */}
+                        <div className="p-6 rounded-2xl bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/20 dark:to-slate-900/40 border border-blue-200 dark:border-blue-800/50 backdrop-blur-md relative overflow-hidden shadow-lg shadow-blue-900/5 group">
+                            <div className="absolute top-0 right-0 p-4 opacity-5 dark:opacity-10 group-hover:opacity-10 dark:group-hover:opacity-20 transition-opacity">
+                                <HeartHandshake size={80} />
+                            </div>
+                            <div className="relative z-10">
+                                <span className="inline-block px-3 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-full mb-4">
+                                    PARA CLIENTES
+                                </span>
+                                <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Busca por Ajuda?</h3>
+                                <p className="text-slate-600 dark:text-slate-400 text-sm mb-6 leading-relaxed">
+                                    Você que busca um terapeuta para resolver suas dores emocionais pode acessar nossa área dedicada a clientes e agendar sua sessão agora mesmo.
+                                </p>
+                                <button
+                                    onClick={() => navigate('/cliente')}
+                                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm shadow-md shadow-blue-500/20 transition-all hover:scale-105 inline-flex items-center gap-2"
+                                >
+                                    Ir para a Área do Cliente
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -350,6 +397,20 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                     <p className="text-slate-400 mb-12 max-w-xl mx-auto">
                         Comece grátis e experimente tudo por 1 mês. Sem cartão de crédito, sem surpresas.
                     </p>
+
+                    {/* Pricing Clarification Alert */}
+                    <div className="max-w-4xl mx-auto mb-14 bg-blue-900/20 border border-blue-800/50 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-6 text-left relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-500/5 to-transparent skew-x-12 translate-x-full group-hover:animate-shimmer" />
+                        <div className="w-16 h-16 rounded-2xl bg-blue-500/20 flex items-center justify-center shrink-0 text-blue-400">
+                            <Shield size={32} />
+                        </div>
+                        <div>
+                            <h4 className="text-xl font-bold text-white mb-2">Transparência total: Zero taxas por sessão</h4>
+                            <p className="text-slate-300 text-sm md:text-base leading-relaxed">
+                                No TeraNexus, <strong>nós NÃO cobramos por sessão</strong>. Seus clientes não pagam taxa alguma para a plataforma — pagam apenas pela consulta diretamente a você. O terapeuta assina um plano único mensal e usa o sistema à vontade. Simples, justo e transparente.
+                            </p>
+                        </div>
+                    </div>
 
                     <div className="grid md:grid-cols-3 gap-6 items-center">
 
