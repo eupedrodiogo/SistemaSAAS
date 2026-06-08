@@ -48,6 +48,12 @@ const PatientLandingPage: React.FC<PatientLandingPageProps> = ({ isDarkMode, tog
                             Sou Terapeuta
                         </button>
                         <button
+                            onClick={() => window.location.href = '/portal-paciente/login'}
+                            className="text-sm font-bold text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors hidden sm:block"
+                        >
+                            Área do Cliente
+                        </button>
+                        <button
                             onClick={toggleTheme}
                             className="p-2 rounded-full text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
                         >
