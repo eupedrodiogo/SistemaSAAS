@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
-    FileText, AlertCircle, Users, Target, PenTool, AlertTriangle, Edit2, Activity, Calendar,
-    Brain, HeartPulse, Sparkles, Quote
+    FileText, Users, Target, PenTool, Activity,
+    Brain, HeartPulse, Sparkles, Quote, MessageSquare
 } from 'lucide-react';
 import { ClientIntakeData } from 'types';
 
@@ -25,10 +25,6 @@ export const SessionNotes: React.FC<SessionNotesProps> = ({ intakeData, observat
 
     /**
      * Renders a list of items with their intensity levels using premium badges.
-     * Logic matches AnamnesisStep.tsx:
-     * - 0-3: Emerald (Leve)
-     * - 4-6: Amber (Moderado)
-     * - 7-10: Rose (Intenso)
      */
     const renderLevelItems = (items?: { name: string; level: number }[], emptyText = "Nenhum relatado") => {
         if (!items || items.length === 0) return <p className="text-slate-400 dark:text-slate-500 italic text-sm">{emptyText}</p>;
@@ -62,6 +58,27 @@ export const SessionNotes: React.FC<SessionNotesProps> = ({ intakeData, observat
                         </div>
                     );
                 })}
+            </div>
+        );
+    };
+
+    const renderDetailedSection = (title: string, icon: React.ReactNode, data: { label: string, value?: string }[]) => {
+        const validData = data.filter(d => d.value && d.value.trim() !== '' && d.value.trim() !== '-');
+        if (validData.length === 0) return null;
+        
+        return (
+            <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    {icon} {title}
+                </h3>
+                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3 text-sm">
+                    {validData.map((item, idx) => (
+                        <div key={idx} className="flex flex-col gap-1">
+                            <span className="text-slate-500 dark:text-slate-400 font-medium">{item.label}</span>
+                            <span className="text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">{item.value}</span>
+                        </div>
+                    ))}
+                </div>
             </div>
         );
     };
@@ -140,41 +157,41 @@ export const SessionNotes: React.FC<SessionNotesProps> = ({ intakeData, observat
                 </div>
             </div>
 
-            {/* 3. Detailed Information (Collapsible or Gridded) */}
+            {/* 3. Detailed Information */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100 dark:border-slate-800">
                 <div className="space-y-4">
-                    <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                         <Users size={16} /> Contexto Pessoal
                     </h3>
                     <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3 text-sm">
                         <div className="grid grid-cols-[130px_1fr] gap-2">
-                            <span className="text-slate-400">Nome:</span>
-                            <span className="font-medium">{intakeData?.nome || intakeData?.name || '-'}</span>
+                            <span className="text-slate-500 dark:text-slate-400">Nome:</span>
+                            <span className="font-medium text-slate-800 dark:text-slate-200">{intakeData?.nome || intakeData?.name || '-'}</span>
                         </div>
                         <div className="grid grid-cols-[130px_1fr] gap-2">
-                            <span className="text-slate-400">Data Nasc.:</span>
-                            <span className="font-medium">{intakeData?.dataNascimento || '-'}</span>
+                            <span className="text-slate-500 dark:text-slate-400">Data Nasc.:</span>
+                            <span className="font-medium text-slate-800 dark:text-slate-200">{intakeData?.dataNascimento || '-'}</span>
                         </div>
                         <div className="grid grid-cols-[130px_1fr] gap-2">
-                            <span className="text-slate-400">Celular:</span>
-                            <span className="font-medium">{intakeData?.celular || intakeData?.phone || '-'}</span>
+                            <span className="text-slate-500 dark:text-slate-400">Celular:</span>
+                            <span className="font-medium text-slate-800 dark:text-slate-200">{intakeData?.celular || intakeData?.phone || '-'}</span>
                         </div>
                         <div className="grid grid-cols-[130px_1fr] gap-2">
-                            <span className="text-slate-400">Profissão:</span>
-                            <span className="font-medium">{intakeData?.profissao || '-'}</span>
+                            <span className="text-slate-500 dark:text-slate-400">Profissão:</span>
+                            <span className="font-medium text-slate-800 dark:text-slate-200">{intakeData?.profissao || '-'}</span>
                         </div>
                     </div>
                 </div>
 
                 {intakeData?.visaoFuturo && (
                     <div className="space-y-4">
-                        <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                             <Target size={16} /> Objetivos & Visão
                         </h3>
-                        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3 text-sm">
+                        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3 text-sm h-full">
                             <div className="mb-3">
-                                <span className="block text-slate-400 text-xs uppercase tracking-wider mb-1">Visão de Futuro</span>
-                                <p className="text-slate-700 dark:text-slate-300 leading-relaxed italic">
+                                <span className="block text-slate-500 dark:text-slate-400 text-xs uppercase tracking-wider mb-1">Visão de Futuro</span>
+                                <p className="text-slate-800 dark:text-slate-200 leading-relaxed italic">
                                     "{intakeData.visaoFuturo}"
                                 </p>
                             </div>
@@ -183,18 +200,103 @@ export const SessionNotes: React.FC<SessionNotesProps> = ({ intakeData, observat
                 )}
             </div>
 
+            {/* FULL ANAMNESIS FIELDS */}
+            {renderDetailedSection("Saúde e Hábitos", <HeartPulse size={16} />, [
+                { label: "Nível de Estresse", value: intakeData?.nivelStress },
+                { label: "Dores de Cabeça Constantes", value: intakeData?.doresCabeca },
+                { label: "Insônia", value: intakeData?.insonia },
+                { label: "Medicações em Uso", value: intakeData?.medications },
+                { label: "Ideações Suicidas", value: intakeData?.ideiasSuicidas },
+                { label: "Uso de Álcool", value: intakeData?.alcool },
+                { label: "Uso de Drogas", value: intakeData?.drogas },
+                { label: "Fobias", value: intakeData?.fobias },
+                { label: "Traumas Relatados", value: intakeData?.traumas },
+                { label: "Aspectos de Sexualidade", value: intakeData?.sexualidade },
+            ])}
+
+            {renderDetailedSection("Vida Pessoal e Dinâmica Familiar", <Users size={16} />, [
+                { label: "Estado Civil", value: intakeData?.estadoCivil },
+                { label: "Motivo de Divórcio (se houver)", value: intakeData?.motivoDivorcio },
+                { label: "Número de Filhos", value: intakeData?.numeroFilhos },
+                { label: "Relação com os Filhos", value: intakeData?.relacaoFilhos },
+                { label: "Relação com Parceiro(a)", value: intakeData?.relacaoParceiro },
+                { label: "Sentimento sobre a Casa onde mora", value: intakeData?.sentimentoCasa },
+                { label: "Sentimento sobre o Ambiente de Trabalho", value: intakeData?.sentimentoTrabalho },
+                { label: "Sentimento de Pertencimento Familiar", value: intakeData?.pertenceFamilia },
+                { label: "Sentimento de Pertencimento Social", value: intakeData?.pertenceSocial },
+                { label: "Maiores Frustrações", value: intakeData?.frustracoes },
+            ])}
+
+            {renderDetailedSection("Histórico da Infância", <Brain size={16} />, [
+                { label: "Por quem foi criado(a)", value: intakeData?.criadoPais },
+                { label: "Como era a relação com o Pai", value: intakeData?.relacaoPai },
+                { label: "Como era a relação com a Mãe", value: intakeData?.relacaoMae },
+                { label: "Pais eram agressivos?", value: intakeData?.paisAgressivos },
+                { label: "Havia alcoolismo em casa?", value: intakeData?.paisAlcool },
+                { label: "Como os pais se tratavam", value: intakeData?.relacaoEntrePais },
+                { label: "Crença sobre relacionamentos", value: intakeData?.crencaRelacionamento },
+                { label: "Maior mágoa da infância", value: intakeData?.magoaInfancia },
+                { label: "Maior medo na infância", value: intakeData?.medoInfancia },
+            ])}
+
+            {renderDetailedSection("Mapeamento Emocional Profundo", <Activity size={16} />, [
+                { label: "Pensamentos sobre si mesmo", value: intakeData?.pensamentosSi },
+                { label: "Pensamentos sobre o próprio corpo", value: intakeData?.pensamentosCorpo },
+                { label: "Pensamentos sobre sua competência", value: intakeData?.pensamentosCompetencia },
+                { label: "O que seria felicidade para você", value: intakeData?.felicidade },
+                { label: "O que acha mais difícil mudar hoje", value: intakeData?.mudanca },
+                { label: "Maiores Medos Hoje", value: intakeData?.maioresMedosHoje },
+                { label: "Qual papel costuma assumir na vida", value: intakeData?.papelVida },
+                { label: "Mais dominante ou submisso?", value: intakeData?.dominanteSubmisso },
+                { label: "Situações de Raiva e Rancor", value: intakeData?.raivaRancor },
+                { label: "Situações de Culpa", value: intakeData?.sentimentoCulpa },
+            ])}
+            
+            {/* Tabela de Sentimentos Intensidade */}
+            {(() => {
+                const sentimentos = [
+                    { label: "Raiva", value: intakeData?.int_raiva },
+                    { label: "Medo", value: intakeData?.int_medo },
+                    { label: "Culpa", value: intakeData?.int_culpa },
+                    { label: "Tristeza", value: intakeData?.int_tristeza },
+                    { label: "Ansiedade", value: intakeData?.int_ansiedade },
+                    { label: "Solidão", value: intakeData?.int_solidão },
+                    { label: "Desânimo", value: intakeData?.int_desanimo },
+                    { label: "Angústia", value: intakeData?.int_angustia },
+                ].filter(s => s.value && s.value.trim() !== '');
+                
+                if (sentimentos.length === 0) return null;
+
+                return (
+                    <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                            <MessageSquare size={16} /> Intensidade de Sentimentos (0 a 10)
+                        </h3>
+                        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                            {sentimentos.map((s, idx) => (
+                                <div key={idx} className="flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700">
+                                    <span className="text-slate-500 dark:text-slate-400 font-medium mb-1">{s.label}</span>
+                                    <span className="text-lg font-bold text-slate-800 dark:text-slate-200">{s.value}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            })()}
+
             {/* 4. Therapist Observations (Input) */}
             <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
-                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-3 flex items-center gap-2">
                     <PenTool size={16} /> Observações Iniciais do Terapeuta
                 </h3>
                 <textarea
                     value={observation}
                     onChange={(e) => onObservationChange(e.target.value)}
-                    className="w-full h-32 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none transition-all placeholder:text-slate-400"
-                    placeholder="Registre aqui suas impressões iniciais, linguagem corporal observada ou pontos de atenção para a sessão..."
+                    className="w-full h-32 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500 text-slate-800 dark:text-slate-200"
+                    placeholder="Registre aqui suas impressões iniciais para a sessão..."
                 />
             </div>
         </div>
     );
 };
+

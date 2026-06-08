@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowRight, Mail, FileText, Shield, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import LegalModal from '../Legal/LegalModal';
 
@@ -14,12 +14,30 @@ const ClientLogin: React.FC = () => {
         type: 'terms'
     });
 
+    useEffect(() => {
+        const queryParams = new URLSearchParams(window.location.search);
+        const emailParam = queryParams.get('email');
+        if (emailParam) {
+            setEmail(emailParam);
+            // Attempt auto-login after state updates
+            setTimeout(() => {
+                const btn = document.getElementById('auto-login-btn');
+                if (btn) btn.click();
+            }, 100);
+        }
+    }, []);
+
     const openLegal = (type: 'terms' | 'privacy') => {
         setLegalModal({ isOpen: true, type });
     };
 
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleLogin = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        
+        // Prevent empty email submission
+        const currentEmail = email || new URLSearchParams(window.location.search).get('email');
+        if (!currentEmail) return;
+
         setIsLoading(true);
         setError(null);
 
@@ -27,7 +45,7 @@ const ClientLogin: React.FC = () => {
             const response = await fetch('/api/client-portal?action=login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
+                body: JSON.stringify({ email: currentEmail, password })
             });
 
             let data;
@@ -127,6 +145,7 @@ const ClientLogin: React.FC = () => {
                     )}
 
                     <button
+                        id="auto-login-btn"
                         type="submit"
                         disabled={isLoading}
                         className="w-full py-4 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-lg shadow-primary-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
