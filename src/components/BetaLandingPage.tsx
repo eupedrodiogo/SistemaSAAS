@@ -94,8 +94,7 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
             {/* Hero Section */}
             <section className="pt-32 pb-24 px-6 text-center">
                 <div className="max-w-4xl mx-auto">
-                    {/* Urgency badge */}
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-900/40 border border-emerald-700/50 text-emerald-400 text-sm font-semibold mb-8">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-100 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-700/50 text-emerald-700 dark:text-emerald-400 text-sm font-semibold mb-8">
                         <Gift size={15} />
                         Experimente grátis por 30 dias — sem cartão de crédito
                     </div>
@@ -114,7 +113,7 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                         </button>
                         <button
                             onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
-                            className="px-8 py-4 border border-slate-600 hover:border-slate-400 text-slate-300 hover:text-white rounded-xl font-semibold text-lg transition-all hover:scale-105"
+                            className="px-8 py-4 border border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-400 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-xl font-semibold text-lg transition-all hover:scale-105"
                         >
                             Ver todos os planos
                         </button>
