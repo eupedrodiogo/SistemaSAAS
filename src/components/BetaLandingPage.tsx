@@ -71,13 +71,13 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
         <div className="min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-white transition-colors duration-300 font-sans">
 
             {/* Header */}
-            <nav className="fixed w-full z-50 bg-[#020617]/80 backdrop-blur-md border-b border-slate-900/50">
+            <nav className="fixed w-full z-50 bg-white/80 dark:bg-[#020617]/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-900/50">
                 <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <img src="/logo-new.jpg" alt="TeraNexus Logo" className="w-10 h-10 rounded-xl object-cover shadow-lg shadow-blue-500/10" />
                         <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-white tracking-tight">Tera<span className="text-blue-500">Nexus</span></span>
-                            <span className="text-[10px] font-bold bg-blue-900/40 text-blue-400 px-2 py-0.5 rounded-md uppercase tracking-wider">BETA</span>
+                            <span className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">Tera<span className="text-blue-500">Nexus</span></span>
+                            <span className="text-[10px] font-bold bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-md uppercase tracking-wider">BETA</span>
                         </div>
                     </div>
                     <div className="flex items-center gap-4">
@@ -86,7 +86,7 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                             className="hidden md:flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg text-sm font-bold transition-all hover:scale-105 shadow-lg shadow-emerald-500/30">
                             <Gift size={14} /> Testar Grátis
                         </button>
-                        <button onClick={() => navigate('/login')} className="text-sm font-semibold text-slate-300 hover:text-white transition-colors">Entrar</button>
+                        <button onClick={() => navigate('/login')} className="text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors">Entrar</button>
                     </div>
                 </div>
             </nav>
@@ -174,18 +174,18 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
             <section className="py-20 px-6 bg-slate-50 dark:bg-[#020617]">
                 <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center gap-12">
                     <div className="flex-1">
-                        <div className="inline-block px-4 py-2 rounded-2xl bg-[#3b2a20] text-[#d4996a] text-sm font-bold mb-6">A Origem</div>
-                        <h2 className="text-4xl font-bold mb-8 text-white">"E para a minha área?"</h2>
-                        <div className="space-y-6 text-slate-300 italic border-l-4 border-blue-600 pl-8 py-2">
+                        <div className="inline-block px-4 py-2 rounded-2xl bg-amber-100 dark:bg-[#3b2a20] text-amber-700 dark:text-[#d4996a] text-sm font-bold mb-6">A Origem</div>
+                        <h2 className="text-4xl font-bold mb-8 text-slate-900 dark:text-white">"E para a minha área?"</h2>
+                        <div className="space-y-6 text-slate-700 dark:text-slate-300 italic border-l-4 border-blue-600 pl-8 py-2">
                             <p className="text-lg leading-relaxed">
-                                "Sou o Pedro Diogo, desenvolvedor. Tudo começou quando minha esposa — futura Terapeuta TRG — me viu criando um sistema genérico e perguntou: <strong>'Por que não algo específico para nós?'</strong>"
+                                "Sou o Pedro Diogo, desenvolvedor. Tudo começou quando minha esposa — futura Terapeuta TRG — me viu criando um sistema genérico e perguntou: <strong className="text-slate-900 dark:text-white">'Por que não algo específico para nós?'</strong>"
                             </p>
                             <p className="text-lg leading-relaxed">
-                                "Aceitei o desafio. Estudei a rotina, o TRG Club, e vi que faltava o elo perdido: <strong>a Gestão do dia a dia.</strong> O Tera Nexus nasce para ser esse braço direito."
+                                "Aceitei o desafio. Estudei a rotina, o TRG Club, e vi que faltava o elo perdido: <strong className="text-slate-900 dark:text-white">a Gestão do dia a dia.</strong> O Tera Nexus nasce para ser esse braço direito."
                             </p>
                         </div>
                     </div>
-                    <div className="w-full md:w-1/3 rounded-2xl overflow-hidden shadow-2xl border border-slate-800 rotate-3 hover:rotate-0 transition-all duration-500">
+                    <div className="w-full md:w-1/3 rounded-2xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 rotate-3 hover:rotate-0 transition-all duration-500">
                         <img
                             src="/origem-photo-final.jpg"
                             alt="Foto dos Bastidores: A Origem"
@@ -196,14 +196,14 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
             </section>
 
             {/* === SEÇÃO DE DORES === */}
-            <section className="py-24 px-6 bg-[#0a0a0f]">
+            <section className="py-24 px-6 bg-slate-100 dark:bg-[#0a0a0f]">
                 <div className="max-w-5xl mx-auto">
                     <div className="text-center mb-16">
-                        <div className="inline-block px-4 py-2 rounded-2xl bg-red-900/30 text-red-400 text-sm font-bold mb-6 border border-red-800/50">A Realidade de Quem Está no Mercado</div>
-                        <h2 className="text-3xl md:text-5xl font-extrabold text-white mb-5 leading-tight">
-                            Você se reconhece <br /><span className="text-red-400">nessas situações?</span>
+                        <div className="inline-block px-4 py-2 rounded-2xl bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-sm font-bold mb-6 border border-red-200 dark:border-red-800/50">A Realidade de Quem Está no Mercado</div>
+                        <h2 className="text-3xl md:text-5xl font-extrabold text-slate-900 dark:text-white mb-5 leading-tight">
+                            Você se reconhece <br /><span className="text-red-500 dark:text-red-400">nessas situações?</span>
                         </h2>
-                        <p className="text-slate-400 max-w-xl mx-auto">
+                        <p className="text-slate-600 dark:text-slate-400 max-w-xl mx-auto">
                             Antes de criar o TeraNexus, minha esposa me descreveu o dia a dia real de uma Terapeuta TRG recém-formada:
                         </p>
                     </div>
@@ -241,20 +241,20 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                                 desc: 'O limite não é a sua capacidade como terapeuta. É o caos operacional que impede sua agenda de crescer de forma saudável.'
                             },
                         ].map((pain, i) => (
-                            <div key={i} className="p-6 rounded-2xl border border-red-900/40 bg-red-950/20 hover:border-red-700/60 transition-all duration-300 group">
-                                <div className="w-12 h-12 rounded-xl bg-red-900/40 flex items-center justify-center text-red-400 mb-5 group-hover:bg-red-900/60 transition-all">
+                            <div key={i} className="p-6 rounded-2xl border border-red-200 dark:border-red-900/40 bg-white dark:bg-red-950/20 hover:border-red-300 dark:hover:border-red-700/60 shadow-sm dark:shadow-none transition-all duration-300 group">
+                                <div className="w-12 h-12 rounded-xl bg-red-50 dark:bg-red-900/40 flex items-center justify-center text-red-500 dark:text-red-400 mb-5 group-hover:bg-red-100 dark:group-hover:bg-red-900/60 transition-all">
                                     {pain.icon}
                                 </div>
-                                <h3 className="font-bold text-white mb-3 text-base leading-snug italic">{pain.title}</h3>
-                                <p className="text-slate-400 text-sm leading-relaxed">{pain.desc}</p>
+                                <h3 className="font-bold text-slate-800 dark:text-white mb-3 text-base leading-snug italic">{pain.title}</h3>
+                                <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">{pain.desc}</p>
                             </div>
                         ))}
                     </div>
 
                     <div className="mt-14 text-center">
-                        <p className="text-slate-300 text-lg font-medium">
+                        <p className="text-slate-700 dark:text-slate-300 text-lg font-medium">
                             Se você marcou mentalmente algum desses pontos... <br />
-                            <span className="text-white font-bold">o TeraNexus foi criado exatamente para você.</span>
+                            <span className="text-slate-900 dark:text-white font-bold">o TeraNexus foi criado exatamente para você.</span>
                         </p>
                         <div className="mt-2 text-3xl">👇</div>
                     </div>
@@ -262,14 +262,14 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
             </section>
 
             {/* === SEÇÃO DE SOLUÇÃO === */}
-            <section className="py-24 px-6 bg-gradient-to-b from-[#020617] to-[#0c1a33]">
+            <section className="py-24 px-6 bg-gradient-to-b from-white to-blue-50 dark:from-[#020617] dark:to-[#0c1a33]">
                 <div className="max-w-5xl mx-auto">
                     <div className="text-center mb-16">
-                        <div className="inline-block px-4 py-2 rounded-2xl bg-blue-900/30 text-blue-400 text-sm font-bold mb-6 border border-blue-800/50">A Solução Completa</div>
-                        <h2 className="text-3xl md:text-5xl font-extrabold text-white mb-5 leading-tight">
-                            Tudo que você precisa. <br /><span className="text-blue-400">Em um só lugar.</span>
+                        <div className="inline-block px-4 py-2 rounded-2xl bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-sm font-bold mb-6 border border-blue-200 dark:border-blue-800/50">A Solução Completa</div>
+                        <h2 className="text-3xl md:text-5xl font-extrabold text-slate-900 dark:text-white mb-5 leading-tight">
+                            Tudo que você precisa. <br /><span className="text-blue-600 dark:text-blue-400">Em um só lugar.</span>
                         </h2>
-                        <p className="text-slate-400 max-w-xl mx-auto">
+                        <p className="text-slate-600 dark:text-slate-400 max-w-xl mx-auto">
                             O TeraNexus substitui a pilha de apps e te devolve o mais precioso: o seu tempo.
                         </p>
                     </div>
@@ -277,38 +277,38 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                     <div className="grid md:grid-cols-2 gap-8">
                         {[
                             {
-                                icon: <Calendar size={24} className="text-blue-400" />,
+                                icon: <Calendar size={24} className="text-blue-600 dark:text-blue-400" />,
                                 badge: 'Agenda Inteligente',
                                 title: 'Pacientes agendam sozinhos, 24h por dia',
                                 desc: 'Seu link de agendamento personalizado funciona enquanto você atende, dorme ou descansa. Sem trocas de mensagem, sem conflitos de horário.'
                             },
                             {
-                                icon: <BadgeDollarSign size={24} className="text-blue-400" />,
+                                icon: <BadgeDollarSign size={24} className="text-blue-600 dark:text-blue-400" />,
                                 badge: 'Cobrança Automática',
-                                title: 'Receba em dia, sem awkwardness',
+                                title: 'Receba em dia, sem constrangimento',
                                 desc: 'Cobranças configuradas uma vez e enviadas automaticamente. Você nunca mais precisa ser a "vilã" da situação.'
                             },
                             {
-                                icon: <FileText size={24} className="text-blue-400" />,
+                                icon: <FileText size={24} className="text-blue-600 dark:text-blue-400" />,
                                 badge: 'Registro de Dados Digital',
                                 title: 'Evolução de cada cliente na palma da mão',
                                 desc: 'Registre sessões, protocolos e observações de qualquer dispositivo. Seguro, organizado e sempre disponível.'
                             },
                             {
-                                icon: <BrainCircuit size={24} className="text-blue-400" />,
+                                icon: <BrainCircuit size={24} className="text-blue-600 dark:text-blue-400" />,
                                 badge: 'Relatórios com IA',
                                 title: 'Insights que vão além dos seus registros',
                                 desc: 'A IA analisa o progresso dos clientes e gera resumos e sugestões baseadas no TRG, economizando horas de trabalho por semana.'
                             },
                         ].map((sol, i) => (
-                            <div key={i} className="flex gap-5 p-6 rounded-2xl border border-blue-900/40 bg-blue-950/20 hover:border-blue-600/50 transition-all duration-300 group">
-                                <div className="w-12 h-12 rounded-xl bg-blue-900/40 flex items-center justify-center shrink-0 group-hover:bg-blue-900/60 transition-all">
+                            <div key={i} className="flex gap-5 p-6 rounded-2xl border border-blue-200 dark:border-blue-900/40 bg-white dark:bg-blue-950/20 hover:border-blue-300 dark:hover:border-blue-600/50 shadow-md dark:shadow-none transition-all duration-300 group">
+                                <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/40 flex items-center justify-center shrink-0 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/60 transition-all">
                                     {sol.icon}
                                 </div>
                                 <div>
-                                    <span className="text-xs font-bold text-blue-500 uppercase tracking-wider">{sol.badge}</span>
-                                    <h3 className="font-bold text-white text-lg mt-1 mb-2">{sol.title}</h3>
-                                    <p className="text-slate-400 text-sm leading-relaxed">{sol.desc}</p>
+                                    <span className="text-xs font-bold text-blue-600 dark:text-blue-500 uppercase tracking-wider">{sol.badge}</span>
+                                    <h3 className="font-bold text-slate-800 dark:text-white text-lg mt-1 mb-2">{sol.title}</h3>
+                                    <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">{sol.desc}</p>
                                 </div>
                             </div>
                         ))}
@@ -321,7 +321,7 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                             <HeartHandshake size={22} />
                             Quero meu sistema funcionando agora
                         </button>
-                        <p className="text-slate-500 text-sm mt-4">Comece grátis por 30 dias. Sem burocracia.</p>
+                        <p className="text-slate-600 dark:text-slate-500 text-sm mt-4">Comece grátis por 30 dias. Sem burocracia.</p>
                     </div>
                 </div>
             </section>
@@ -388,25 +388,25 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
             </section>
 
             {/* Pricing Section */}
-            <section id="pricing" className="py-24 bg-slate-900 text-white relative overflow-hidden">
+            <section id="pricing" className="py-24 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white relative overflow-hidden">
                 {/* Abstract BG */}
-                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
+                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-5 dark:opacity-20"></div>
 
                 <div className="max-w-5xl mx-auto px-6 relative z-10 text-center">
                     <h2 className="text-3xl md:text-5xl font-bold mb-6">Escolha o seu plano</h2>
-                    <p className="text-slate-400 mb-12 max-w-xl mx-auto">
+                    <p className="text-slate-600 dark:text-slate-400 mb-12 max-w-xl mx-auto">
                         Comece grátis e experimente tudo por 1 mês. Sem cartão de crédito, sem surpresas.
                     </p>
 
                     {/* Pricing Clarification Alert */}
-                    <div className="max-w-4xl mx-auto mb-14 bg-blue-900/20 border border-blue-800/50 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-6 text-left relative overflow-hidden">
+                    <div className="max-w-4xl mx-auto mb-14 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-6 text-left relative overflow-hidden shadow-sm dark:shadow-none">
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-500/5 to-transparent skew-x-12 translate-x-full group-hover:animate-shimmer" />
-                        <div className="w-16 h-16 rounded-2xl bg-blue-500/20 flex items-center justify-center shrink-0 text-blue-400">
+                        <div className="w-16 h-16 rounded-2xl bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center shrink-0 text-blue-600 dark:text-blue-400">
                             <Shield size={32} />
                         </div>
                         <div>
-                            <h4 className="text-xl font-bold text-white mb-2">Transparência total: Zero taxas por sessão</h4>
-                            <p className="text-slate-300 text-sm md:text-base leading-relaxed">
+                            <h4 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Transparência total: Zero taxas por sessão</h4>
+                            <p className="text-slate-600 dark:text-slate-300 text-sm md:text-base leading-relaxed">
                                 No TeraNexus, <strong>nós NÃO cobramos por sessão</strong>. Seus clientes não pagam taxa alguma para a plataforma — pagam apenas pela consulta diretamente a você. O terapeuta assina um plano único mensal e usa o sistema à vontade. Simples, justo e transparente.
                             </p>
                         </div>
@@ -415,24 +415,24 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                     <div className="grid md:grid-cols-3 gap-6 items-center">
 
                         {/* Teste Gratuito */}
-                        <div className="p-8 rounded-3xl border-2 border-emerald-500 bg-emerald-950/30 relative shadow-2xl shadow-emerald-500/20 order-first">
+                        <div className="p-8 rounded-3xl border-2 border-emerald-500 bg-white dark:bg-emerald-950/30 relative shadow-xl dark:shadow-2xl dark:shadow-emerald-500/20 order-first">
                             <div className="absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap">
                                 <span className="bg-emerald-500 text-white text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5">
                                     <Gift size={12} /> Comece Aqui — Grátis
                                 </span>
                             </div>
                             <div className="mt-4">
-                                <h3 className="text-xl font-bold text-emerald-300 mb-1">Teste Gratuito</h3>
-                                <p className="text-slate-400 text-xs mb-4">Sem cartão de crédito</p>
+                                <h3 className="text-xl font-bold text-emerald-600 dark:text-emerald-300 mb-1">Teste Gratuito</h3>
+                                <p className="text-slate-500 dark:text-slate-400 text-xs mb-4">Sem cartão de crédito</p>
                                 <div className="my-5">
-                                    <span className="text-5xl font-extrabold text-emerald-400">R$ 0</span>
-                                    <span className="text-slate-400 text-sm">/por 30 dias</span>
+                                    <span className="text-5xl font-extrabold text-emerald-500 dark:text-emerald-400">R$ 0</span>
+                                    <span className="text-slate-500 dark:text-slate-400 text-sm">/por 30 dias</span>
                                 </div>
-                                <ul className="space-y-3 mb-8 text-left text-sm text-slate-300">
-                                    <li className="flex gap-2 items-start"><Check size={16} className="text-emerald-400 shrink-0 mt-0.5" /> Acesso completo por <strong className="text-white ml-1">1 mês</strong></li>
-                                    <li className="flex gap-2 items-start"><Check size={16} className="text-emerald-400 shrink-0 mt-0.5" /> Até 10 Clientes</li>
-                                    <li className="flex gap-2 items-start"><Check size={16} className="text-emerald-400 shrink-0 mt-0.5" /> Agenda & Registro de Dados</li>
-                                    <li className="flex gap-2 items-start"><Check size={16} className="text-emerald-400 shrink-0 mt-0.5" /> Suporte pelo WhatsApp</li>
+                                <ul className="space-y-3 mb-8 text-left text-sm text-slate-600 dark:text-slate-300">
+                                    <li className="flex gap-2 items-start"><Check size={16} className="text-emerald-500 dark:text-emerald-400 shrink-0 mt-0.5" /> Acesso completo por <strong className="text-slate-900 dark:text-white ml-1">1 mês</strong></li>
+                                    <li className="flex gap-2 items-start"><Check size={16} className="text-emerald-500 dark:text-emerald-400 shrink-0 mt-0.5" /> Até 10 Clientes</li>
+                                    <li className="flex gap-2 items-start"><Check size={16} className="text-emerald-500 dark:text-emerald-400 shrink-0 mt-0.5" /> Agenda & Registro de Dados</li>
+                                    <li className="flex gap-2 items-start"><Check size={16} className="text-emerald-500 dark:text-emerald-400 shrink-0 mt-0.5" /> Suporte pelo WhatsApp</li>
                                 </ul>
                                 <button
                                     onClick={() => navigate('/register')}
@@ -444,37 +444,37 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                         </div>
 
                         {/* Iniciante */}
-                        <div className="p-8 rounded-3xl border border-slate-700 hover:border-slate-500 transition-colors bg-slate-800/50">
-                            <h3 className="text-xl font-bold text-slate-300">Iniciante Beta</h3>
+                        <div className="p-8 rounded-3xl border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-500 transition-colors bg-white dark:bg-slate-800/50 shadow-md dark:shadow-none">
+                            <h3 className="text-xl font-bold text-slate-800 dark:text-slate-300">Iniciante Beta</h3>
                             <div className="my-6">
-                                <span className="text-4xl font-extrabold">R$ 47</span>
+                                <span className="text-4xl font-extrabold text-slate-900 dark:text-white">R$ 47</span>
                                 <span className="text-slate-500 text-sm">/único</span>
                             </div>
-                            <ul className="space-y-3 mb-8 text-left text-sm text-slate-300">
-                                <li className="flex gap-2"><Check size={16} /> Até 10 Clientes</li>
-                                <li className="flex gap-2"><Check size={16} /> Agenda Básica</li>
-                                <li className="flex gap-2"><Check size={16} /> Registro de Dados Simples</li>
+                            <ul className="space-y-3 mb-8 text-left text-sm text-slate-600 dark:text-slate-300">
+                                <li className="flex gap-2"><Check size={16} className="text-slate-400" /> Até 10 Clientes</li>
+                                <li className="flex gap-2"><Check size={16} className="text-slate-400" /> Agenda Básica</li>
+                                <li className="flex gap-2"><Check size={16} className="text-slate-400" /> Registro de Dados Simples</li>
                             </ul>
                             <button
                                 onClick={() => handleCheckout('price_1ScuH5KPo7EypB7VnIs6qfbQ')}
-                                className="w-full py-3 rounded-xl border border-slate-600 hover:bg-slate-700 font-semibold transition-all">
+                                className="w-full py-3 rounded-xl border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 font-semibold transition-all">
                                 Garantir Vaga
                             </button>
                         </div>
 
                         {/* Profissional */}
-                        <div className="p-8 rounded-3xl border-2 border-blue-500 bg-slate-800 relative shadow-2xl shadow-blue-500/20 transform md:scale-105">
+                        <div className="p-8 rounded-3xl border-2 border-blue-500 bg-white dark:bg-slate-800 relative shadow-xl dark:shadow-2xl dark:shadow-blue-500/20 transform md:scale-105">
                             <div className="absolute top-0 right-0 bg-blue-500 text-white text-xs font-bold px-3 py-1 rounded-bl-xl uppercase tracking-wider">Mais Escolhido</div>
-                            <h3 className="text-xl font-bold text-white">Profissional Beta</h3>
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">Profissional Beta</h3>
                             <div className="my-6">
-                                <span className="text-5xl font-extrabold text-blue-400">R$ 97</span>
+                                <span className="text-5xl font-extrabold text-blue-600 dark:text-blue-400">R$ 97</span>
                                 <span className="text-slate-500 text-sm">/único</span>
                             </div>
-                            <ul className="space-y-3 mb-8 text-left text-sm text-slate-200">
-                                <li className="flex gap-2"><Check size={16} className="text-blue-400" /> <strong>Clientes Ilimitados</strong></li>
-                                <li className="flex gap-2"><Check size={16} className="text-blue-400" /> Protocolos Exclusivos</li>
-                                <li className="flex gap-2"><Check size={16} className="text-blue-400" /> Relatórios com IA</li>
-                                <li className="flex gap-2"><Check size={16} className="text-blue-400" /> Acesso Vitalício</li>
+                            <ul className="space-y-3 mb-8 text-left text-sm text-slate-700 dark:text-slate-200">
+                                <li className="flex gap-2"><Check size={16} className="text-blue-500 dark:text-blue-400" /> <strong>Clientes Ilimitados</strong></li>
+                                <li className="flex gap-2"><Check size={16} className="text-blue-500 dark:text-blue-400" /> Protocolos Exclusivos</li>
+                                <li className="flex gap-2"><Check size={16} className="text-blue-500 dark:text-blue-400" /> Relatórios com IA</li>
+                                <li className="flex gap-2"><Check size={16} className="text-blue-500 dark:text-blue-400" /> Acesso Vitalício</li>
                             </ul>
                             <button
                                 onClick={() => handleCheckout('price_1Sd8DXKPo7EypB7VZwytTUEP')}

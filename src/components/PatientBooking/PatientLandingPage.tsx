@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrainCircuit, CheckCircle2, ArrowRight, Star, ShieldCheck, Clock, Heart, Users, Sun, Moon, PlayCircle, X } from 'lucide-react';
+import { BrainCircuit, CheckCircle2, ArrowRight, Star, ShieldCheck, Clock, Heart, Users, Sun, Moon, PlayCircle, X, Menu } from 'lucide-react';
 
 interface PatientLandingPageProps {
     isDarkMode: boolean;
@@ -20,6 +20,7 @@ const PatientLandingPage: React.FC<PatientLandingPageProps> = ({ isDarkMode, tog
     };
 
     const [showVideoModal, setShowVideoModal] = React.useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
     React.useEffect(() => {
         localStorage.setItem('teranexus_app_type', 'patient');
@@ -65,8 +66,40 @@ const PatientLandingPage: React.FC<PatientLandingPageProps> = ({ isDarkMode, tog
                         >
                             Agendar Sessão
                         </button>
+
+                        {/* Mobile Menu Button */}
+                        <button
+                            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                            className="p-2 sm:hidden rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+                        >
+                            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                        </button>
                     </div>
                 </div>
+
+                {/* Mobile Menu Dropdown */}
+                {isMobileMenuOpen && (
+                    <div className="sm:hidden absolute top-20 left-0 w-full bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 py-4 px-6 flex flex-col gap-4 shadow-xl">
+                        <button
+                            onClick={() => window.location.href = '/'}
+                            className="text-left font-bold text-slate-600 dark:text-slate-300 hover:text-primary-600"
+                        >
+                            Sou Terapeuta
+                        </button>
+                        <button
+                            onClick={() => window.location.href = '/portal-paciente/login'}
+                            className="text-left font-bold text-primary-600 dark:text-primary-400"
+                        >
+                            Área do Cliente
+                        </button>
+                        <button
+                            onClick={handleBooking}
+                            className="w-full text-center px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-lg"
+                        >
+                            Agendar Sessão
+                        </button>
+                    </div>
+                )}
             </nav>
 
             {/* Hero Section */}
