@@ -45,7 +45,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     <div style="padding: 40px 32px; color: #334155; line-height: 1.6;">
                         <h2 style="color: ${primaryColor}; margin-top: 0;">Agendamento Confirmado!</h2>
                         <p style="font-size: 18px;">Olá, <strong>${patientName}</strong>!</p>
-                        <p>O TERAPEUTA <strong>${therapistName || 'SEU TERAPEUTA'}</strong> AGENDOU SUA SESSÃO COM SUCESSO</p>
+                        <p>O(A) TERAPEUTA <strong>${therapistName || 'SEU TERAPEUTA'}</strong> AGENDOU SUA SESSÃO COM SUCESSO</p>
                         
                         ${date && time ? `
                         <div style="background-color: #f1f5f9; border-left: 4px solid ${accentColor}; padding: 15px; border-radius: 4px; margin: 20px 0;">
@@ -56,12 +56,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         ` : ''}
 
                         <p>${therapistName ? `O(a) terapeuta <strong>${therapistName}</strong> solicitou o preenchimento da sua ficha` : 'Solicitamos o preenchimento da sua ficha'} de anamnese antes da sua SESSÃO.</p>
-                        <p>Por favor, clique no botão abaixo para preencher o formulário. Leva apenas alguns minutos.</p>
+                        <p>Por favor, clique no botão abaixo para acessar a sua área do cliente</p>
                         <div style="text-align: center; margin-top: 30px;">
-                            <a href="${link}" style="display: inline-block; background-color: ${accentColor}; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px;">Preencher Anamnese</a>
-                        </div>
-                        <div style="text-align: center; margin-top: 15px;">
-                            <a href="${link}" style="display: inline-block; color: ${accentColor}; font-weight: bold; text-decoration: underline; font-size: 14px;">Iniciar Sessão</a>
+                            <a href="${link}" style="display: inline-block; background-color: ${accentColor}; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px;">Acessar Área do Cliente</a>
                         </div>
                         <p style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 12px; color: #64748b; text-align: center;">
                             Enviado por TeraNexus · Gestão Terapêutica

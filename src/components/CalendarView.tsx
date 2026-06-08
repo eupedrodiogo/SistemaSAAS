@@ -1237,7 +1237,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
                          <>
                             <button 
                                onClick={async () => {
-                                   const link = `${window.location.origin}/anamnese/${selectedAppointment.patientId}`;
+                                   const link = `${window.location.origin}/portal-paciente/cadastro?email=${encodeURIComponent(selectedAppointment.patientEmail || '')}&appointmentId=${selectedAppointment.id}`;
                                    
                                    // Copia pro clipboard como backup
                                    navigator.clipboard.writeText(`Olá ${selectedAppointment.patientName}! Preencha sua ficha de anamnese: ${link}`);
@@ -1258,6 +1258,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
                                    if (hasEmail) {
                                       try {
                                          const { data: { session } } = await supabase.auth.getSession();
+                                         const { data: userData } = await supabase.auth.getUser();
+                                         const therapistName = userData?.user?.user_metadata?.name || userData?.user?.email?.split('@')[0] || 'Terapeuta';
+                                         
                                          const emailRes = await fetch('/api/emails/anamnese', {
                                             method: 'POST',
                                             headers: {
@@ -1267,6 +1270,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
                                             body: JSON.stringify({
                                                email: selectedAppointment.patientEmail,
                                                patientName: selectedAppointment.patientName,
+                                               therapistName: therapistName,
+                                               date: new Date(selectedAppointment.start).toLocaleDateString('pt-BR', { timeZone: 'UTC' }),
+                                               time: selectedAppointment.time,
                                                link: link
                                             })
                                          });

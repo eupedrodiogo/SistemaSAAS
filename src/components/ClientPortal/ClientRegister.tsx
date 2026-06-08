@@ -15,12 +15,16 @@ const ClientRegister: React.FC = () => {
     const [isAnjoFlow, setIsAnjoFlow] = useState(false);
 
     useEffect(() => {
-        // Lê o appointmentId da URL (fluxo Anjo)
+        // Lê o appointmentId e email da URL
         const params = new URLSearchParams(window.location.search);
         const apptId = params.get('appointmentId');
+        const urlEmail = params.get('email');
         if (apptId) {
             setAppointmentId(apptId);
             setIsAnjoFlow(true);
+        }
+        if (urlEmail) {
+            setEmail(urlEmail);
         }
 
         // Try to get patient ID from localStorage (set during booking)
