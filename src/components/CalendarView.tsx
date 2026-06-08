@@ -527,7 +527,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
                              body: JSON.stringify({ 
                                 email: (payload as any).patientEmail, 
                                 patientName: payload.patientName, 
-                                link: `${window.location.origin}/portal-paciente/login?email=${encodeURIComponent((payload as any).patientEmail)}`,
+                                link: `${window.location.origin}/portal-paciente/login?t=${btoa((payload as any).patientEmail)}`,
                                 date: date.toLocaleDateString('pt-BR', { timeZone: 'UTC' }),
                                 time
                              })
@@ -1272,7 +1272,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToPatient, onNavi
                                                therapistName: therapistName,
                                                date: new Date(selectedAppointment.start).toLocaleDateString('pt-BR', { timeZone: 'UTC' }),
                                                time: selectedAppointment.time,
-                                               link: `${window.location.origin}/portal-paciente/login?email=${encodeURIComponent(selectedAppointment.patientEmail)}`
+                                               link: `${window.location.origin}/portal-paciente/login?t=${btoa(selectedAppointment.patientEmail)}`
                                             })
                                          });
                                          const emailData = await emailRes.json();

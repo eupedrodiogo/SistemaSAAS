@@ -16,7 +16,12 @@ const ClientLogin: React.FC = () => {
 
     useEffect(() => {
         const queryParams = new URLSearchParams(window.location.search);
-        const emailParam = queryParams.get('email');
+        let emailParam = queryParams.get('email');
+        const tokenParam = queryParams.get('t');
+        if (tokenParam) {
+            try { emailParam = atob(tokenParam); } catch(e) {}
+        }
+        
         if (emailParam) {
             setEmail(emailParam);
             // Attempt auto-login after state updates
@@ -35,7 +40,12 @@ const ClientLogin: React.FC = () => {
         if (e) e.preventDefault();
         
         // Prevent empty email submission
-        const currentEmail = email || new URLSearchParams(window.location.search).get('email');
+        const urlParams = new URLSearchParams(window.location.search);
+        let fallbackEmail = urlParams.get('email');
+        if (!fallbackEmail && urlParams.get('t')) {
+            try { fallbackEmail = atob(urlParams.get('t')!); } catch(e) {}
+        }
+        const currentEmail = email || fallbackEmail;
         if (!currentEmail) return;
 
         setIsLoading(true);
