@@ -57,11 +57,11 @@ const InstallPrompt: React.FC = () => {
             <div className="bg-slate-950 border border-slate-800 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] w-full max-w-sm overflow-hidden flex flex-col">
 
                 {/* Header Bar - Highlighted */}
-                <div className="bg-primary-600 p-4 flex justify-between items-center relative overflow-hidden">
+                <div className="bg-primary-600 p-4 flex justify-center items-center relative overflow-hidden">
                     {/* Abstract Shine Effect */}
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 translate-x-[-100%] animate-[shimmer_3s_infinite] pointer-events-none"></div>
 
-                    <div className="flex items-center gap-3 relative z-10 w-full justify-center">
+                    <div className="flex items-center gap-3 relative z-10">
                         <div className="w-11 h-11 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/20 shadow-sm">
                             <img src="/logo-new.jpg" alt="App Icon" className="w-8 h-8 object-contain" />
                         </div>
@@ -75,6 +75,15 @@ const InstallPrompt: React.FC = () => {
                             </div>
                         </div>
                     </div>
+
+                    {!isPatientContext && (
+                        <button 
+                            onClick={() => setIsVisible(false)}
+                            className="absolute right-4 z-20 w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+                        >
+                            <X size={18} />
+                        </button>
+                    )}
                 </div>
 
                 {/* Body */}
@@ -91,6 +100,15 @@ const InstallPrompt: React.FC = () => {
                             <Download size={20} className="group-hover:translate-y-0.5 transition-transform" />
                             Instalar Agora
                         </button>
+
+                        {!isPatientContext && (
+                            <button
+                                onClick={() => setIsVisible(false)}
+                                className="w-full bg-slate-800/50 hover:bg-slate-800 active:bg-slate-700 border border-slate-700/50 text-slate-300 font-bold py-3.5 px-6 rounded-2xl transition-all active:scale-[0.97] text-[15px]"
+                            >
+                                Lembrar mais tarde
+                            </button>
+                        )}
                     </div>
                 </div>
 
