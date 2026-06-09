@@ -35,7 +35,7 @@ export default defineConfig(({ mode }) => {
           theme_color: '#020617',
           background_color: '#020617',
           display: 'fullscreen',
-          start_url: '/portal-paciente/dashboard',
+          start_url: 'https://www.teranexus.com.br/portal-paciente/dashboard',
           icons: [
             {
               src: '/logo-new.jpg',

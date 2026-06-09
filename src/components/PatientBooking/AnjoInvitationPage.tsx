@@ -73,7 +73,7 @@ const AnjoInvitationPage: React.FC = () => {
                 setSuccessMsg('Encontrando sua sala... Redirecionando...');
                 const destination = appointmentId
                     ? `/sessao-cliente/${appointmentId}`
-                    : `/sessao-cliente/${paramId}`;
+                    : `/sessao-cliente/${therapistId}`;
                 setTimeout(() => { window.location.href = destination; }, 1200);
             }
         } catch (err: any) {
