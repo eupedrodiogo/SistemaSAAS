@@ -15,10 +15,8 @@ const InstallPrompt: React.FC = () => {
                              location.pathname.startsWith('/t/') ||
                              localStorage.getItem('teranexus_app_type') === 'patient';
                              
-    const appName = isPatientContext ? "Portal do Paciente" : "TeraNexus";
-    const description = isPatientContext 
-        ? <>Adicione o Portal do Paciente à tela inicial para acessar suas <strong>sessões e agendamentos</strong> de forma muito mais rápida.</>
-        : <>Adicione o TeraNexus à sua tela inicial para um acesso <span className="text-white font-bold underline decoration-primary-500 underline-offset-4">muito mais rápido</span> e performance otimizada.</>;
+    const appName = "TeraNexus";
+    const description = <>Adicione o aplicativo à tela inicial para acessar suas sessões e agendamentos de forma muito mais rápida.</>;
 
     useEffect(() => {
         const handler = (e: any) => {
@@ -63,7 +61,7 @@ const InstallPrompt: React.FC = () => {
                     {/* Abstract Shine Effect */}
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 translate-x-[-100%] animate-[shimmer_3s_infinite] pointer-events-none"></div>
 
-                    <div className="flex items-center gap-3 relative z-10">
+                    <div className="flex items-center gap-3 relative z-10 w-full justify-center">
                         <div className="w-11 h-11 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/20 shadow-sm">
                             <img src="/logo-new.jpg" alt="App Icon" className="w-8 h-8 object-contain" />
                         </div>
@@ -77,19 +75,11 @@ const InstallPrompt: React.FC = () => {
                             </div>
                         </div>
                     </div>
-
-                    <button
-                        onClick={() => setIsVisible(false)}
-                        className="text-white/70 hover:text-white transition-all p-2 hover:bg-white/10 rounded-full relative z-10"
-                        title="Fechar"
-                    >
-                        <X size={22} strokeWidth={2.5} />
-                    </button>
                 </div>
 
                 {/* Body */}
                 <div className="p-6 pt-5 bg-gradient-to-b from-slate-900 to-slate-950">
-                    <p className="text-slate-300 text-[15px] leading-relaxed mb-8 font-medium">
+                    <p className="text-slate-300 text-[15px] leading-relaxed mb-8 font-medium text-center">
                         {description}
                     </p>
 
@@ -100,13 +90,6 @@ const InstallPrompt: React.FC = () => {
                         >
                             <Download size={20} className="group-hover:translate-y-0.5 transition-transform" />
                             Instalar Agora
-                        </button>
-
-                        <button
-                            onClick={() => setIsVisible(false)}
-                            className="w-full bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-slate-200 font-bold py-3.5 px-6 rounded-2xl border border-slate-700/50 transition-all text-sm active:scale-[0.98]"
-                        >
-                            Lembrar mais tarde
                         </button>
                     </div>
                 </div>
