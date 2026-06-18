@@ -25,6 +25,7 @@ import { useVideoCall } from '../../hooks/useVideoCall';
 import { useAdaptiveVideo } from '../../hooks/useAdaptiveVideo';
 import { DraggablePip } from '../Session/DraggablePip';
 import { ChronologicalPhase } from '../Session/ChronologicalPhase';
+import { StandardPhase } from '../Session/StandardPhase';
 
 const ClientSessionView: React.FC = () => {
     const AGE_RANGES = ['0-10 anos', '11-20 anos', '21-30 anos', '31-40 anos', '41-50 anos', '51-60 anos', '61+ anos'];
@@ -57,6 +58,7 @@ const ClientSessionView: React.FC = () => {
     const currentAppointment = appointments.find(appt => appt.id === appointmentId) || appointments.find(appt => appt.status === 'Agendado');
 
     const [realtimeSessionData, setRealtimeSessionData] = useState<any>(null);
+    const [isSessionEnded, setIsSessionEnded] = useState(false);
 
     // PeerJS Integration
     // Standardized IDs:
@@ -118,8 +120,13 @@ const ClientSessionView: React.FC = () => {
     });
 
     useEffect(() => {
-        if (syncData?.data?.type === 'SESSION_DATA_UPDATE') {
+        if (syncData?.data?.type === 'SESSION_ENDED') {
+            setIsSessionEnded(true);
+        } else if (syncData?.data?.type === 'SESSION_DATA_UPDATE') {
             setRealtimeSessionData(syncData.data.payload);
+            if (syncData.data.payload.activeAgeRange) {
+                setSelectedAgeRange(syncData.data.payload.activeAgeRange);
+            }
         }
     }, [syncData]);
 
@@ -421,6 +428,28 @@ const ClientSessionView: React.FC = () => {
         }
     };
 
+    if (isSessionEnded) {
+        return (
+            <ClientLayout activePage="session">
+                <div className="h-full flex flex-col text-white font-sans bg-slate-950 items-center justify-center p-6">
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 max-w-md w-full text-center shadow-2xl animate-in fade-in zoom-in duration-500">
+                        <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <ShieldCheck size={40} className="text-emerald-500" />
+                        </div>
+                        <h2 className="text-2xl font-bold text-white mb-2">Sessão Concluída</h2>
+                        <p className="text-slate-400 mb-8">Sua sessão foi encerrada pelo terapeuta. Agradecemos sua participação! Você já pode retornar com segurança para a sua Área do Cliente.</p>
+                        <button 
+                            onClick={() => window.location.href = '/portal-paciente/dashboard'}
+                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-indigo-900/40"
+                        >
+                            Voltar para a Área do Cliente
+                        </button>
+                    </div>
+                </div>
+            </ClientLayout>
+        );
+    }
+
     return (
         <ClientLayout activePage="session">
             <div className="h-full flex flex-col text-white font-sans bg-slate-950">
@@ -628,7 +657,7 @@ const ClientSessionView: React.FC = () => {
                         {/* Controls Overlay */}
                         <div 
                             onClick={(e) => { e.stopPropagation(); resetControlsTimeout(); }}
-                            className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 md:gap-4 bg-slate-950/90 backdrop-blur-xl p-2 md:p-3 rounded-2xl border border-white/10 shadow-2xl w-[90%] md:w-auto justify-center transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                            className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 sm:gap-3 md:gap-4 bg-slate-950/90 backdrop-blur-xl p-1.5 sm:p-2 md:p-3 rounded-2xl border border-white/10 shadow-2xl w-[96%] max-w-max justify-center transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                         >
                             <button
                                 onClick={toggleMic}
@@ -757,22 +786,65 @@ const ClientSessionView: React.FC = () => {
 
                             {/* SUD Progress */}
                             <div className="bg-slate-900 rounded-2xl border border-slate-800 p-0 overflow-hidden flex flex-col justify-between relative">
-                                <div className="absolute top-2 right-2 z-10">
-                                    <select 
-                                        value={selectedAgeRange}
-                                        onChange={(e) => setSelectedAgeRange(e.target.value)}
-                                        className="bg-slate-800 text-xs text-slate-300 border border-slate-700 rounded px-2 py-1 outline-none"
-                                    >
-                                        {AGE_RANGES.map(r => <option key={r} value={r}>{r}</option>)}
-                                    </select>
-                                </div>
-                                <ChronologicalPhase 
-                                    selectedRange={selectedAgeRange}
-                                    onRangeChange={setSelectedAgeRange}
-                                    ranges={AGE_RANGES}
-                                    mentalHistory={realtimeSessionData?.mentalHistory || currentAppointment?.sessionData?.mentalHistory || {}}
-                                    physicalHistory={realtimeSessionData?.physicalHistory || currentAppointment?.sessionData?.physicalHistory || {}}
-                                />
+                                {(() => {
+                                    const clientPhase = realtimeSessionData?.lastPhaseInProgress || currentAppointment?.sessionData?.lastPhaseInProgress || currentAppointment?.sessionData?.clinicalRecord?.lastPhase || 'cronologico';
+                                    
+                                    if (clientPhase === 'cronologico' || !['somatico', 'tematico', 'futuro', 'potencializacao'].includes(clientPhase)) {
+                                        return (
+                                            <>
+                                                <div className="absolute top-2 right-2 z-10">
+                                                    <select 
+                                                        value={selectedAgeRange}
+                                                        onChange={(e) => setSelectedAgeRange(e.target.value)}
+                                                        className="bg-slate-800 text-xs text-slate-300 border border-slate-700 rounded px-2 py-1 outline-none"
+                                                    >
+                                                        {AGE_RANGES.map(r => <option key={r} value={r}>{r}</option>)}
+                                                    </select>
+                                                </div>
+                                                <ChronologicalPhase 
+                                                    selectedRange={selectedAgeRange}
+                                                    onRangeChange={setSelectedAgeRange}
+                                                    ranges={AGE_RANGES}
+                                                    mentalHistory={realtimeSessionData?.mentalHistory || currentAppointment?.sessionData?.mentalHistory || {}}
+                                                    physicalHistory={realtimeSessionData?.physicalHistory || currentAppointment?.sessionData?.physicalHistory || {}}
+                                                />
+                                            </>
+                                        );
+                                    }
+
+                                    return (
+                                        <div className="h-full relative min-h-[220px]">
+                                            {clientPhase === 'somatico' && (
+                                                <StandardPhase
+                                                    mentalHistory={realtimeSessionData?.somaticMentalHistory || currentAppointment?.sessionData?.somaticMentalHistory || []}
+                                                    physicalHistory={realtimeSessionData?.somaticPhysicalHistory || currentAppointment?.sessionData?.somaticPhysicalHistory || []}
+                                                    type="distress"
+                                                />
+                                            )}
+                                            {clientPhase === 'tematico' && (
+                                                <StandardPhase
+                                                    mentalHistory={realtimeSessionData?.thematicMentalHistory || currentAppointment?.sessionData?.thematicMentalHistory || []}
+                                                    physicalHistory={realtimeSessionData?.thematicPhysicalHistory || currentAppointment?.sessionData?.thematicPhysicalHistory || []}
+                                                    type="distress"
+                                                />
+                                            )}
+                                            {clientPhase === 'futuro' && (
+                                                <StandardPhase
+                                                    mentalHistory={realtimeSessionData?.futureMentalHistory || currentAppointment?.sessionData?.futureMentalHistory || []}
+                                                    physicalHistory={realtimeSessionData?.futurePhysicalHistory || currentAppointment?.sessionData?.futurePhysicalHistory || []}
+                                                    type="distress"
+                                                />
+                                            )}
+                                            {clientPhase === 'potencializacao' && (
+                                                <StandardPhase
+                                                    mentalHistory={realtimeSessionData?.potentializationMentalHistory || currentAppointment?.sessionData?.potentializationMentalHistory || []}
+                                                    physicalHistory={realtimeSessionData?.potentializationPhysicalHistory || currentAppointment?.sessionData?.potentializationPhysicalHistory || []}
+                                                    type="positive"
+                                                />
+                                            )}
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </div>
                     )}

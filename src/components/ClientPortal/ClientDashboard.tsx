@@ -15,7 +15,7 @@ const ClientDashboard: React.FC = () => {
         
         // Verifica se a anamnese já foi preenchida
         // Lógica: se o paciente tem notas de anamnese preenchidas E o usuário não dispensou o aviso nesta sessão
-        const isCompleted = localStorage.getItem('anamnese_completed') === 'true' || (patient.notes && patient.notes.includes('Transtornos:'));
+        const isCompleted = localStorage.getItem('anamnese_completed') === 'true' || (patient.notes && patient.notes.toLowerCase().includes('transtornos'));
         const isDismissedSession = sessionStorage.getItem('anamnese_dismissed_session') === 'true';
 
         if (!isCompleted && !isDismissedSession) {

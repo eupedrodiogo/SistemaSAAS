@@ -127,6 +127,12 @@ const SettingsView: React.FC = () => {
             specialties: profile.specialties || (profile.specialty ? [profile.specialty] : []),
             certificates: profile.certificates || [],
             is_overflow_source: profile.is_overflow_source || false,
+            pixKey: profile.pix_key || profile.pixKey || '',
+            pixType: profile.pix_type || profile.pixType || 'cpf',
+            invoiceNotes: profile.invoice_notes || profile.invoiceNotes || '',
+            clinicName: profile.clinic_name || profile.clinicName || '',
+            cnpj: profile.cnpj || '',
+            address: profile.address || '',
           }));
         }
       }
@@ -139,7 +145,7 @@ const SettingsView: React.FC = () => {
       const parsed = JSON.parse(savedSettings);
       // Merge but prefer DB values for critical fields if we just loaded them? 
       // Actually simply merging non-conflicting keys:
-      setFormData(prev => ({ ...prev, ...parsed, ...prev }));
+      setFormData(prev => ({ ...prev, ...parsed }));
       if (parsed.availability) {
         setAvailability(parsed.availability);
       }
@@ -168,8 +174,15 @@ const SettingsView: React.FC = () => {
             session_duration: formData.session_duration ? parseInt(String(formData.session_duration)) : 50,
             specialties: formData.specialties,
             certificates: formData.certificates,
+            is_verified: formData.is_verified,
             is_overflow_source: formData.is_overflow_source,
             is_overflow_target: formData.is_overflow_target,
+            pix_key: formData.pixKey,
+            pix_type: formData.pixType,
+            invoice_notes: formData.invoiceNotes,
+            clinic_name: formData.clinicName,
+            cnpj: formData.cnpj,
+            address: formData.address,
           })
           .eq('id', user.id)
           // @ts-ignore
@@ -373,6 +386,9 @@ const SettingsView: React.FC = () => {
   });
 
   const [whatsappTemplate, setWhatsappTemplate] = useState("Olá {paciente}, confirmando sua sessão de TRG para {data} às {hora}.");
+  // Preferências de lembretes automáticos (opt-out: true por padrão)
+  const [reminder15minEnabled, setReminder15minEnabled] = useState(true);
+  const [reminder24hEnabled, setReminder24hEnabled] = useState(true);
 
   // Help Center State
   const [helpView, setHelpView] = useState<'home' | 'article' | 'guide' | 'ticket'>('home');
@@ -761,14 +777,46 @@ const SettingsView: React.FC = () => {
                                         <button
                                           onClick={async () => {
                                             try {
-                                              triggerToast('Inicializando leitura do documento (OCR)...', 'success');
+                                              triggerToast('Inicializando leitura do documento...', 'success');
+                                              let imageUrlToScan = cert.url;
+
+                                              if (cert.url.startsWith('data:application/pdf')) {
+                                                triggerToast('Processando arquivo PDF...', 'success');
+                                                const pdfjsLib = await import('pdfjs-dist');
+                                                const workerUrlModule = await import('pdfjs-dist/build/pdf.worker.min.mjs?url');
+                                                pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrlModule.default;
+
+                                                const base64Data = cert.url.split(',')[1];
+                                                const binaryString = atob(base64Data);
+                                                const len = binaryString.length;
+                                                const bytes = new Uint8Array(len);
+                                                for (let i = 0; i < len; i++) {
+                                                  bytes[i] = binaryString.charCodeAt(i);
+                                                }
+
+                                                const pdfTask = pdfjsLib.getDocument({ data: bytes });
+                                                const pdf = await pdfTask.promise;
+                                                const page = await pdf.getPage(1);
+                                                const viewport = page.getViewport({ scale: 1.5 });
+                                                
+                                                const canvas = document.createElement('canvas');
+                                                const context = canvas.getContext('2d');
+                                                if (!context) throw new Error('Não foi possível criar o canvas');
+                                                canvas.height = viewport.height;
+                                                canvas.width = viewport.width;
+                                                
+                                                await page.render({ canvasContext: context, viewport } as any).promise;
+                                                imageUrlToScan = canvas.toDataURL('image/jpeg');
+                                              }
+
+                                              triggerToast('Iniciando análise OCR...', 'success');
 
                                               // Import Tesseract dynamically
                                               const Tesseract = (await import('tesseract.js')).default;
 
                                               // 1. Recognize Text
                                               const { data: { text } } = await Tesseract.recognize(
-                                                cert.url,
+                                                imageUrlToScan,
                                                 'por', // Portuguese
                                                 { logger: m => console.log(m) }
                                               );
@@ -791,15 +839,30 @@ const SettingsView: React.FC = () => {
                                                 await new Promise(r => setTimeout(r, 2000));
                                                 const updatedCerts = [...formData.certificates];
                                                 updatedCerts[idx].status = 'verified';
-                                                setFormData({ ...formData, certificates: updatedCerts });
+                                                
+                                                const newFormData = { ...formData, certificates: updatedCerts, is_verified: true };
+                                                setFormData(newFormData);
                                                 triggerToast(`Membro Validado: ${formData.name} - CITRG ${formData.citrg_code}`, 'success');
-                                                handleSave();
+                                                
+                                                // Directly update DB to prevent stale closure data overriding
+                                                const { data: { user } } = await supabase.auth.getUser();
+                                                if (user) {
+                                                  await supabase.from('therapists').update({
+                                                    certificates: updatedCerts,
+                                                    is_verified: true
+                                                  }).eq('id', user.id);
+                                                  
+                                                  // Also update Auth user_metadata to reflect globally in the UI context
+                                                  await supabase.auth.updateUser({ data: { is_verified: true } });
+                                                  
+                                                  localStorage.setItem('TRG_SETTINGS', JSON.stringify({ ...newFormData, availability }));
+                                                }
                                               } else {
                                                 triggerToast('Documento ilegível ou dados não conferem. Verifique se o nome ou CITRG estão visíveis.', 'error');
                                               }
-                                            } catch (err) {
+                                            } catch (err: any) {
                                               console.error(err);
-                                              triggerToast('Erro na leitura do documento. Tente uma imagem mais nítida.', 'error');
+                                              triggerToast(`Erro na leitura: ${err.message || 'Tente uma imagem nítida.'}`, 'error');
                                             }
                                           }}
                                           className="text-xs text-primary-600 hover:underline flex items-center gap-1"
@@ -813,7 +876,15 @@ const SettingsView: React.FC = () => {
                                 </div>
                               </div>
                               <button
-                                onClick={() => setFormData({ ...formData, certificates: formData.certificates.filter((_, i) => i !== idx) })}
+                                onClick={() => {
+                                  const remainingCerts = formData.certificates.filter((_, i) => i !== idx);
+                                  const hasVerified = remainingCerts.some(c => c.status === 'verified');
+                                  setFormData({ 
+                                    ...formData, 
+                                    certificates: remainingCerts,
+                                    is_verified: hasVerified 
+                                  });
+                                }}
                                 className="text-slate-400 hover:text-red-500 p-2"
                               >
                                 <Trash2 size={16} />
@@ -916,7 +987,13 @@ const SettingsView: React.FC = () => {
                         <span className="text-xs font-bold uppercase text-slate-400">Status</span>
                         <ToggleSwitch
                           checked={formData.is_overflow_target}
-                          onChange={() => setFormData({ ...formData, is_overflow_target: !formData.is_overflow_target })}
+                          onChange={() => {
+                            if (!formData.is_verified) {
+                                triggerToast('Você precisa validar seu certificado primeiro para receber indicações.', 'error');
+                                return;
+                            }
+                            setFormData({ ...formData, is_overflow_target: !formData.is_overflow_target })
+                          }}
                         />
                         <span className={`text-sm font-bold ${formData.is_overflow_target ? 'text-green-600' : 'text-slate-400'}`}>
                           {formData.is_overflow_target ? 'Disponível' : 'Indisponível'}
@@ -1323,22 +1400,79 @@ const SettingsView: React.FC = () => {
                     </div>
 
                     {formData.notifications.whatsapp && (
-                      <div className="bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/30 rounded-xl p-4 animate-slide-up">
-                        <label className="block text-xs font-bold text-green-700 dark:text-green-400 mb-2 uppercase">Modelo de Mensagem</label>
-                        <textarea
-                          className="w-full p-3 bg-white dark:bg-slate-800 border border-green-200 dark:border-green-800 rounded-lg text-sm text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-green-500 outline-none"
-                          rows={3}
-                          value={whatsappTemplate}
-                          onChange={(e) => setWhatsappTemplate(e.target.value)}
-                        />
-                        <div className="flex justify-end mt-2">
-                          <button
-                            onClick={() => showNotification("Mensagem de teste enviada!")}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 transition-colors shadow-sm"
-                          >
-                            <Send size={12} /> Testar Envio
-                          </button>
+                      <div className="bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/30 rounded-xl p-4 animate-slide-up space-y-5">
+
+                        {/* Lembrete 15 minutos */}
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <p className="font-bold text-sm text-slate-800 dark:text-white flex items-center gap-2">
+                              ⏰ Lembrete 15 minutos antes
+                            </p>
+                            <p className="text-xs text-slate-500 mt-0.5">Enviado automaticamente no dia da sessão via Z-API.</p>
+                            {reminder15minEnabled && (
+                              <div className="mt-2 p-3 bg-white dark:bg-slate-800 rounded-lg border border-green-200 dark:border-green-800">
+                                <p className="text-xs text-slate-400 font-bold uppercase mb-1">Preview da mensagem</p>
+                                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                                  🌿 <strong>TeraNexus — Lembrete de Sessão</strong><br/>
+                                  Olá, <strong>[Nome do Paciente]</strong>! ⏰ Sua sessão está marcada para <strong>hoje às [HH:MM]</strong>.<br/>
+                                  🔗 Acesse o portal e entre na sala com antecedência.
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                          <ToggleSwitch
+                            checked={reminder15minEnabled}
+                            onChange={() => setReminder15minEnabled(v => !v)}
+                          />
                         </div>
+
+                        <div className="border-t border-green-100 dark:border-green-900/30" />
+
+                        {/* Lembrete 24 horas */}
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <p className="font-bold text-sm text-slate-800 dark:text-white flex items-center gap-2">
+                              📅 Lembrete 24 horas antes
+                            </p>
+                            <p className="text-xs text-slate-500 mt-0.5">Enviado na véspera da sessão via Z-API (texto livre, sem aprovação Meta).</p>
+                            {reminder24hEnabled && (
+                              <div className="mt-2 p-3 bg-white dark:bg-slate-800 rounded-lg border border-green-200 dark:border-green-800">
+                                <p className="text-xs text-slate-400 font-bold uppercase mb-1">Preview da mensagem</p>
+                                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                                  🌿 <strong>TeraNexus — Lembrete de Sessão</strong><br/>
+                                  Olá, <strong>[Nome do Paciente]</strong>! Sua sessão com <strong>[Seu Nome]</strong> está confirmada para <strong>amanhã às [HH:MM]</strong>. ✨<br/>
+                                  🔗 Acesse seu portal com antecedência.
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                          <ToggleSwitch
+                            checked={reminder24hEnabled}
+                            onChange={() => setReminder24hEnabled(v => !v)}
+                          />
+                        </div>
+
+                        <div className="border-t border-green-100 dark:border-green-900/30" />
+
+                        {/* Modelo personalizado (legado) */}
+                        <div>
+                          <label className="block text-xs font-bold text-green-700 dark:text-green-400 mb-2 uppercase">Modelo Personalizado (15min)</label>
+                          <textarea
+                            className="w-full p-3 bg-white dark:bg-slate-800 border border-green-200 dark:border-green-800 rounded-lg text-sm text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-green-500 outline-none"
+                            rows={3}
+                            value={whatsappTemplate}
+                            onChange={(e) => setWhatsappTemplate(e.target.value)}
+                          />
+                          <div className="flex justify-end mt-2">
+                            <button
+                              onClick={() => showNotification("Mensagem de teste enviada!")}
+                              className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 transition-colors shadow-sm"
+                            >
+                              <Send size={12} /> Testar Envio
+                            </button>
+                          </div>
+                        </div>
+
                       </div>
                     )}
                   </div>
@@ -1641,6 +1775,36 @@ const SettingsView: React.FC = () => {
           </div>
         )
       }
+
+      {/* Toast Notification (showToast) */}
+      {showToast && (
+        <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border animate-in slide-in-from-bottom-5 fade-in duration-300 ${
+          toastType === 'success' 
+            ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/40 dark:border-green-800/60 dark:text-green-300' 
+            : 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/40 dark:border-red-800/60 dark:text-red-300'
+        }`}>
+          {toastType === 'success' ? <CheckCircle2 size={24} className="text-green-600 dark:text-green-400" /> : <AlertCircle size={24} className="text-red-600 dark:text-red-400" />}
+          <span className="font-bold text-sm">{toastMessage}</span>
+          <button onClick={() => setShowToast(false)} className="ml-2 p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+      )}
+
+      {/* Notification (notification state) */}
+      {notification && (
+        <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border animate-in slide-in-from-bottom-5 fade-in duration-300 ${
+          notification.type === 'success' 
+            ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/40 dark:border-green-800/60 dark:text-green-300' 
+            : 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/40 dark:border-red-800/60 dark:text-red-300'
+        }`}>
+          {notification.type === 'success' ? <CheckCircle2 size={24} className="text-green-600 dark:text-green-400" /> : <AlertCircle size={24} className="text-red-600 dark:text-red-400" />}
+          <span className="font-bold text-sm">{notification.message}</span>
+          <button onClick={() => setNotification(null)} className="ml-2 p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+      )}
     </div >
   );
 };

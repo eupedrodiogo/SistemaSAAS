@@ -39,15 +39,16 @@ const ScheduleStep: React.FC<ScheduleStepProps> = ({ data, onUpdate, onNext, onB
                 let bookedTimes: string[] = [];
                 
                 if (data.therapistId) {
-                    const { data: appointments, error } = await supabase
-                        .from('appointments')
-                        .select('time')
-                        .eq('date', dateStr)
-                        .eq('therapist_id', data.therapistId)
-                        .neq('status', 'cancelled');
-                        
-                    if (!error && appointments) {
-                        bookedTimes = appointments.map(a => a.time.substring(0, 5));
+                    try {
+                        const response = await fetch(`/api/availability?date=${dateStr}&therapistId=${data.therapistId}`);
+                        if (response.ok) {
+                            const result = await response.json();
+                            if (result.slots) {
+                                bookedTimes = result.slots.filter((s: any) => !s.available).map((s: any) => s.time.substring(0, 5));
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Error fetching availability API:', err);
                     }
                 }
 

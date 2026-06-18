@@ -33,6 +33,10 @@ export interface Appointment {
   status: 'Agendado' | 'Concluído' | 'Cancelado' | 'scheduled' | 'pending_payment' | 'completed' | 'cancelled';
   type: 'Anamnese' | 'Cronológico' | 'Reprocessamento' | 'Somático' | 'Temático' | 'Futuro' | 'Potencialização';
   sessionData?: SessionData;
+  /** Lembrete de 15min enviado via WhatsApp — sincronizado com o banco */
+  reminder_sent?: boolean;
+  /** Lembrete de 24h enviado via WhatsApp — nova feature */
+  reminder_24h_sent?: boolean;
 }
 
 export interface SessionData {

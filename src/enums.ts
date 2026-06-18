@@ -8,7 +8,8 @@ export enum AppView {
     MARKETING = 'marketing', // New Module
     REPORTS = 'reports',
     SETTINGS = 'settings',
-    SITE_BUILDER = 'site_builder'
+    SITE_BUILDER = 'site_builder',
+    NETWORK = 'network' // Transbordo
 }
 
 // Subscription Plans

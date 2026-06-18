@@ -21,6 +21,7 @@ import setupSud from '../src/api-handlers/setup_sud';
 import sud from '../src/api-handlers/sud';
 import testWhatsapp from '../src/api-handlers/test-whatsapp';
 import webhook from '../src/api-handlers/webhook';
+import asaas from '../src/api-handlers/asaas';
 
 // ai
 import aiChat from '../src/api-handlers/ai/chat';
@@ -38,6 +39,7 @@ import clientAuthRegister from '../src/api-handlers/client-auth/register';
 // cron
 import cronKeepAlive from '../src/api-handlers/cron/keep-alive';
 import cronReminders from '../src/api-handlers/cron/reminders';
+import cronReminders24h from '../src/api-handlers/cron/reminders-24h';
 
 // debug
 import debugCheckMeta from '../src/api-handlers/debug/check-meta';
@@ -67,6 +69,7 @@ import systemAddPasswordHash from '../src/api-handlers/system/add_password_hash'
 import systemMigrateReminders from '../src/api-handlers/system/migrate-reminders';
 import systemSimpleTest from '../src/api-handlers/system/simple-test';
 import systemTestWhatsapp from '../src/api-handlers/system/test-whatsapp';
+import systemTestZapi from '../src/api-handlers/system/test-zapi';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     const url = req.url || '';
@@ -95,6 +98,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         case 'sud': return sud(req, res);
         case 'test-whatsapp': return testWhatsapp(req, res);
         case 'webhook': return webhook(req, res);
+        case 'asaas': return asaas(req, res);
 
         case 'ai/chat': return aiChat(req, res);
         case 'ai/optimize': return aiOptimize(req, res);
@@ -108,6 +112,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         case 'cron/keep-alive': return cronKeepAlive(req, res);
         case 'cron/reminders': return cronReminders(req, res);
+        case 'cron/reminders-24h': return cronReminders24h(req, res);
 
         case 'debug/check-meta': return debugCheckMeta(req, res);
 
@@ -131,6 +136,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         case 'system/migrate-reminders': return systemMigrateReminders(req, res);
         case 'system/simple-test': return systemSimpleTest(req, res);
         case 'system/test-whatsapp': return systemTestWhatsapp(req, res);
+        case 'system/test-zapi': return systemTestZapi(req, res);
 
         default:
             res.status(404).json({ error: `Route not found: /api/${cleanUrl}` });

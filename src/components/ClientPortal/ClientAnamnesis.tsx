@@ -3,7 +3,7 @@ import ClientLayout from './ClientLayout';
 import { useNavigate } from 'react-router-dom';
 import { useClientData } from './ClientContext';
 import AnamnesisStep from '../PatientBooking/steps/AnamnesisStep';
-import { ClientIntakeData } from '../../../../types';
+import { ClientIntakeData } from '../../../types';
 import { ArrowLeft, FileText, CheckCircle } from 'lucide-react';
 
 const ClientAnamnesis: React.FC = () => {
@@ -11,6 +11,7 @@ const ClientAnamnesis: React.FC = () => {
     const { patient, refreshData } = useClientData();
     const [isLoading, setIsLoading] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
+    const [activeTab, setActiveTab] = useState('anamnese' as any);
     
     // Initialize data with existing patient details if available
     const [data, setData] = useState<ClientIntakeData>({
@@ -25,6 +26,7 @@ const ClientAnamnesis: React.FC = () => {
 
     const handleUpdate = (newData: ClientIntakeData) => {
         setData(newData);
+        setActiveTab('anamnese' as any);
     };
 
     const handleBack = () => {
@@ -58,7 +60,7 @@ const ClientAnamnesis: React.FC = () => {
 
     if (isSuccess) {
         return (
-            <ClientLayout activePage="anamnese">
+            <ClientLayout activePage={"profile" as any}>
                 <div className="max-w-2xl mx-auto py-20 text-center animate-fade-in">
                     <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-6 text-green-600 dark:text-green-400">
                         <CheckCircle size={40} strokeWidth={3} />
@@ -79,8 +81,9 @@ const ClientAnamnesis: React.FC = () => {
     }
 
     return (
-        <ClientLayout activePage="anamnese">
+        <ClientLayout activePage={"profile" as any}>
             <div className="max-w-3xl mx-auto space-y-6 animate-fade-in pb-20 md:pb-0">
+
                 <div className="flex items-center gap-4 mb-2">
                     <button 
                         onClick={handleBack}

@@ -9,18 +9,20 @@ import { PLAN_FEATURES } from '../../config/planConfig';
 import UpgradeModal from '../Shared/UpgradeModal';
 import MainDashboardView from '../MainDashboardView';
 import PatientsList from '../PatientsList';
-import CalendarView from '../CalendarView';
+import CalendarView from '../Calendar';
 import SessionView from '../SessionView';
 import FinancialView from '../FinancialView';
 import MarketingView from '../MarketingView';
 import ReportsView from '../ReportsView';
 import SettingsView from '../SettingsView';
+import NetworkView from '../NetworkView';
 import { Loader2 } from 'lucide-react';
 import PasswordSetupModal from '../Auth/PasswordSetupModal';
 import AiAssistant from '../AiAssistant';
 import SiteBuilder from '../Dashboard/SiteBuilder';
 import InteractiveTour from '../Shared/InteractiveTour';
 import { useTour } from '../../hooks/useTour';
+import MobileBottomNav from '../MobileBottomNav';
 
 
 import { useTheme } from '../../contexts/ThemeContext';
@@ -97,6 +99,7 @@ const TherapistDashboard: React.FC = () => {
                 [AppView.MARKETING]: 'Marketing & CRM',
                 [AppView.REPORTS]: 'Relatórios',
                 [AppView.SETTINGS]: 'Configurações',
+                [AppView.NETWORK]: 'Rede de Transbordo',
                 [AppView.SITE_BUILDER]: 'Construtor de Site',
             };
             setUpgradeModal({ isOpen: true, featureName: viewLabels[currentView] });
@@ -270,6 +273,8 @@ const TherapistDashboard: React.FC = () => {
                 />;
             case AppView.SETTINGS:
                 return <SettingsView />;
+            case AppView.NETWORK:
+                return <NetworkView />;
             case AppView.SITE_BUILDER:
                 return <SiteBuilder />;
             default:
@@ -318,24 +323,43 @@ const TherapistDashboard: React.FC = () => {
 
                 {/* Mobile Header */}
                 {(currentView !== AppView.THERAPY || !isTherapySessionActive) && (
-                    <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 z-40">
-                        <button onClick={() => setIsMobileOpen(true)} className="p-2 text-slate-600 dark:text-slate-300">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-                        </button>
-                        <div className="flex items-center gap-2">
+                    <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center px-4 z-30">
+                        {/* Empty div for flex spacing balance */}
+                        <div className="w-8 h-8" />
+                        
+                        <div className="flex-1 flex items-center justify-center gap-2">
                             <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden shadow-lg shadow-primary-500/20">
                                 <img src="/logo-new.jpg" alt="TeraNexus" className="w-full h-full object-cover" />
                             </div>
                             <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white">Tera<span className="text-primary-600">Nexus</span></span>
                         </div>
-                        <div className="w-8" />
+                        
+                        <button onClick={() => setIsMobileOpen(true)} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm active:scale-95 transition-transform">
+                             <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                                {therapist?.name ? therapist.name.substring(0, 2).toUpperCase() : 'TN'}
+                             </span>
+                        </button>
                     </header>
                 )}
 
-                <div className={currentView === AppView.THERAPY ? "w-full h-full md:h-screen" : "p-4 md:p-8 max-w-[1600px] mx-auto"}>
+                <div className={currentView === AppView.THERAPY ? "w-full h-full md:h-screen" : "p-4 md:p-8 max-w-[1600px] mx-auto pb-24 md:pb-8"}>
                     {renderView()}
                 </div>
             </main>
+
+            {/* Mobile Bottom Nav */}
+            {(currentView !== AppView.THERAPY || !isTherapySessionActive) && (
+                <MobileBottomNav 
+                    currentView={currentView}
+                    onChangeView={(view) => {
+                        setCurrentView(view);
+                        setViewParams(null);
+                    }}
+                    onOpenMore={() => setIsMobileOpen(!isMobileOpen)}
+                    isMoreOpen={isMobileOpen}
+                    hasAccess={hasAccess}
+                />
+            )}
 
             {/* Mobile Overlay */}
             {isMobileOpen && (currentView !== AppView.THERAPY || !isTherapySessionActive) && (

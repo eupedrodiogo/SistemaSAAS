@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Lock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { CreditCard, Lock, CheckCircle2, AlertCircle, Mail } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -171,6 +171,11 @@ const PaymentStep: React.FC<PaymentStepProps> = ({ data, appointmentId, onBack, 
     const { isDarkMode } = useTheme();
     const [clientSecret, setClientSecret] = useState('');
     const [isLoadingSecret, setIsLoadingSecret] = useState(true);
+    const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'pix' | 'whatsapp' | 'email'>('stripe');
+    const [emailLoading, setEmailLoading] = useState(false);
+    const [emailSent, setEmailSent] = useState(false);
+    const [emailError, setEmailError] = useState<string | null>(null);
+    const [selectedBilling, setSelectedBilling] = useState<'pix' | 'card'>('pix');
     // Use dynamic price or default fallback
     const actualPrice = data.price || 100;
 
@@ -240,7 +245,112 @@ const PaymentStep: React.FC<PaymentStepProps> = ({ data, appointmentId, onBack, 
                 </div>
             </div>
 
-            {isLoadingSecret ? (
+
+
+            {/* Opções de Pagamento */}
+            <div className="flex gap-2 mb-6 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl flex-wrap">
+                <button
+                    onClick={() => setPaymentMethod('stripe')}
+                    className={`flex-1 min-w-[140px] py-2.5 px-2 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${paymentMethod === 'stripe' ? 'bg-white dark:bg-slate-700 shadow text-primary-600 dark:text-primary-400' : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700/50'}`}
+                >
+                    <CreditCard size={16} /> Cartão / Outros
+                </button>
+                <button
+                    onClick={() => setPaymentMethod('email')}
+                    className={`flex-1 min-w-[140px] py-2.5 px-2 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${paymentMethod === 'email' ? 'bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700/50'}`}
+                >
+                    <Mail size={16} /> Receber por E-mail
+                </button>
+            </div>
+
+            {paymentMethod === 'email' ? (
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl text-center">
+                    <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Mail size={32} />
+                    </div>
+                    <h3 className="font-bold text-slate-800 dark:text-white mb-2">Um link já foi enviado para seu E-mail!</h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                        Se você preferir pagar depois, não se preocupe: o sistema acabou de mandar o link seguro de pagamento para a sua caixa de entrada ({data.email}).
+                    </p>
+
+                    {emailError && (
+                        <div className="mb-4 text-sm text-red-500 bg-red-50 p-3 rounded-xl border border-red-100">
+                            {emailError}
+                        </div>
+                    )}
+
+                    {emailSent ? (
+                        <div className="space-y-4">
+                            <div className="p-4 bg-green-50 text-green-700 rounded-xl border border-green-200">
+                                <CheckCircle2 className="inline-block mr-2" size={20} />
+                                Tudo certo! O e-mail foi reenviado com sucesso.
+                            </div>
+                            <div className="flex gap-4 mt-4">
+                                <button
+                                    onClick={() => onComplete()}
+                                    className="flex-1 py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg shadow-green-500/20 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <CheckCircle2 size={20} /> Entendido, vou fechar
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex gap-4">
+                            <button
+                                type="button"
+                                onClick={() => setPaymentMethod('stripe')}
+                                className="w-1/3 py-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-all"
+                            >
+                                Pagar Agora
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    setEmailLoading(true);
+                                    setEmailError(null);
+                                    try {
+                                        const res = await fetch('/api/payments?action=checkout', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                amount: Math.round(actualPrice * 100),
+                                                productName: `Sessão com ${data.therapistName || 'Terapeuta TRG'}`,
+                                                successUrl: window.location.origin + `/portal-paciente/cadastro?email=${encodeURIComponent(data.email || '')}&name=${encodeURIComponent(data.name || '')}&appointmentId=${appointmentId || ''}`,
+                                                cancelUrl: window.location.href,
+                                            })
+                                        });
+                                        const checkoutData = await res.json();
+                                        if (!res.ok) throw new Error(checkoutData.message || 'Erro ao gerar link de pagamento.');
+                                        
+                                        const emailRes = await fetch('/api/system/send-email-link', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                email: data.email,
+                                                name: data.name,
+                                                checkoutUrl: checkoutData.url,
+                                                price: DISPLAY_PRICE,
+                                                therapistName: data.therapistName
+                                            })
+                                        });
+                                        const emailData = await emailRes.json();
+                                        if (!emailRes.ok) throw new Error(emailData.error || 'Erro ao enviar e-mail.');
+
+                                        setEmailSent(true);
+                                    } catch (err: any) {
+                                        setEmailError(err.message);
+                                    } finally {
+                                        setEmailLoading(false);
+                                    }
+                                }}
+                                disabled={emailLoading}
+                                className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                            >
+                                {emailLoading ? 'Reenviando...' : 'Reenviar E-mail'}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            ) : isLoadingSecret ? (
                 <div className="flex flex-col items-center justify-center py-10">
                     <div className="w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin mb-4"></div>
                     <p className="text-slate-500 text-sm">Iniciando pagamento seguro...</p>

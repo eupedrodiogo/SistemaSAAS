@@ -50,8 +50,7 @@ const InstallPrompt: React.FC = () => {
         setIsVisible(false);
     };
 
-    if (!isVisible) return null;
-
+    if (!isVisible || !location.pathname.startsWith('/portal-paciente') || location.pathname === '/portal-paciente/cadastro') return null;
     return (
         <div className="fixed bottom-6 left-4 right-4 z-[9999] animate-slide-up flex justify-center">
             <div className="bg-slate-950 border border-slate-800 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] w-full max-w-sm overflow-hidden flex flex-col">

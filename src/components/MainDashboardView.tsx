@@ -32,10 +32,29 @@ interface MainDashboardViewProps {
   therapist?: any;
 }
 
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/50 dark:border-slate-800/50 p-3 rounded-xl shadow-xl flex flex-col gap-1">
+        <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{label}</p>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-gradient-to-r from-cyan-400 to-indigo-500 shadow-[0_0_8px_rgba(6,182,212,0.5)]"></span>
+          <p className="text-xs font-bold text-slate-800 dark:text-slate-100">
+            {payload[0].value} {payload[0].value === 1 ? 'sessão' : 'sessões'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 const MainDashboardView: React.FC<MainDashboardViewProps> = ({ onChangeView, therapist }) => {
 
   const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [chartPeriod, setChartPeriod] = useState<number>(6);
+  const [chartMetric, setChartMetric] = useState<'sessions' | 'revenue'>('sessions');
   const [loading, setLoading] = useState(true);
   const [dashboardStats, setDashboardStats] = useState({
     patientsCount: 0,
@@ -46,6 +65,7 @@ const MainDashboardView: React.FC<MainDashboardViewProps> = ({ onChangeView, the
   });
   const [chartData, setChartData] = useState<any[]>([]);
   const [upcomingAppointments, setUpcomingAppointments] = useState<any[]>([]);
+  const [recentSessions, setRecentSessions] = useState<any[]>([]);
 
   // Filtering Logic
   useEffect(() => {
@@ -58,78 +78,119 @@ const MainDashboardView: React.FC<MainDashboardViewProps> = ({ onChangeView, the
         const prevYear = prevDate.getFullYear();
 
         // ── SSoT: busca dados reais em paralelo ──────────────────────
-        const [patients, appointments, currentSummary, prevSummary] = await Promise.all([
+        const [patients, appointments, currentSummary, prevSummary, transactions] = await Promise.all([
           api.patients.list(),
           api.appointments.list(),
           // Receita real do mês selecionado (via tabela transactions)
           api.transactions.summary(selYear, selMonth + 1),
           // Receita real do mês anterior (para calcular delta)
           api.transactions.summary(prevYear, prevMonth + 1),
+          api.transactions.list(), // Lista completa para o histórico do gráfico
         ]);
-
-        // 1. Filtra agendamentos para contagem de sessões (não para receita!)
-        const currentMonthAppointments = appointments.filter(app => {
-          const appDate = new Date(app.date);
-          return appDate.getMonth() === selMonth &&
-            appDate.getFullYear() === selYear &&
-            app.status !== 'cancelled' && app.status !== 'Cancelado';
-        });
-
-        const prevMonthAppointments = appointments.filter(app => {
-          const appDate = new Date(app.date);
-          return appDate.getMonth() === prevMonth &&
-            appDate.getFullYear() === prevYear &&
-            app.status !== 'cancelled' && app.status !== 'Cancelado';
-        });
-
-        const sessionsThisMonth = currentMonthAppointments.length;
-        const sessionsLastMonth = prevMonthAppointments.length;
-
-        // ── Receita vem da tabela transactions (SSoT) ─────────────────
-        const revenue = Number(currentSummary[0]?.total_revenue ?? 0);
-        const revenueLastMonth = Number(prevSummary[0]?.total_revenue ?? 0);
-        const patientsCount = patients.length;
-
-        const calcDelta = (curr: number, prev: number) => {
-          if (prev === 0) return curr > 0 ? '+100%' : '0%';
-          const delta = ((curr - prev) / prev) * 100;
-          return (delta > 0 ? '+' : '') + delta.toFixed(0) + '%';
-        };
-
-        setDashboardStats({
-          patientsCount,
-          sessionsThisMonth,
-          revenue,
-          revenueDelta: calcDelta(revenue, revenueLastMonth),
-          sessionsDelta: calcDelta(sessionsThisMonth, sessionsLastMonth)
-        });
-
-        // 2. Gráfico: últimos 6 meses de sessões (contagem via agendamentos)
-        const last6Months = [];
-        for (let i = 5; i >= 0; i--) {
+ 
+         // 1. Filtra agendamentos para contagem de sessões (não para receita!)
+         const currentMonthAppointments = appointments.filter(app => {
+           const appDate = new Date(app.date);
+           return appDate.getMonth() === selMonth &&
+             appDate.getFullYear() === selYear &&
+             app.status !== 'cancelled' && app.status !== 'Cancelado';
+         });
+ 
+         const prevMonthAppointments = appointments.filter(app => {
+           const appDate = new Date(app.date);
+           return appDate.getMonth() === prevMonth &&
+             appDate.getFullYear() === prevYear &&
+             app.status !== 'cancelled' && app.status !== 'Cancelado';
+         });
+ 
+         const sessionsThisMonth = currentMonthAppointments.length;
+         const sessionsLastMonth = prevMonthAppointments.length;
+ 
+         // ── Receita vem da tabela transactions (SSoT) ─────────────────
+         const revenue = Number(currentSummary[0]?.total_revenue ?? 0);
+         const revenueLastMonth = Number(prevSummary[0]?.total_revenue ?? 0);
+         const patientsCount = patients.length;
+ 
+         const calcDelta = (curr: number, prev: number) => {
+           if (prev === 0) return curr > 0 ? '+100%' : '0%';
+           const delta = ((curr - prev) / prev) * 100;
+           return (delta > 0 ? '+' : '') + delta.toFixed(0) + '%';
+         };
+ 
+         setDashboardStats({
+           patientsCount,
+           sessionsThisMonth,
+           revenue,
+           revenueDelta: calcDelta(revenue, revenueLastMonth),
+           sessionsDelta: calcDelta(sessionsThisMonth, sessionsLastMonth)
+         });
+ 
+        // 2. Gráfico histórico: sessões ou faturamento (calculado com base nas escolhas)
+        const historyData = [];
+        for (let i = chartPeriod - 1; i >= 0; i--) {
           const d = new Date(selYear, selMonth - i, 1);
           const monthName = d.toLocaleString('pt-BR', { month: 'short' });
           const y = d.getFullYear();
           const m = d.getMonth();
 
-          const count = appointments.filter(app => {
-            const [aYear, aMonth] = app.date.split('-').map(Number);
-            return (aMonth - 1) === m && aYear === y &&
-              app.status !== 'cancelled' && app.status !== 'Cancelado';
-          }).length;
+          if (chartMetric === 'sessions') {
+            const count = appointments.filter(app => {
+              const [aYear, aMonth] = app.date.split('-').map(Number);
+              return (aMonth - 1) === m && aYear === y &&
+                app.status !== 'cancelled' && app.status !== 'Cancelado';
+            }).length;
 
-          last6Months.push({
-            name: monthName.charAt(0).toUpperCase() + monthName.slice(1),
-            sessions: count
-          });
+            historyData.push({
+              name: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+              value: count
+            });
+          } else {
+            const totalRevenue = transactions
+              .filter(t => {
+                const tDate = new Date(t.date);
+                return tDate.getMonth() === m && 
+                       tDate.getFullYear() === y && 
+                       t.type === 'income' && 
+                       t.status === 'paid';
+              })
+              .reduce((sum, t) => sum + Number(t.amount), 0);
+
+            historyData.push({
+              name: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+              value: totalRevenue
+            });
+          }
         }
-        setChartData(last6Months);
+        setChartData(historyData);
 
-        // 3. Próximos agendamentos do mês selecionado
-        const monthApps = currentMonthAppointments
-          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-          .slice(0, 5);
-        setUpcomingAppointments(monthApps);
+        // 3. Próximos agendamentos (filtra apenas futuros e não concluídos)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const isAppCompleted = (app: any) => {
+          // Apenas consideramos finalizado se o status for explicitamente setado pelo botão "Finalizar Sessão"
+          return app.status === 'Concluído' || app.status === 'Realizado' || app.status === 'completed';
+        };
+
+        const upcomingApps = appointments.filter(app => {
+          const [year, month, day] = app.date.split('-').map(Number);
+          const appDate = new Date(year, month - 1, day);
+          return appDate >= today && 
+                 app.status !== 'cancelled' && 
+                 app.status !== 'Cancelado' && 
+                 !isAppCompleted(app);
+        })
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .slice(0, 3);
+        
+        setUpcomingAppointments(upcomingApps);
+
+        // 4. Últimas sessões realizadas
+        const completedApps = appointments.filter(app => isAppCompleted(app))
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 5);
+
+        setRecentSessions(completedApps);
 
       } catch (error) {
         console.error('Failed to load dashboard data', error);
@@ -139,7 +200,7 @@ const MainDashboardView: React.FC<MainDashboardViewProps> = ({ onChangeView, the
     };
 
     fetchData();
-  }, [selectedDate]);
+  }, [selectedDate, chartPeriod, chartMetric]);
 
   const stats = [
     {
@@ -178,10 +239,71 @@ const MainDashboardView: React.FC<MainDashboardViewProps> = ({ onChangeView, the
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i); // 2 years back, 2 years forward
 
+  const nextAppointmentCard = (
+    <div className="bg-white dark:bg-slate-900 p-4 md:p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col h-full">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold text-slate-800 dark:text-white">
+          A Próxima Sessão
+        </h3>
+        <Clock size={18} className="text-slate-400" />
+      </div>
+
+      <div className="flex-1 flex flex-col justify-center">
+        {upcomingAppointments.length > 0 ? (
+          [upcomingAppointments[0]].map((apt, i) => {
+            const [year, month, day] = apt.date.split('-').map(Number);
+            const appDate = new Date(year, month - 1, day);
+            const timeString = apt.time ? apt.time.substring(0, 5) : '00:00';
+            const dateString = appDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+            const today = new Date();
+            const isToday = appDate.getDate() === today.getDate() &&
+              appDate.getMonth() === today.getMonth() &&
+              appDate.getFullYear() === today.getFullYear();
+
+            return (
+              <div key={i} className="flex flex-col gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-bold px-3 py-2 rounded text-sm flex flex-col items-center min-w-[60px]">
+                    <span>{timeString}</span>
+                    <span className="text-[10px] font-normal opacity-80">{isToday ? 'Hoje' : dateString}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-bold text-slate-800 dark:text-white truncate" title={apt.patients?.name || apt.patientName || 'Cliente sem nome'}>
+                      {apt.patients?.name || apt.patientName || 'Cliente sem nome'}
+                    </h4>
+                    <p className="text-xs text-slate-500 truncate">{apt.type}</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const patientIdToUse = apt.patientId || apt.patient_id || '';
+                    localStorage.setItem('TRG_CURRENT_PATIENT_ID', patientIdToUse);
+                    localStorage.setItem('TRG_CURRENT_APPOINTMENT_ID', apt.id);
+                    onChangeView(AppView.THERAPY, { appointmentId: apt.id, patientId: patientIdToUse });
+                  }}
+                  className="w-full py-2 bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white text-sm font-bold rounded-lg shadow-[0_4px_12px_rgba(99,102,241,0.3)] transition-all flex items-center justify-center"
+                >
+                  Entrar na Sessão
+                </button>
+              </div>
+            );
+          })
+        ) : (
+          <div className="text-center py-4 text-slate-500 dark:text-slate-400">
+            <Calendar size={24} className="mx-auto mb-2 opacity-50" />
+            <p className="text-xs">Sem agendamentos futuros.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="flex flex-col gap-4 animate-fadeIn">
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 dark:text-white">
             Painel Geral
@@ -297,13 +419,15 @@ const MainDashboardView: React.FC<MainDashboardViewProps> = ({ onChangeView, the
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+      {/* KPI Cards & Próxima Sessão */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        {nextAppointmentCard}
         {stats.map((stat, index) => (
           <div
             key={index}
             onClick={stat.onClick}
-            className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+            className={`bg-white dark:bg-slate-900 p-4 md:p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between h-full`}
           >
             <div className="flex items-start justify-between">
               <div>
@@ -331,86 +455,137 @@ const MainDashboardView: React.FC<MainDashboardViewProps> = ({ onChangeView, the
       </div>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Sessions Chart */}
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-semibold text-slate-800 dark:text-white">
-              Evolução de Sessões
+        <div className="bg-white dark:bg-slate-900 p-4 md:p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm order-2 lg:order-2 flex flex-col">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <h3 className="font-semibold text-slate-800 dark:text-white flex items-center gap-2">
+              <Activity size={18} className="text-indigo-500 dark:text-indigo-400" />
+              {chartMetric === 'sessions' ? 'Evolução de Sessões' : 'Evolução de Faturamento'}
             </h3>
-            <Activity size={18} className="text-slate-400" />
+
+            <div className="flex items-center gap-3 self-end sm:self-auto">
+              {/* Segmented Control de Métrica */}
+              <div className="flex bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                <button
+                  onClick={() => setChartMetric('sessions')}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                    chartMetric === 'sessions'
+                      ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                  }`}
+                >
+                  Sessões
+                </button>
+                <button
+                  onClick={() => setChartMetric('revenue')}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                    chartMetric === 'revenue'
+                      ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                  }`}
+                >
+                  Faturamento
+                </button>
+              </div>
+
+              {/* Seletor de Período */}
+              <select
+                value={chartPeriod}
+                onChange={(e) => setChartPeriod(Number(e.target.value))}
+                className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300 outline-none cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-750 transition-colors"
+              >
+                <option value={3}>3M</option>
+                <option value={6}>6M</option>
+                <option value={12}>12M</option>
+              </select>
+            </div>
           </div>
-          <div className="h-[300px] w-full">
+
+          <div className="h-[240px] w-full flex-1">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
+              <AreaChart data={chartData} margin={{ top: 15, right: 10, left: -20, bottom: 0 }}>
                 <defs>
+                  {/* Gradiente de Preenchimento da Área */}
                   <linearGradient id="colorSessions" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#818cf8" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#818cf8" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
                   </linearGradient>
+
+                  {/* Gradiente do Contorno da Linha */}
+                  <linearGradient id="colorStroke" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="#06b6d4" />
+                    <stop offset="50%" stopColor="#3b82f6" />
+                    <stop offset="100%" stopColor="#6366f1" />
+                  </linearGradient>
+
+                  {/* Efeito Glow / Sombra da Linha */}
+                  <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+                    <feDropShadow dx="0" dy="6" stdDeviation="5" floodColor="#3b82f6" floodOpacity="0.22" />
+                  </filter>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="rgba(148, 163, 184, 0.08)" />
                 <XAxis
                   dataKey="name"
-                  tick={{ fill: '#94a3b8' }}
+                  tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }}
                   axisLine={false}
                   tickLine={false}
+                  dy={10}
                 />
                 <YAxis
-                  tick={{ fill: '#94a3b8' }}
+                  tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }}
                   axisLine={false}
                   tickLine={false}
+                  dx={-5}
                 />
                 <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#fff',
-                    borderRadius: '8px',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-                  }}
+                  content={<CustomTooltip metric={chartMetric} />}
+                  cursor={{ stroke: 'rgba(99, 102, 241, 0.12)', strokeWidth: 2, strokeDasharray: '4 4' }}
                 />
                 <Area
                   type="monotone"
-                  dataKey="sessions"
-                  stroke="#6366f1"
+                  dataKey="value"
+                  stroke="url(#colorStroke)"
                   strokeWidth={3}
                   fillOpacity={1}
                   fill="url(#colorSessions)"
+                  filter="url(#shadow)"
+                  dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: '#3b82f6' }}
+                  activeDot={{ r: 6, strokeWidth: 0, fill: '#06b6d4' }}
                 />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Recent Activity / Next Appointments */}
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
+
+        {/* Right Column Content */}
+        <div className="flex flex-col h-full order-1 lg:order-1">
+          {/* Agenda do Dia */}
+          <div className="bg-white dark:bg-slate-900 p-4 md:p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col h-full">
+          <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-slate-800 dark:text-white">
-              Próximos Agendamentos
+              Sua Agenda do Dia
             </h3>
-            <Clock size={18} className="text-slate-400" />
+            <Calendar size={18} className="text-slate-400" />
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3 flex-1 flex flex-col justify-between">
+            <div>
             {upcomingAppointments.length > 0 ? (
               upcomingAppointments.map((apt, i) => {
-                // Parse date manually to avoid timezone shift
                 const [year, month, day] = apt.date.split('-').map(Number);
-                const appDate = new Date(year, month - 1, day); // Local midnight
-
-                // Use stored time directly (formatted to HH:MM)
+                const appDate = new Date(year, month - 1, day);
                 const timeString = apt.time ? apt.time.substring(0, 5) : '00:00';
-
                 const dateString = appDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-
                 const today = new Date();
                 const isToday = appDate.getDate() === today.getDate() &&
                   appDate.getMonth() === today.getMonth() &&
                   appDate.getFullYear() === today.getFullYear();
 
                 return (
-                  <div key={i} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-100 dark:hover:border-slate-700">
-                    <div className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold px-3 py-2 rounded text-sm flex flex-col items-center">
+                  <div key={`agenda-${i}`} className="flex items-center p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 mb-3 last:mb-0">
+                    <div className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold px-3 py-1.5 rounded text-sm flex flex-col items-center">
                       <span>{timeString}</span>
                       <span className="text-[10px] font-normal text-slate-400">{isToday ? 'Hoje' : dateString}</span>
                     </div>
@@ -418,22 +593,23 @@ const MainDashboardView: React.FC<MainDashboardViewProps> = ({ onChangeView, the
                       <h4 className="text-sm font-medium text-slate-800 dark:text-white">
                         {apt.patients?.name || apt.patientName || 'Cliente sem nome'}
                       </h4>
-                      <p className="text-xs text-slate-500">{apt.type}</p>
+                      <p className="text-xs text-slate-500 line-clamp-1">{apt.type}</p>
                     </div>
-                    <div className={`w-2 h-2 rounded-full ${apt.status === 'confirmed' ? 'bg-green-500' : 'bg-yellow-500'}`} />
                   </div>
                 );
               })
             ) : (
-              <div className="text-center py-8 text-slate-500 dark:text-slate-400">
-                <Calendar size={32} className="mx-auto mb-2 opacity-50" />
-                <p>Sem agendamentos futuros.</p>
+              <div className="text-center py-6 text-slate-500 dark:text-slate-400">
+                <Calendar size={28} className="mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Nenhum agendamento futuro.</p>
               </div>
             )}
-
+            
+            </div>
+            
             <button
               onClick={() => onChangeView(AppView.AGENDA)}
-              className="w-full mt-4 py-2 text-sm text-primary-600 hover:text-primary-700 font-medium text-center border border-dashed border-primary-200 rounded-lg hover:bg-primary-50 transition-colors"
+              className="w-full mt-2 py-2 text-sm text-primary-600 hover:text-primary-700 font-medium text-center border border-dashed border-primary-200 rounded-lg hover:bg-primary-50 transition-colors"
             >
               Ver Agenda Completa
             </button>
@@ -441,7 +617,8 @@ const MainDashboardView: React.FC<MainDashboardViewProps> = ({ onChangeView, the
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 };
 
 export default MainDashboardView;

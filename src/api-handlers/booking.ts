@@ -48,7 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         } else {
             const { data: newP, error: pError } = await supabase.from('patients').insert({
                 name, email, phone, therapist_id: therapistId, status: 'active',
-                notes: `Queixa: ${anamnesisData.complaint || anamnesisData.queixaPrincipal || 'Não informado'} | Transtornos: ${(anamnesisData.transtornos || []).map((t: any) => `${t.name} (${t.level})`).join(', ')}`
+                notes: JSON.stringify(anamnesisData)
             }).select('id').single();
             if (pError) throw pError;
             patientId = newP.id;
@@ -101,6 +101,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
 
             console.log('[Booking] Notifications processed.');
+        } else if (status === 'pending_payment') {
+            console.log('[Booking] Status is pending_payment, generating Stripe link and sending email...');
+            
+            const { data: therapistData } = await supabase
+                .from('therapists')
+                .select('name')
+                .eq('id', therapistId)
+                .single();
+                
+            try {
+                // Generate Stripe Checkout URL
+                const Stripe = (await import('stripe')).default;
+                const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-12-18.acacia' as any });
+                
+                const appointmentId = rows && rows[0] ? rows[0].id : '';
+                const origin = req.headers.origin || 'https://www.teranexus.com.br';
+                const successUrl = `${origin}/portal-paciente/cadastro?email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}&appointmentId=${appointmentId}`;
+                const cancelUrl = `${origin}/`;
+
+                const session = await stripe.checkout.sessions.create({
+                    line_items: [{
+                        price_data: { 
+                            currency: 'brl', 
+                            product_data: { name: `Sessão com ${therapistData?.name || 'Terapeuta TRG'}` }, 
+                            unit_amount: Math.round((price || 0) * 100) 
+                        },
+                        quantity: 1
+                    }],
+                    mode: 'payment',
+                    success_url: successUrl,
+                    cancel_url: cancelUrl,
+                    metadata: { appointmentId, patientId, therapistId, date, time }
+                });
+
+                // Send email
+                const { sendPaymentLinkEmail } = await import('./utils/notifications.js');
+                await sendPaymentLinkEmail({
+                    name,
+                    email,
+                    checkoutUrl: session.url!,
+                    price: price ? `R$ ${Number(price).toFixed(2).replace('.', ',')}` : 'R$ 0,00',
+                    therapistName: therapistData?.name || 'Terapeuta TRG'
+                });
+                
+                console.log('[Booking] Payment link email sent successfully.');
+            } catch (err: any) {
+                console.error('[Booking] Error generating stripe link or sending email:', err);
+            }
         } else {
             console.log(`[Booking] Status is ${status}, skipping notifications.`);
         }

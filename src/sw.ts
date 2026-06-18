@@ -2,7 +2,7 @@ import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
 import { clientsClaim } from 'workbox-core';
 
 // Força a ativação imediata do novo Service Worker
-self.skipWaiting();
+(self as any).skipWaiting();
 clientsClaim();
 
 // Limpa caches de versões anteriores
@@ -12,14 +12,14 @@ cleanupOutdatedCaches();
 precacheAndRoute((self as any).__WB_MANIFEST);
 
 // Permitir skipWaiting manual via mensagem
-self.addEventListener('message', (event) => {
+(self as any).addEventListener('message', (event: any) => {
     if (event.data && event.data.type === 'SKIP_WAITING') {
-        self.skipWaiting();
+        (self as any).skipWaiting();
     }
 });
 
 // Handle Push Notifications
-self.addEventListener('push', (event: any) => {
+(self as any).addEventListener('push', (event: any) => {
     const data = event.data ? event.data.json() : { title: 'Nova Notificação', body: 'Você tem uma nova atualização no TeraNexus.' };
 
     const options = {
@@ -36,8 +36,8 @@ self.addEventListener('push', (event: any) => {
     );
 });
 
-// Handle Notification Clicks
-self.addEventListener('notificationclick', (event: any) => {
+// Handle Notification Click
+(self as any).addEventListener('notificationclick', (event: any) => {
     event.notification.close();
 
     const urlToOpen = event.notification.data?.url || '/';

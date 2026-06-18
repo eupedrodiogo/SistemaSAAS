@@ -104,6 +104,75 @@ var init_templates = __esm({
   }
 });
 
+// src/api-handlers/utils/zapi.ts
+function formatPhoneBR(phone) {
+  let clean = phone.replace(/\D/g, "");
+  if (!clean.startsWith("55") && clean.length <= 11) {
+    clean = "55" + clean;
+  }
+  return clean;
+}
+async function sendZApiMessage(phone, message) {
+  const instanceId = process.env.ZAPI_INSTANCE_ID;
+  const instanceToken = process.env.ZAPI_INSTANCE_TOKEN;
+  const clientToken = process.env.ZAPI_CLIENT_TOKEN;
+  if (!instanceId || !instanceToken) {
+    console.warn("[Z-API] Credenciais n\xE3o configuradas (ZAPI_INSTANCE_ID / ZAPI_INSTANCE_TOKEN).");
+    return { success: false, error: "missing_credentials" };
+  }
+  const cleanPhone = formatPhoneBR(phone);
+  const url = `${ZAPI_BASE}/${instanceId}/token/${instanceToken}/send-text`;
+  const headers = {
+    "Content-Type": "application/json"
+  };
+  if (clientToken) headers["Client-Token"] = clientToken;
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        phone: cleanPhone,
+        message
+      })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      console.error("[Z-API] Erro no envio:", JSON.stringify(data));
+      return { success: false, error: data };
+    }
+    console.log(`[Z-API] Mensagem enviada para ${cleanPhone} \u2192 ID: ${data.zaapId || data.messageId}`);
+    return { success: true, id: data.zaapId || data.messageId };
+  } catch (err) {
+    console.error("[Z-API] Erro de rede:", err);
+    return { success: false, error: err.message };
+  }
+}
+async function checkZApiStatus() {
+  const instanceId = process.env.ZAPI_INSTANCE_ID;
+  const instanceToken = process.env.ZAPI_INSTANCE_TOKEN;
+  const clientToken = process.env.ZAPI_CLIENT_TOKEN;
+  if (!instanceId || !instanceToken) {
+    return { connected: false, error: "missing_credentials" };
+  }
+  const url = `${ZAPI_BASE}/${instanceId}/token/${instanceToken}/status`;
+  const headers = {};
+  if (clientToken) headers["Client-Token"] = clientToken;
+  try {
+    const response = await fetch(url, { headers });
+    const data = await response.json();
+    const connected = data.connected === true || data.value === "CONNECTED";
+    return { connected, phone: data.smartphoneConnected };
+  } catch (err) {
+    return { connected: false, error: err.message };
+  }
+}
+var ZAPI_BASE;
+var init_zapi = __esm({
+  "src/api-handlers/utils/zapi.ts"() {
+    ZAPI_BASE = "https://api.z-api.io/instances";
+  }
+});
+
 // src/api-handlers/utils/notifications.ts
 var notifications_exports = {};
 __export(notifications_exports, {
@@ -295,29 +364,49 @@ async function sendBookingNotification(data) {
     result.error = error.message || error;
   }
   try {
-    const { therapistPhone, name, date, time, therapistName, mainComplaint } = data;
+    const { therapistPhone, name, date, time, therapistName } = data;
     if (data.phone) {
-      const template = WHATSAPP_TEMPLATES.SESSION_NOTIFICATION_CLIENT(
-        name,
-        therapistName || "Terapeuta TRG",
-        date,
-        time
-      );
-      await sendMetaWhatsApp(data.phone, template.name, template.language.code, template.components);
+      const clientMsg = `\u{1F4C5} *TeraNexus \u2014 Agendamento Confirmado!*
+
+Ol\xE1, *${name}*! Seu agendamento foi confirmado com sucesso.
+
+*Detalhes da Sess\xE3o:*
+\u{1F4C6} Data: *${date}*
+\u23F0 Hor\xE1rio: *${time}*
+\u{1F464} Terapeuta: *${therapistName || "TeraNexus"}*
+
+\u{1F517} Acesse seu portal:
+https://www.teranexus.com.br/portal-paciente/dashboard
+
+_Entre na sala de espera alguns minutos antes do hor\xE1rio._
+
+At\xE9 a sess\xE3o! \u{1F499}`;
+      await sendZApiMessage(data.phone, clientMsg);
+      console.log("[Notification] WhatsApp de confirma\xE7\xE3o enviado ao cliente:", name);
     }
     if (therapistPhone) {
-      const template = WHATSAPP_TEMPLATES.BOOKING_CONFIRMATION(
-        therapistName || "Terapeuta",
-        name,
-        date,
-        time
-      );
-      await sendMetaWhatsApp(therapistPhone, template.name, template.language.code, template.components);
+      const therapistMsg = `\u{1F4C5} *TeraNexus \u2014 Novo Agendamento!*
+
+Ol\xE1, *${therapistName || "Terapeuta"}*!
+
+Voc\xEA tem um novo agendamento confirmado:
+
+\u{1F464} Cliente: *${name}*
+\u{1F4C6} Data: *${date}*
+\u23F0 Hor\xE1rio: *${time}*
+\u{1F4DE} Telefone: *${data.phone || "N\xE3o informado"}*
+
+\u{1F517} Ver na sua agenda:
+https://www.teranexus.com.br/dashboard
+
+_TeraNexus_ \u{1F499}`;
+      await sendZApiMessage(therapistPhone, therapistMsg);
+      console.log("[Notification] WhatsApp de confirma\xE7\xE3o enviado ao terapeuta:", therapistName);
     }
-    result.status = "sent_meta_whatsapp";
+    result.status = "sent_zapi_whatsapp";
   } catch (error) {
-    console.error("Error sending WhatsApp (Meta):", error);
-    result.status = "error_meta";
+    console.error("[Notification] Erro ao enviar WhatsApp (Z-API):", error);
+    result.status = "error_zapi";
     result.error = error;
   }
 }
@@ -330,10 +419,29 @@ async function sendBookingCancellation(data) {
   }
 }
 async function sendSessionReminder(data) {
-  console.log("[Notification] Sending Reminder to:", data.name);
-  if (data.phone) {
-    const template = WHATSAPP_TEMPLATES.SESSION_REMINDER_15MIN(data.name);
-    await sendMetaWhatsApp(data.phone, template.name, template.language.code, template.components);
+  console.log("[Notification] Sending Reminder via Z-API to:", data.name);
+  if (!data.phone) return;
+  const message = `\u{1F33F} *TeraNexus \u2014 Lembrete de Sess\xE3o*
+
+Ol\xE1, *${data.name}*! Tudo bem?
+
+\u23F0 Sua sess\xE3o est\xE1 marcada para *hoje \xE0s ${data.time}*.
+
+\u{1F517} Acesse o portal pelo link abaixo e entre na sala de espera alguns minutinhos antes:
+https://www.teranexus.com.br/portal-paciente/dashboard
+
+_Caso precise reagendar, entre em contato com seu terapeuta._
+
+At\xE9 logo! \u{1F499}`;
+  const result = await sendZApiMessage(data.phone, message);
+  if (!result.success) {
+    console.warn("[Notification] Z-API falhou para reminder, tentando Meta API como fallback...");
+    try {
+      const template = WHATSAPP_TEMPLATES.SESSION_REMINDER_15MIN(data.name);
+      await sendMetaWhatsApp(data.phone, template.name, template.language.code, template.components);
+    } catch (err) {
+      console.error("[Notification] Fallback Meta API tamb\xE9m falhou:", err);
+    }
   }
 }
 async function sendMetaWhatsApp(to, templateName, languageCode = "pt_BR", components = []) {
@@ -383,6 +491,7 @@ async function sendMetaWhatsApp(to, templateName, languageCode = "pt_BR", compon
 var init_notifications = __esm({
   "src/api-handlers/utils/notifications.ts"() {
     init_templates();
+    init_zapi();
   }
 });
 
@@ -395,14 +504,14 @@ async function verifyAuth(req, res) {
     return null;
   }
   const token = (Array.isArray(auth) ? auth[0] : auth).split(" ")[1];
-  const supabaseUrl11 = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const supabaseUrl12 = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-  if (!supabaseUrl11 || !supabaseKey) {
+  if (!supabaseUrl12 || !supabaseKey) {
     console.error("Supabase Config Missing in verifyAuth");
     res.status(500).json({ message: "Server Configuration Error" });
     return null;
   }
-  const supabase6 = createClient(supabaseUrl11, supabaseKey);
+  const supabase6 = createClient(supabaseUrl12, supabaseKey);
   const { data: { user }, error } = await supabase6.auth.getUser(token);
   if (error || !user) {
     console.warn("Auth Failed:", error?.message);
@@ -414,12 +523,12 @@ async function verifyAuth(req, res) {
 async function handler(req, res) {
   const user = await verifyAuth(req, res);
   if (!user) return;
-  const supabaseUrl11 = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const supabaseUrl12 = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-  if (!supabaseUrl11 || !supabaseKey) {
+  if (!supabaseUrl12 || !supabaseKey) {
     return res.status(500).json({ error: "Database configuration missing" });
   }
-  const supabase6 = createClient(supabaseUrl11, supabaseKey);
+  const supabase6 = createClient(supabaseUrl12, supabaseKey);
   const { id } = req.query;
   try {
     if (id) {
@@ -623,12 +732,12 @@ async function handler3(req, res) {
     return res.status(401).json({ error: "Token n\xE3o fornecido" });
   }
   const token = (Array.isArray(auth) ? auth[0] : auth).split(" ")[1];
-  const supabaseUrl11 = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const supabaseUrl12 = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-  if (!supabaseUrl11 || !supabaseKey) {
+  if (!supabaseUrl12 || !supabaseKey) {
     return res.status(500).json({ error: "Configura\xE7\xE3o de Auth ausente no servidor" });
   }
-  const supabase6 = createClient3(supabaseUrl11, supabaseKey);
+  const supabase6 = createClient3(supabaseUrl12, supabaseKey);
   const { data: { user }, error: authError } = await supabase6.auth.getUser(token);
   if (authError || !user) {
     return res.status(403).json({ error: "Token inv\xE1lido ou expirado" });
@@ -724,7 +833,7 @@ async function handler4(req, res) {
         phone,
         therapist_id: therapistId,
         status: "active",
-        notes: `Queixa: ${anamnesisData.complaint || anamnesisData.queixaPrincipal || "N\xE3o informado"} | Transtornos: ${(anamnesisData.transtornos || []).map((t) => `${t.name} (${t.level})`).join(", ")}`
+        notes: JSON.stringify(anamnesisData)
       }).select("id").single();
       if (pError) throw pError;
       patientId = newP.id;
@@ -840,8 +949,7 @@ async function handler5(req, res) {
     if (req.method === "POST" && action === "save_anamnesis") {
       if (!patientId) return res.status(400).json({ error: "Patient ID required" });
       const anamnesisData = req.body;
-      const patientNotes = `Queixa: ${anamnesisData.complaint || "N\xE3o informado"} | Transtornos: ${(anamnesisData.transtornos || []).map((t) => `${t.name} (${t.level})`).join(", ")}`;
-      const { error: pUpdateError } = await supabase6.from("patients").update({ notes: patientNotes }).eq("id", patientId);
+      const { error: pUpdateError } = await supabase6.from("patients").update({ notes: JSON.stringify(anamnesisData) }).eq("id", patientId);
       if (pUpdateError) throw pUpdateError;
       const { data: recentAppt, error: recentApptError } = await supabase6.from("appointments").select("id").eq("patient_id", patientId).in("status", ["scheduled", "agendado", "active", "ativo", "pending_payment"]).order("date", { ascending: true }).limit(1).single();
       if (!recentApptError && recentAppt) {
@@ -1194,33 +1302,62 @@ async function handler10(req, res) {
       throw updateError;
     }
     const { data: appt, error: fetchError } = await supabase2.from("appointments").select(`
-                date, time,
+                date, time, therapist_id, patient_id, session_data,
                 patients (name, email, phone, notes),
                 therapists (name, email, phone)
             `).eq("id", appointmentId).single();
-    if (appt && appt.patients && appt.therapists) {
+    if (appt) {
+      const amountInReais = paymentIntent.amount / 100;
+      const finalAmount = Number(appt.session_data?.price ?? amountInReais) || amountInReais;
+      const { error: txError } = await supabase2.from("transactions").upsert(
+        {
+          therapist_id: appt.therapist_id,
+          patient_id: appt.patient_id,
+          appointment_id: appointmentId,
+          amount: finalAmount,
+          type: "income",
+          status: "paid",
+          category: "Sess\xE3o TRG",
+          description: `Pagamento via Stripe \u2014 ${appt.patients?.name ?? "Paciente"}`,
+          date: appt.date
+        },
+        { onConflict: "appointment_id", ignoreDuplicates: true }
+      );
+      if (txError) {
+        console.error("[Manual Confirm] Failed to upsert transaction:", txError);
+      } else {
+        console.log(`[Manual Confirm] Transaction registered \u2014 R$ ${finalAmount}`);
+      }
       const patient = appt.patients;
       const therapist = appt.therapists;
-      console.log(`[Manual Confirm] Sending WhatsApp to ${patient.name}`);
-      await sendBookingNotification({
-        name: patient.name,
-        email: patient.email,
-        phone: patient.phone,
-        date: appt.date,
-        time: appt.time,
-        therapistName: therapist.name,
-        therapistEmail: therapist.email,
-        therapistPhone: therapist.phone
-      });
-      return res.status(200).json({
-        success: true,
-        message: "Booking confirmed and notification sent"
-      });
+      if (patient && therapist) {
+        console.log(`[Manual Confirm] Sending notifications to ${patient.name}`);
+        await sendBookingNotification({
+          name: patient.name,
+          email: patient.email,
+          phone: patient.phone,
+          date: appt.date,
+          time: appt.time,
+          therapistName: therapist.name,
+          therapistEmail: therapist.email,
+          therapistPhone: therapist.phone
+        });
+        return res.status(200).json({
+          success: true,
+          message: "Booking confirmed and notification sent"
+        });
+      } else {
+        console.warn("Could not fetch appointment details:", fetchError);
+        return res.status(200).json({
+          success: true,
+          warning: "Booking confirmed but notification details fetch failed"
+        });
+      }
     } else {
-      console.warn("Could not fetch appointment details:", fetchError);
+      console.warn("[Manual Confirm] Could not fetch appointment details:", fetchError);
       return res.status(200).json({
         success: true,
-        warning: "Booking confirmed but notification details fetch failed"
+        warning: "Booking confirmed but appointment details fetch failed"
       });
     }
   } catch (err) {
@@ -1332,12 +1469,12 @@ async function handler12(req, res) {
       documents: []
     });
   }
-  const supabaseUrl11 = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const supabaseUrl12 = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-  if (!supabaseUrl11 || !supabaseKey) {
+  if (!supabaseUrl12 || !supabaseKey) {
     return res.status(500).json({ error: "Database configuration missing" });
   }
-  const supabase6 = createClient9(supabaseUrl11, supabaseKey);
+  const supabase6 = createClient9(supabaseUrl12, supabaseKey);
   try {
     if (req.method !== "GET") {
       return res.status(405).json({ error: "Method not allowed" });
@@ -1409,12 +1546,12 @@ async function handler13(req, res) {
   const user = verifyAuth5(req, res);
   if (!user) return;
   console.log("Requesting Patients via Supabase Client...");
-  const supabaseUrl11 = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const supabaseUrl12 = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-  if (!supabaseUrl11 || !supabaseKey) {
+  if (!supabaseUrl12 || !supabaseKey) {
     return res.status(500).json({ error: "Database configuration missing" });
   }
-  const supabase6 = createClient10(supabaseUrl11, supabaseKey);
+  const supabase6 = createClient10(supabaseUrl12, supabaseKey);
   const { id } = req.query;
   try {
     if (id) {
@@ -1512,7 +1649,7 @@ async function handler14(req, res) {
         };
       }
       const sessionParams = {
-        payment_method_types: ["card", "pix"],
+        // payment_method_types omitido para usar a configuração do Dashboard do Stripe automaticamente
         line_items: [lineItem],
         mode,
         success_url: successUrl,
@@ -1863,33 +2000,139 @@ async function handler20(req, res) {
       }
       console.log(`[Webhook] Appointment ${appointmentId} updated to 'scheduled'`);
       const { data: appt, error: fetchError } = await supabase3.from("appointments").select(`
-                    date, time,
+                    date, time, therapist_id, patient_id, session_data,
                     patients (name, email, phone, notes),
                     therapists (name, email, phone)
                 `).eq("id", appointmentId).single();
       if (appt) {
+        const amountInReais = paymentIntent.amount / 100;
+        const finalAmount = Number(appt.session_data?.price ?? amountInReais) || amountInReais;
+        const { error: txError } = await supabase3.from("transactions").upsert(
+          {
+            therapist_id: appt.therapist_id,
+            patient_id: appt.patient_id,
+            appointment_id: appointmentId,
+            amount: finalAmount,
+            type: "income",
+            status: "paid",
+            category: "Sess\xE3o TRG",
+            description: `Pagamento via Stripe \u2014 ${appt.patients?.name ?? "Paciente"}`,
+            date: appt.date
+          },
+          { onConflict: "appointment_id", ignoreDuplicates: true }
+        );
+        if (txError) {
+          console.error("[Webhook] Failed to upsert transaction:", txError);
+        } else {
+          console.log(`[Webhook] Transaction registered for appointment ${appointmentId} \u2014 R$ ${finalAmount}`);
+        }
         const patient = appt.patients;
         const therapist = appt.therapists;
-        console.log(`[Webhook] Preparing notifications for ${patient?.name}`);
-        await sendBookingNotification({
-          name: patient.name,
-          email: patient.email,
-          phone: patient.phone,
-          date: appt.date,
-          time: appt.time,
-          therapistName: therapist.name,
-          therapistEmail: therapist.email,
-          therapistPhone: therapist.phone
-        });
-        console.log("[Webhook] Notifications Sent Successfully");
+        if (patient) {
+          console.log(`[Webhook] Preparing notifications for ${patient?.name}`);
+          await sendBookingNotification({
+            name: patient.name,
+            email: patient.email,
+            phone: patient.phone,
+            date: appt.date,
+            time: appt.time,
+            therapistName: therapist?.name,
+            therapistEmail: therapist?.email,
+            therapistPhone: therapist?.phone
+          });
+          console.log("[Webhook] Notifications Sent Successfully");
+        }
       } else {
-        console.error("[Webhook] Could not fetch appointment details for notification. Fetch Error:", fetchError);
+        console.error("[Webhook] Could not fetch appointment details. Fetch Error:", fetchError);
       }
     } else {
       console.warn("[Webhook] No appointmentId found in PaymentIntent metadata.");
     }
   }
   res.json({ received: true });
+}
+
+// src/api-handlers/asaas.ts
+var ASAAS_API_KEY = process.env.ASAAS_API_KEY;
+var ASAAS_API_URL = process.env.ASAAS_API_URL || "https://api.asaas.com/v3";
+var asaasRequest = async (endpoint, options = {}) => {
+  if (!ASAAS_API_KEY) {
+    throw new Error("ASAAS_API_KEY n\xE3o configurada no ambiente");
+  }
+  const response = await fetch(`${ASAAS_API_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      "access_token": ASAAS_API_KEY,
+      ...options.headers || {}
+    }
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    console.error("Asaas Error Details:", data);
+    throw new Error(data?.errors?.[0]?.description || "Erro na requisi\xE7\xE3o ao Asaas");
+  }
+  return data;
+};
+async function handler21(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+  const { action } = req.query;
+  try {
+    if (action === "charge") {
+      const { name, email, phone, cpfCnpj, amount, description, billingType = "UNDEFINED", dueDate } = req.body;
+      let customerId = "";
+      let searchEndpoint = `/customers?email=${encodeURIComponent(email)}`;
+      if (cpfCnpj) {
+        searchEndpoint = `/customers?cpfCnpj=${encodeURIComponent(cpfCnpj)}`;
+      }
+      const searchResponse = await asaasRequest(searchEndpoint);
+      if (searchResponse && searchResponse.data && searchResponse.data.length > 0) {
+        customerId = searchResponse.data[0].id;
+      } else {
+        const customerData = await asaasRequest("/customers", {
+          method: "POST",
+          body: JSON.stringify({
+            name: name || "Paciente TeraNexus",
+            email,
+            mobilePhone: phone,
+            cpfCnpj
+          })
+        });
+        customerId = customerData.id;
+      }
+      const nextDay = /* @__PURE__ */ new Date();
+      nextDay.setDate(nextDay.getDate() + 1);
+      const chargePayload = {
+        customer: customerId,
+        billingType,
+        // PIX, BOLETO, CREDIT_CARD ou UNDEFINED
+        value: amount,
+        dueDate: dueDate || nextDay.toISOString().split("T")[0],
+        description: description || "Sess\xE3o de Terapia - TeraNexus"
+      };
+      const chargeData = await asaasRequest("/payments", {
+        method: "POST",
+        body: JSON.stringify(chargePayload)
+      });
+      let pixData = null;
+      if (billingType === "PIX" || chargeData.billingType === "PIX") {
+        pixData = await asaasRequest(`/payments/${chargeData.id}/pixQrCode`);
+      }
+      return res.status(200).json({
+        success: true,
+        charge: chargeData,
+        pix: pixData,
+        invoiceUrl: chargeData.invoiceUrl
+      });
+    } else {
+      return res.status(400).json({ error: "Invalid action" });
+    }
+  } catch (err) {
+    console.error("Asaas API Error:", err);
+    return res.status(500).json({ statusCode: 500, message: err.message || "Internal Server Error" });
+  }
 }
 
 // src/api-handlers/ai/chat.ts
@@ -1912,7 +2155,7 @@ Diretrizes:
 
 Sempre responda em Portugu\xEAs do Brasil.
 `;
-async function handler21(req, res) {
+async function handler22(req, res) {
   res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
@@ -1961,7 +2204,7 @@ Hist\xF3rico da Conversa:
 
 // src/api-handlers/ai/optimize.ts
 import { GoogleGenerativeAI as GoogleGenerativeAI2 } from "@google/generative-ai";
-async function handler22(req, res) {
+async function handler23(req, res) {
   res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
@@ -2069,7 +2312,7 @@ var REPORT_PROMPTS = {
       5. Solicita\xE7\xE3o de avalia\xE7\xE3o/conduta.
     `
 };
-async function handler23(req, res) {
+async function handler24(req, res) {
   res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
@@ -2131,7 +2374,7 @@ var getSecret5 = () => process.env.SECRET_KEY || "change-this-secret-in-prod";
 function signToken(payload) {
   return jwt5.sign(payload, getSecret5(), { expiresIn: "8h" });
 }
-async function handler24(req, res) {
+async function handler25(req, res) {
   res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS,PATCH,DELETE,POST,PUT");
@@ -2150,12 +2393,12 @@ async function handler24(req, res) {
     return res.status(400).json({ error: "Email and password are required" });
   }
   try {
-    const supabaseUrl11 = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+    const supabaseUrl12 = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-    if (!supabaseUrl11 || !supabaseKey) {
+    if (!supabaseUrl12 || !supabaseKey) {
       throw new Error("Supabase configuration missing");
     }
-    const supabase6 = createClient12(supabaseUrl11, supabaseKey);
+    const supabase6 = createClient12(supabaseUrl12, supabaseKey);
     const { data: authData, error: authError } = await supabase6.auth.signInWithPassword({
       email,
       password
@@ -2279,7 +2522,7 @@ var getEmailTemplate = (plan, name) => {
         `
   };
 };
-async function handler25(req, res) {
+async function handler26(req, res) {
   res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
@@ -2294,12 +2537,12 @@ async function handler25(req, res) {
     return res.status(400).json({ error: "Missing required fields" });
   }
   try {
-    const supabaseUrl11 = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+    const supabaseUrl12 = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-    if (!supabaseUrl11 || !supabaseKey) {
+    if (!supabaseUrl12 || !supabaseKey) {
       throw new Error("Supabase Configuration missing in environment variables");
     }
-    const supabaseAdmin2 = createClient13(supabaseUrl11, supabaseKey);
+    const supabaseAdmin2 = createClient13(supabaseUrl12, supabaseKey);
     let formattedPhone = phone.replace(/\D/g, "");
     if (!formattedPhone.startsWith("55") && formattedPhone.length <= 11) {
       formattedPhone = "55" + formattedPhone;
@@ -2443,7 +2686,7 @@ var supabaseAdmin = createClient14(
   process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "",
   process.env.SUPABASE_SERVICE_ROLE_KEY || ""
 );
-async function handler26(req, res) {
+async function handler27(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -2573,19 +2816,19 @@ import crypto from "crypto";
 var hashPassword = (password) => {
   return crypto.createHash("sha256").update(password + (process.env.STRIPE_SECRET_KEY || "default_secret")).digest("hex");
 };
-async function handler27(req, res) {
+async function handler28(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
-  const supabaseUrl11 = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "";
+  const supabaseUrl12 = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "";
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || "";
-  if (!supabaseUrl11 || !supabaseKey) {
+  if (!supabaseUrl12 || !supabaseKey) {
     return res.status(500).json({
       error: "Erro de configura\xE7\xE3o do banco de dados.",
-      debug: { supabaseUrl: supabaseUrl11 ? "SET" : "MISSING", supabaseKey: supabaseKey ? "SET" : "MISSING" }
+      debug: { supabaseUrl: supabaseUrl12 ? "SET" : "MISSING", supabaseKey: supabaseKey ? "SET" : "MISSING" }
     });
   }
-  const supabaseAdmin2 = createClient15(supabaseUrl11, supabaseKey);
+  const supabaseAdmin2 = createClient15(supabaseUrl12, supabaseKey);
   try {
     const { email, password, name, patientId, appointmentId } = req.body;
     if (!email || !password) {
@@ -2594,7 +2837,7 @@ async function handler27(req, res) {
     const cleanEmail = email.trim().toLowerCase();
     const hashedPassword = hashPassword(password);
     if (appointmentId) {
-      const { data: appt, error: apptError } = await supabaseAdmin2.from("appointments").select("id, therapist_id, patient_id, patient_name").eq("id", appointmentId).single();
+      const { data: appt, error: apptError } = await supabaseAdmin2.from("appointments").select("id, therapist_id, patient_id, date, time").eq("id", appointmentId).single();
       if (apptError || !appt) {
         return res.status(404).json({ error: "Agendamento n\xE3o encontrado." });
       }
@@ -2637,9 +2880,29 @@ async function handler27(req, res) {
       }
       await supabaseAdmin2.from("appointments").update({
         patient_id: finalPatientId,
-        patient_name: finalPatientName,
         status: "scheduled"
       }).eq("id", appointmentId);
+      try {
+        const { data: therapistData } = await supabaseAdmin2.from("therapists").select("name, email, phone").eq("id", appt.therapist_id).single();
+        if (therapistData) {
+          const { sendBookingNotification: sendBookingNotification2 } = await Promise.resolve().then(() => (init_notifications(), notifications_exports));
+          await sendBookingNotification2({
+            name: finalPatientName,
+            email: cleanEmail,
+            phone: "",
+            // Paciente Anjo pode não ter telefone preenchido neste passo
+            date: appt.date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+            time: appt.time || "A definir",
+            therapistName: therapistData.name,
+            therapistEmail: therapistData.email,
+            therapistPhone: therapistData.phone,
+            mainComplaint: "Sess\xE3o Anjo (Gratuita)",
+            location: "Sess\xE3o Online"
+          });
+        }
+      } catch (notifyErr) {
+        console.error("Erro ao notificar terapeuta sobre Sess\xE3o Anjo:", notifyErr);
+      }
       return res.status(200).json({
         success: true,
         patientId: finalPatientId,
@@ -2682,18 +2945,18 @@ async function handler27(req, res) {
 
 // src/api-handlers/cron/keep-alive.ts
 import { createClient as createClient16 } from "@supabase/supabase-js";
-async function handler28(req, res) {
+async function handler29(req, res) {
   const authHeader = req.headers.authorization;
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: "Unauthorized" });
   }
-  const supabaseUrl11 = process.env.VITE_SUPABASE_URL;
+  const supabaseUrl12 = process.env.VITE_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl11 || !supabaseKey) {
+  if (!supabaseUrl12 || !supabaseKey) {
     return res.status(500).json({ error: "Missing Supabase credentials" });
   }
   try {
-    const supabase6 = createClient16(supabaseUrl11, supabaseKey);
+    const supabase6 = createClient16(supabaseUrl12, supabaseKey);
     const { data, error } = await supabase6.from("therapists").select("id").limit(1);
     if (error) throw error;
     console.log(`[Keep-Alive] Supabase ping OK \xE0s ${(/* @__PURE__ */ new Date()).toISOString()}`);
@@ -2713,7 +2976,7 @@ init_notifications();
 import { createClient as createClient17 } from "@supabase/supabase-js";
 var supabaseUrl7 = process.env.VITE_SUPABASE_URL;
 var supabaseServiceKey7 = process.env.SUPABASE_SERVICE_ROLE_KEY;
-async function handler29(req, res) {
+async function handler30(req, res) {
   const authHeader = req.headers["authorization"];
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).end("Unauthorized");
@@ -2723,59 +2986,203 @@ async function handler29(req, res) {
   }
   const supabase6 = createClient17(supabaseUrl7, supabaseServiceKey7);
   try {
-    console.log("Cron: Checking for appointments tomorrow...");
     const now = /* @__PURE__ */ new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toLocaleDateString("pt-BR");
-    console.log(`Target Date: ${tomorrowStr}`);
+    const windowStart = new Date(now.getTime() + 50 * 60 * 1e3);
+    const windowEnd = new Date(now.getTime() + 70 * 60 * 1e3);
+    const todayStr = now.toLocaleDateString("pt-BR");
+    const timeStart = windowStart.toTimeString().slice(0, 5);
+    const timeEnd = windowEnd.toTimeString().slice(0, 5);
+    console.log(`[Cron Reminders] Janela: ${todayStr} ${timeStart} \u2192 ${timeEnd}`);
     const { data: appointments, error } = await supabase6.from("appointments").select(`
                 id, date, time, reminder_sent,
                 patients!inner (name, email, phone),
                 therapists!inner (name)
-            `).eq("status", "scheduled").eq("date", tomorrowStr).is("reminder_sent", false);
+            `).eq("status", "scheduled").eq("date", todayStr).is("reminder_sent", false).gte("time", timeStart).lte("time", timeEnd);
     if (error) throw error;
-    console.log(`Found ${appointments?.length || 0} appointments for ${tomorrowStr}`);
+    console.log(`[Cron Reminders] ${appointments?.length || 0} agendamento(s) encontrado(s).`);
     if (!appointments || appointments.length === 0) {
-      return res.status(200).json({ message: "No appointments to remind." });
+      return res.status(200).json({ message: "Nenhum agendamento para lembrar nesta janela." });
     }
-    const updates = [];
+    const successIds = [];
+    const failedIds = [];
     for (const appt of appointments) {
       const patient = Array.isArray(appt.patients) ? appt.patients[0] : appt.patients;
       const therapist = Array.isArray(appt.therapists) ? appt.therapists[0] : appt.therapists;
       const pName = patient?.name || "Paciente";
       const pPhone = patient?.phone;
-      const pEmail = patient?.email;
-      const tName = therapist?.name || "Trg Nexus";
-      console.log(`Sending reminder to ${pName} (${pPhone})...`);
+      const tName = therapist?.name || "TeraNexus";
+      console.log(`[Cron] Lembrando: ${pName} (${pPhone}) para sess\xE3o \xE0s ${appt.time}`);
+      if (!pPhone) {
+        console.warn(`[Cron] Sem telefone para o paciente ${pName} (id: ${appt.id})`);
+        continue;
+      }
       try {
-        if (pPhone) {
-          await sendSessionReminder({
-            name: pName,
-            phone: pPhone,
-            date: appt.date,
-            time: appt.time
-          });
-          updates.push(appt.id);
-        }
+        await sendSessionReminder({
+          name: pName,
+          phone: pPhone,
+          date: appt.date,
+          time: appt.time
+        });
+        successIds.push(appt.id);
       } catch (err) {
-        console.error(`Failed to remind appointment ${appt.id}:`, err);
+        console.error(`[Cron] Falha ao lembrar agendamento ${appt.id}:`, err);
+        failedIds.push(appt.id);
       }
     }
-    if (updates.length > 0) {
-      const { error: updateError } = await supabase6.from("appointments").update({ reminder_sent: true }).in("id", updates);
+    if (successIds.length > 0) {
+      const { error: updateError } = await supabase6.from("appointments").update({ reminder_sent: true }).in("id", successIds);
       if (updateError) throw updateError;
-      console.log(`Marked ${updates.length} appointments as reminded.`);
+      console.log(`[Cron] ${successIds.length} agendamento(s) marcado(s) como lembrado(s).`);
     }
-    return res.status(200).json({ success: true, processed: appointments.length, sent: updates.length });
+    return res.status(200).json({
+      success: true,
+      window: `${todayStr} ${timeStart}\u2013${timeEnd}`,
+      total: appointments.length,
+      sent: successIds.length,
+      failed: failedIds.length
+    });
   } catch (error) {
-    console.error("Cron Error:", error);
+    console.error("[Cron Reminders] Erro:", error);
+    return res.status(500).json({ error: error.message });
+  }
+}
+
+// src/api-handlers/cron/reminders-24h.ts
+import { createClient as createClient18 } from "@supabase/supabase-js";
+var supabaseUrl8 = process.env.VITE_SUPABASE_URL;
+var supabaseServiceKey8 = process.env.SUPABASE_SERVICE_ROLE_KEY;
+var ZAPI_BASE2 = "https://api.z-api.io/instances";
+function formatPhoneBR2(phone) {
+  let clean = phone.replace(/\D/g, "");
+  if (!clean.startsWith("55") && clean.length <= 11) clean = "55" + clean;
+  return clean;
+}
+async function sendZApiText(phone, message) {
+  const instanceId = process.env.ZAPI_INSTANCE_ID;
+  const instanceToken = process.env.ZAPI_INSTANCE_TOKEN;
+  const clientToken = process.env.ZAPI_CLIENT_TOKEN;
+  if (!instanceId || !instanceToken) {
+    console.warn("[Z-API 24h] Credenciais n\xE3o configuradas.");
+    return { success: false, error: "missing_credentials" };
+  }
+  const cleanPhone = formatPhoneBR2(phone);
+  const url = `${ZAPI_BASE2}/${instanceId}/token/${instanceToken}/send-text`;
+  const headers = { "Content-Type": "application/json" };
+  if (clientToken) headers["Client-Token"] = clientToken;
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ phone: cleanPhone, message })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      console.error("[Z-API 24h] Erro no envio:", JSON.stringify(data));
+      return { success: false, error: data };
+    }
+    console.log(`[Z-API 24h] Mensagem enviada para ${cleanPhone} \u2192 ID: ${data.zaapId || data.messageId}`);
+    return { success: true, id: data.zaapId || data.messageId };
+  } catch (err) {
+    console.error("[Z-API 24h] Erro de rede:", err);
+    return { success: false, error: err.message };
+  }
+}
+function buildMessage(patientName, therapistName, date, time) {
+  return `\u{1F33F} *TeraNexus \u2014 Lembrete de Sess\xE3o*
+
+Ol\xE1, *${patientName}*! Tudo bem?
+
+Passando para lembrar que sua sess\xE3o com *${therapistName}* est\xE1 confirmada para *amanh\xE3, ${date} \xE0s ${time}*. \u2728
+
+\u{1F517} Acesse seu portal com anteced\xEAncia:
+https://www.teranexus.com.br/portal-paciente/dashboard
+
+_Caso precise reagendar, entre em contato o quanto antes._
+
+At\xE9 logo! \u{1F499}`;
+}
+async function handler31(req, res) {
+  const authHeader = req.headers["authorization"];
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return res.status(401).end("Unauthorized");
+  }
+  if (!supabaseUrl8 || !supabaseServiceKey8) {
+    return res.status(500).json({ error: "Missing Supabase Config" });
+  }
+  const supabase6 = createClient18(supabaseUrl8, supabaseServiceKey8);
+  try {
+    const now = /* @__PURE__ */ new Date();
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1e3);
+    const tomorrowStr = tomorrow.toLocaleDateString("pt-BR");
+    console.log(`[Cron 24h] Buscando sess\xF5es de amanh\xE3: ${tomorrowStr}`);
+    const { data: appointments, error } = await supabase6.from("appointments").select(`
+        id, date, time, reminder_24h_sent,
+        patients!inner(name, phone),
+        therapists!inner(name, reminder_24h_enabled)
+      `).eq("status", "scheduled").eq("date", tomorrowStr).is("reminder_24h_sent", false);
+    if (error) throw error;
+    console.log(`[Cron 24h] ${appointments?.length || 0} agendamento(s) encontrado(s).`);
+    if (!appointments || appointments.length === 0) {
+      return res.status(200).json({
+        message: "Nenhum agendamento para amanh\xE3 sem lembrete pendente.",
+        targetDate: tomorrowStr
+      });
+    }
+    const successIds = [];
+    const skippedIds = [];
+    const failedIds = [];
+    for (const appt of appointments) {
+      const patient = Array.isArray(appt.patients) ? appt.patients[0] : appt.patients;
+      const therapist = Array.isArray(appt.therapists) ? appt.therapists[0] : appt.therapists;
+      const pName = patient?.name || "Paciente";
+      const pPhone = patient?.phone;
+      const tName = therapist?.name || "TeraNexus";
+      if (therapist?.reminder_24h_enabled === false) {
+        console.log(`[Cron 24h] Terapeuta "${tName}" com lembrete 24h desativado \u2014 pulando "${pName}".`);
+        skippedIds.push(appt.id);
+        continue;
+      }
+      if (!pPhone) {
+        console.warn(`[Cron 24h] Sem telefone para "${pName}" (id: ${appt.id}) \u2014 pulando.`);
+        skippedIds.push(appt.id);
+        continue;
+      }
+      console.log(`[Cron 24h] Lembrando: ${pName} (${pPhone}) \u2192 sess\xE3o em ${appt.date} \xE0s ${appt.time}`);
+      try {
+        const message = buildMessage(pName, tName, appt.date, appt.time);
+        const result = await sendZApiText(pPhone, message);
+        if (result.success) {
+          successIds.push(appt.id);
+        } else {
+          console.error(`[Cron 24h] Falha para "${pName}":`, result.error);
+          failedIds.push(appt.id);
+        }
+      } catch (err) {
+        console.error(`[Cron 24h] Erro no agendamento ${appt.id}:`, err);
+        failedIds.push(appt.id);
+      }
+    }
+    if (successIds.length > 0) {
+      const { error: updateError } = await supabase6.from("appointments").update({ reminder_24h_sent: true }).in("id", successIds);
+      if (updateError) throw updateError;
+      console.log(`[Cron 24h] ${successIds.length} lembrete(s) marcado(s) no banco.`);
+    }
+    return res.status(200).json({
+      success: true,
+      targetDate: tomorrowStr,
+      total: appointments.length,
+      sent: successIds.length,
+      skipped: skippedIds.length,
+      failed: failedIds.length
+    });
+  } catch (error) {
+    console.error("[Cron 24h] Erro cr\xEDtico:", error);
     return res.status(500).json({ error: error.message });
   }
 }
 
 // src/api-handlers/debug/check-meta.ts
-async function handler30(req, res) {
+async function handler32(req, res) {
   const vars = {
     META_WHATSAPP_TOKEN: process.env.META_WHATSAPP_TOKEN ? "Set (starts with " + process.env.META_WHATSAPP_TOKEN.substring(0, 5) + "...)" : "MISSING",
     META_PHONE_ID: process.env.META_PHONE_ID ? "Set (" + process.env.META_PHONE_ID + ")" : "MISSING",
@@ -2802,8 +3209,8 @@ async function handler30(req, res) {
 // src/api-handlers/emails/anamnese.ts
 import { Resend } from "resend";
 import nodemailer4 from "nodemailer";
-import { createClient as createClient18 } from "@supabase/supabase-js";
-async function handler31(req, res) {
+import { createClient as createClient19 } from "@supabase/supabase-js";
+async function handler33(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -2812,7 +3219,7 @@ async function handler31(req, res) {
     return res.status(401).json({ error: "Authorization header missing" });
   }
   const supabaseToken = (Array.isArray(authHeader) ? authHeader[0] : authHeader).split(" ")[1];
-  const supabase6 = createClient18(
+  const supabase6 = createClient19(
     process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "",
     process.env.VITE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
   );
@@ -3054,7 +3461,7 @@ var templates_default2 = { getEmailTemplate: getEmailTemplate2 };
 
 // src/api-handlers/emails/welcome.ts
 import nodemailer5 from "nodemailer";
-import { createClient as createClient19 } from "@supabase/supabase-js";
+import { createClient as createClient20 } from "@supabase/supabase-js";
 var getEmailTemplate3 = (plan, name, magicLink) => {
   const primaryColor = "#0f172a";
   const accentColor = "#3b82f6";
@@ -3170,7 +3577,7 @@ var getEmailTemplate3 = (plan, name, magicLink) => {
         `
   };
 };
-async function handler32(req, res) {
+async function handler34(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -3196,7 +3603,7 @@ async function handler32(req, res) {
         pass
       }
     });
-    const supabaseAdmin2 = createClient19(
+    const supabaseAdmin2 = createClient20(
       process.env.VITE_SUPABASE_URL || "https://qyrsr5sa9s.supabase.co",
       process.env.SUPABASE_SERVICE_ROLE_KEY || ""
     );
@@ -3233,18 +3640,18 @@ async function handler32(req, res) {
 }
 
 // src/api-handlers/network/match.ts
-import { createClient as createClient20 } from "@supabase/supabase-js";
-var supabaseUrl8 = process.env.VITE_SUPABASE_URL;
-var supabaseServiceKey8 = process.env.SUPABASE_SERVICE_ROLE_KEY;
-async function handler33(req, res) {
+import { createClient as createClient21 } from "@supabase/supabase-js";
+var supabaseUrl9 = process.env.VITE_SUPABASE_URL;
+var supabaseServiceKey9 = process.env.SUPABASE_SERVICE_ROLE_KEY;
+async function handler35(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
-  if (!supabaseUrl8 || !supabaseServiceKey8) {
+  if (!supabaseUrl9 || !supabaseServiceKey9) {
     return res.status(500).json({ error: "Missing Supabase Config" });
   }
   const { sourceTherapistId, patientNeeds } = req.body;
-  const supabase6 = createClient20(supabaseUrl8, supabaseServiceKey8);
+  const supabase6 = createClient21(supabaseUrl9, supabaseServiceKey9);
   try {
     console.log(`\u{1F501} Finding match for source: ${sourceTherapistId}, needs: ${patientNeeds}`);
     let query = supabase6.from("therapists").select("id, name, specialty, rating, phone").eq("is_verified", true).eq("is_overflow_target", true).neq("id", sourceTherapistId);
@@ -3272,14 +3679,14 @@ async function handler33(req, res) {
 
 // src/api-handlers/network/referral.ts
 init_notifications();
-import { createClient as createClient21 } from "@supabase/supabase-js";
-var supabaseUrl9 = process.env.VITE_SUPABASE_URL;
-var supabaseServiceKey9 = process.env.SUPABASE_SERVICE_ROLE_KEY;
-async function handler34(req, res) {
+import { createClient as createClient22 } from "@supabase/supabase-js";
+var supabaseUrl10 = process.env.VITE_SUPABASE_URL;
+var supabaseServiceKey10 = process.env.SUPABASE_SERVICE_ROLE_KEY;
+async function handler36(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
-  if (!supabaseUrl9 || !supabaseServiceKey9) {
+  if (!supabaseUrl10 || !supabaseServiceKey10) {
     return res.status(500).json({ error: "Missing Supabase Config" });
   }
   const {
@@ -3290,7 +3697,7 @@ async function handler34(req, res) {
     patientNeeds,
     sessionPrice
   } = req.body;
-  const supabase6 = createClient21(supabaseUrl9, supabaseServiceKey9);
+  const supabase6 = createClient22(supabaseUrl10, supabaseServiceKey10);
   try {
     console.log(`Processing Referral: ${sourceTherapistId} -> ${targetTherapistId}`);
     const price = Number(sessionPrice) || 150;
@@ -3333,7 +3740,7 @@ async function handler34(req, res) {
 
 // src/api-handlers/notifications/manual.ts
 init_templates();
-async function handler35(req, res) {
+async function handler37(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method Not Allowed" });
   }
@@ -3419,7 +3826,7 @@ async function handler35(req, res) {
 
 // src/api-handlers/notifications/register-welcome.ts
 import twilio2 from "twilio";
-async function handler36(req, res) {
+async function handler38(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -3470,12 +3877,12 @@ _Equipe TRG Nexus_`;
 }
 
 // src/api-handlers/notifications/subscribe.ts
-import { createClient as createClient22 } from "@supabase/supabase-js";
-var supabase4 = createClient22(
+import { createClient as createClient23 } from "@supabase/supabase-js";
+var supabase4 = createClient23(
   process.env.VITE_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
-async function handler37(req, res) {
+async function handler39(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -3510,8 +3917,8 @@ init_templates();
 
 // src/api-handlers/notifications/test-push.ts
 import webpush from "web-push";
-import { createClient as createClient23 } from "@supabase/supabase-js";
-var supabase5 = createClient23(
+import { createClient as createClient24 } from "@supabase/supabase-js";
+var supabase5 = createClient24(
   process.env.VITE_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
@@ -3522,7 +3929,7 @@ webpush.setVapidDetails(
   PUBLIC_KEY,
   PRIVATE_KEY
 );
-async function handler38(req, res) {
+async function handler40(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -3565,17 +3972,17 @@ async function handler38(req, res) {
 }
 
 // src/api-handlers/public/therapists.ts
-import { createClient as createClient24 } from "@supabase/supabase-js";
-var supabaseUrl10 = process.env.VITE_SUPABASE_URL;
-var supabaseServiceKey10 = process.env.SUPABASE_SERVICE_ROLE_KEY;
-async function handler39(req, res) {
+import { createClient as createClient25 } from "@supabase/supabase-js";
+var supabaseUrl11 = process.env.VITE_SUPABASE_URL;
+var supabaseServiceKey11 = process.env.SUPABASE_SERVICE_ROLE_KEY;
+async function handler41(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
-  if (!supabaseUrl10 || !supabaseServiceKey10) {
+  if (!supabaseUrl11 || !supabaseServiceKey11) {
     return res.status(500).json({ error: "Server Misconfiguration" });
   }
-  const supabase6 = createClient24(supabaseUrl10, supabaseServiceKey10);
+  const supabase6 = createClient25(supabaseUrl11, supabaseServiceKey11);
   try {
     let query = supabase6.from("therapists").select(`
                 id,
@@ -3609,7 +4016,7 @@ import { Pool as Pool5 } from "pg";
 import dotenv3 from "dotenv";
 import path3 from "path";
 dotenv3.config({ path: path3.resolve(process.cwd(), ".env.local") });
-async function handler40(req, res) {
+async function handler42(req, res) {
   const connectionString4 = process.env.POSTGRES_URL;
   if (!connectionString4) {
     return res.status(500).json({ error: "Database configuration missing" });
@@ -3636,7 +4043,7 @@ async function handler40(req, res) {
 
 // src/api-handlers/system/add_password_hash.ts
 import { Pool as Pool6 } from "pg";
-async function handler41(req, res) {
+async function handler43(req, res) {
   const connectionString4 = "postgresql://postgres:Lebazi802%40.@db.kbuknqfnhgyfywnthgyc.supabase.co:5432/postgres";
   if (!connectionString4) {
     return res.status(500).json({ error: "Database configuration missing" });
@@ -3663,7 +4070,7 @@ async function handler41(req, res) {
 
 // src/api-handlers/system/migrate-reminders.ts
 import pg7 from "pg";
-async function handler42(req, res) {
+async function handler44(req, res) {
   const { Pool: Pool7 } = pg7;
   const connectionString4 = process.env.trgnexus_POSTGRES_URL || process.env.POSTGRES_URL;
   if (!connectionString4) {
@@ -3693,7 +4100,7 @@ async function handler42(req, res) {
 
 // src/api-handlers/system/simple-test.ts
 import twilio3 from "twilio";
-async function handler43(req, res) {
+async function handler45(req, res) {
   if (req.method === "GET" && !req.query.phone) {
     return res.status(200).json({ status: "ok", mode: "read-only", message: "Add ?phone=YOUR_NUMBER to URL to test send" });
   }
@@ -3739,7 +4146,7 @@ async function handler43(req, res) {
 
 // src/api-handlers/system/test-whatsapp.ts
 init_notifications();
-async function handler44(req, res) {
+async function handler46(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -3765,8 +4172,53 @@ async function handler44(req, res) {
   }
 }
 
+// src/api-handlers/system/test-zapi.ts
+init_zapi();
+async function handler47(req, res) {
+  if (req.method === "GET") {
+    const status = await checkZApiStatus();
+    return res.status(200).json({
+      zapi_connected: status.connected,
+      phone: status.phone,
+      error: status.error || null,
+      env: {
+        instance_id_set: !!process.env.ZAPI_INSTANCE_ID,
+        instance_token_set: !!process.env.ZAPI_INSTANCE_TOKEN,
+        client_token_set: !!process.env.ZAPI_CLIENT_TOKEN
+      }
+    });
+  }
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed. Use GET (status) or POST (send test)." });
+  }
+  const { phone, message } = req.body || {};
+  if (!phone) {
+    return res.status(400).json({ error: 'Campo "phone" \xE9 obrigat\xF3rio.' });
+  }
+  const testMessage = message || `\u{1F33F} *TeraNexus \u2014 Teste de Integra\xE7\xE3o*
+
+\u2705 A integra\xE7\xE3o via Z-API est\xE1 funcionando!
+
+Se voc\xEA recebeu esta mensagem, os lembretes autom\xE1ticos de sess\xE3o est\xE3o configurados corretamente.
+
+_Sistema TeraNexus_ \u{1F499}`;
+  const result = await sendZApiMessage(phone, testMessage);
+  if (!result.success) {
+    return res.status(500).json({
+      success: false,
+      error: result.error,
+      tip: "Verifique se ZAPI_INSTANCE_ID, ZAPI_INSTANCE_TOKEN e ZAPI_CLIENT_TOKEN est\xE3o configurados no Vercel e se a inst\xE2ncia est\xE1 conectada."
+    });
+  }
+  return res.status(200).json({
+    success: true,
+    message: `Mensagem enviada para ${phone}`,
+    zapi_message_id: result.id
+  });
+}
+
 // api/index.ts
-async function handler45(req, res) {
+async function handler48(req, res) {
   const url = req.url || "";
   const cleanUrl = url.split("?")[0].replace(/^\/api\//, "").replace(/\/$/, "");
   console.log(`[API Router] Clean URL: ${cleanUrl}`);
@@ -3811,62 +4263,68 @@ async function handler45(req, res) {
       return handler19(req, res);
     case "webhook":
       return handler20(req, res);
-    case "ai/chat":
+    case "asaas":
       return handler21(req, res);
-    case "ai/optimize":
+    case "ai/chat":
       return handler22(req, res);
-    case "ai/report":
+    case "ai/optimize":
       return handler23(req, res);
-    case "auth/login":
+    case "ai/report":
       return handler24(req, res);
-    case "auth/register-complete":
+    case "auth/login":
       return handler25(req, res);
-    case "auth/request-password-reset":
+    case "auth/register-complete":
       return handler26(req, res);
-    case "client-auth/register":
+    case "auth/request-password-reset":
       return handler27(req, res);
-    case "cron/keep-alive":
+    case "client-auth/register":
       return handler28(req, res);
-    case "cron/reminders":
+    case "cron/keep-alive":
       return handler29(req, res);
-    case "debug/check-meta":
+    case "cron/reminders":
       return handler30(req, res);
-    case "emails/anamnese":
+    case "cron/reminders-24h":
       return handler31(req, res);
+    case "debug/check-meta":
+      return handler32(req, res);
+    case "emails/anamnese":
+      return handler33(req, res);
     case "emails/templates":
       return templates_default2(req, res);
     case "emails/welcome":
-      return handler32(req, res);
-    case "network/match":
-      return handler33(req, res);
-    case "network/referral":
       return handler34(req, res);
-    case "notifications/manual":
+    case "network/match":
       return handler35(req, res);
-    case "notifications/register-welcome":
+    case "network/referral":
       return handler36(req, res);
-    case "notifications/subscribe":
+    case "notifications/manual":
       return handler37(req, res);
+    case "notifications/register-welcome":
+      return handler38(req, res);
+    case "notifications/subscribe":
+      return handler39(req, res);
     case "notifications/templates":
       return templates_default(req, res);
     case "notifications/test-push":
-      return handler38(req, res);
-    case "public/therapists":
-      return handler39(req, res);
-    case "system/add_session_data_column":
       return handler40(req, res);
-    case "system/add_password_hash":
+    case "public/therapists":
       return handler41(req, res);
-    case "system/migrate-reminders":
+    case "system/add_session_data_column":
       return handler42(req, res);
-    case "system/simple-test":
+    case "system/add_password_hash":
       return handler43(req, res);
-    case "system/test-whatsapp":
+    case "system/migrate-reminders":
       return handler44(req, res);
+    case "system/simple-test":
+      return handler45(req, res);
+    case "system/test-whatsapp":
+      return handler46(req, res);
+    case "system/test-zapi":
+      return handler47(req, res);
     default:
       res.status(404).json({ error: `Route not found: /api/${cleanUrl}` });
   }
 }
 export {
-  handler45 as default
+  handler48 as default
 };

@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { X, Gift, ChevronRight, Rocket } from 'lucide-react';
 import { APP_VERSION, CHANGELOG } from '../config/version';
 
 const UpdateNotification: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [currentChangelog, setCurrentChangelog] = useState(CHANGELOG[0]);
+    const location = useLocation();
 
     useEffect(() => {
+        if (!location.pathname.startsWith('/dashboard')) return;
+
         const lastSeenVersion = localStorage.getItem('app_last_seen_version');
 
         // Show if no version stored OR version is different
@@ -21,14 +25,14 @@ const UpdateNotification: React.FC = () => {
                 setTimeout(() => setIsOpen(true), 1500);
             }
         }
-    }, []);
+    }, [location.pathname]);
 
     const handleClose = () => {
         setIsOpen(false);
         localStorage.setItem('app_last_seen_version', APP_VERSION);
     };
 
-    if (!isOpen || !currentChangelog) return null;
+    if (!isOpen || !currentChangelog || !location.pathname.startsWith('/dashboard')) return null;
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-sm animate-fade-in">

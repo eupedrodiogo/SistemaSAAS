@@ -107,6 +107,48 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [sessionNumber, setSessionNumber] = useState(1);
   const [isAnamneseModalOpen, setIsAnamneseModalOpen] = useState(false);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.visualViewport) {
+        // Se o visual viewport encolheu mais de 15% em relação ao viewport total,
+        // é quase garantido que o teclado virtual abriu.
+        const isShrunk = window.visualViewport.height < window.innerHeight * 0.85;
+        // Só forçamos o falso se tiver voltado ao normal, se não deixamos
+        // os eventos de focus gerenciarem a abertura.
+        if (!isShrunk) {
+            setIsKeyboardOpen(false);
+        } else {
+            setIsKeyboardOpen(true);
+        }
+      }
+    };
+
+    const handleFocusIn = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        setIsKeyboardOpen(true);
+      }
+    };
+    const handleFocusOut = () => {
+      setIsKeyboardOpen(false);
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleResize);
+    }
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
+    
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleResize);
+      }
+      document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
+    };
+  }, []);
 
   // Protocol & Phase State
   const [phase, setPhase] = useState('anamnese');
@@ -116,6 +158,16 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
   const [isFasesOpen, setIsFasesOpen] = useState(true);
   const [customPhaseName, setCustomPhaseName] = useState('');
   const [isSafetyOpen, setIsSafetyOpen] = useState(false);
+
+  const handlePhaseChange = (newPhase: string) => {
+    setPhase(newPhase);
+    setSelectedCycle(1);
+    setMentalSud(0);
+    setPhysicalSud(0);
+    if (isSessionStarted) {
+      saveSessionData({ ...sessionDataRef.current, lastPhaseInProgress: newPhase });
+    }
+  };
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
   const [sentiment, setSentiment] = useState<'neutral' | 'stress' | 'calm'>('neutral');
 
@@ -271,7 +323,11 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
     setSessionData(newData);
     // Real-time sync of SUD and session progress to the client
     if (sendSyncData) {
-      sendSyncData({ type: 'SESSION_DATA_UPDATE', payload: newData });
+      if (isEndingSession) {
+        sendSyncData({ type: 'SESSION_ENDED' });
+      } else {
+        sendSyncData({ type: 'SESSION_DATA_UPDATE', payload: newData });
+      }
     }
 
     // ── Cache local: garante que os dados sobrevivam mesmo se o save no DB falhar
@@ -358,8 +414,8 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
         setPatients(data);
 
         // Helper to parse legacy pipe-separated notes
-        const parseLegacyNotes = (notes: string): Partial<ClientIntakeData> => {
-          if (!notes) return {};
+        const parseLegacyNotes = (notes: any): Partial<ClientIntakeData> => {
+          if (!notes || typeof notes !== 'string') return {};
           const parts = notes.split('|').map(s => s.trim());
           
           let complaint = notes;
@@ -417,11 +473,42 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
           setSelectedPatientId(pId);
           const p = data.find((pat: any) => pat.id === pId);
           if (p) {
-            const parsedLegacy = parseLegacyNotes(p.notes || '');
+            // Tenta ler JSON completo salvo pelo portal no campo notes
+            if (p.notes && typeof p.notes === 'string' && p.notes.trim().startsWith('{')) {
+              try {
+                const parsed = JSON.parse(p.notes);
+                if (typeof parsed === 'object' && parsed !== null) {
+                  setIntakeData({
+                    nome: parsed.nome || p.name,
+                    email: parsed.email || p.email,
+                    celular: parsed.celular || p.phone || '',
+                    ...parsed,
+                    transtornos: parsed.transtornos || [],
+                    doresFisicas: parsed.doresFisicas || [],
+                    temasFuturo: parsed.temasFuturo || [],
+                  } as ClientIntakeData);
+                  return;
+                }
+              } catch (_) {}
+            } else if (p.notes && typeof p.notes === 'object') {
+               const notes = p.notes as any;
+               setIntakeData({
+                  nome: notes.nome || p.name,
+                  email: notes.email || p.email,
+                  celular: notes.celular || p.phone || '',
+                  ...notes,
+                  transtornos: notes.transtornos || [],
+                  doresFisicas: notes.doresFisicas || [],
+                  temasFuturo: notes.temasFuturo || [],
+               } as ClientIntakeData);
+               return;
+            }
+            // Fallback para formato legado
+            const parsedLegacy = parseLegacyNotes(p.notes);
             setIntakeData({
               nome: p.name,
               email: p.email,
-              complaint: parsedLegacy.complaint || p.notes,
+              complaint: parsedLegacy.complaint || (typeof p.notes === 'string' ? p.notes : '') || 'Anamnese não preenchida.',
               transtornos: parsedLegacy.transtornos || [],
               doresFisicas: parsedLegacy.doresFisicas || [],
               temasFuturo: parsedLegacy.temasFuturo || [],
@@ -429,81 +516,113 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
           }
         };
 
+        /**
+         * Tenta parsear uma string como JSON de anamnese.
+         * Retorna null se não for um JSON válido de anamnese.
+         */
+        const tryParseAnamneseJSON = (raw: any): ClientIntakeData | null => {
+          if (!raw) return null;
+          if (typeof raw === 'object') {
+            return {
+              ...raw,
+              transtornos: raw.transtornos || [],
+              doresFisicas: raw.doresFisicas || [],
+              temasFuturo: raw.temasFuturo || [],
+            } as ClientIntakeData;
+          }
+          if (typeof raw !== 'string') return null;
+          const trimmed = raw.trim();
+          if (!trimmed.startsWith('{')) return null;
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (typeof parsed === 'object' && parsed !== null) {
+              return {
+                ...parsed,
+                transtornos: parsed.transtornos || [],
+                doresFisicas: parsed.doresFisicas || [],
+                temasFuturo: parsed.temasFuturo || [],
+              } as ClientIntakeData;
+            }
+          } catch (_) {}
+          return null;
+        };
+
         if (targetAppointmentId) {
           const appointment = await api.appointments.get(targetAppointmentId);
           
           if (appointment) {
-            setAppointmentObj(appointment); // Save full object
-            if (appointment.patientId) setSelectedPatientId(appointment.patientId);
+            setAppointmentObj(appointment);
+            const patientId = appointment.patientId;
+            if (patientId) setSelectedPatientId(patientId);
 
             // Load session data — prefer DB, fallback to localStorage cache
             const lsKey = `TRG_SESSION_DATA_${targetAppointmentId}`;
             if (appointment.sessionData && Object.keys(appointment.sessionData).length > 0) {
               setSessionData(appointment.sessionData);
-              // Mantém o cache local atualizado
               localStorage.setItem(lsKey, JSON.stringify(appointment.sessionData));
             } else {
-              // DB vazio: tenta restaurar do cache local (caso o save ainda não chegou ao servidor)
               const cached = localStorage.getItem(lsKey);
               if (cached) {
                 try { setSessionData(JSON.parse(cached)); } catch (_) {}
               }
             }
 
-            // Attempt to load intake data from appointment notes (where it acts as anamnesis storage)
-            if (appointment.notes) {
-              try {
-                let parsedNotes = appointment.notes;
-                if (typeof parsedNotes === 'string') {
-                  // Only parse if it looks like a JSON object/array
-                  if (parsedNotes.trim().startsWith('{') || parsedNotes.trim().startsWith('[')) {
-                    parsedNotes = JSON.parse(parsedNotes);
-                  }
-                }
-
-                // Basic validation to see if it's anamnesis data
-                if (typeof parsedNotes === 'object' && parsedNotes !== null) {
-                  setIntakeData({
-                    ...parsedNotes,
-                    transtornos: parsedNotes.transtornos || [],
-                    doresFisicas: parsedNotes.doresFisicas || [],
-                    temasFuturo: parsedNotes.temasFuturo || []
-                  } as ClientIntakeData);
-                } else {
-                  throw new Error("Legacy string note");
-                }
-              } catch (e) {
-                if (!intakeData) {
-                  const parsedLegacy = parseLegacyNotes(appointment.patient?.notes || appointment.notes || '');
-                  setIntakeData({
-                    nome: appointment.patientName,
-                    email: appointment.patient?.email || 'cliente@exemplo.com',
-                    complaint: parsedLegacy.complaint || "Notas legadas",
-                    transtornos: parsedLegacy.transtornos || [], 
-                    doresFisicas: parsedLegacy.doresFisicas || [], 
-                    temasFuturo: parsedLegacy.temasFuturo || []
-                  } as ClientIntakeData);
-                }
+            // ── Carregamento da Anamnese (SSoT: patient.notes > appointment.notes > legado) ──
+            // PRIORIDADE 1: Buscar patient.notes diretamente do banco (JSON completo salvo pelo portal)
+            let loaded = false;
+            if (patientId) {
+              const patientRecord = data.find((p: any) => p.id === patientId);
+              const patientNotes = patientRecord?.notes;
+              const fromPatientNotes = tryParseAnamneseJSON(patientNotes);
+              if (fromPatientNotes) {
+                // Complementa com dados do patient (nome, email, telefone)
+                setIntakeData({
+                  nome: fromPatientNotes.nome || patientRecord?.name || appointment.patientName,
+                  email: fromPatientNotes.email || patientRecord?.email || '',
+                  celular: fromPatientNotes.celular || patientRecord?.phone || '',
+                  ...fromPatientNotes,
+                });
+                loaded = true;
               }
             }
 
-            if (!intakeData && !appointment.notes) {
-              const parsedLegacy = parseLegacyNotes(appointment.patient?.notes || '');
-              const mockIntake: ClientIntakeData = {
-                nome: appointment.patientName,
-                email: appointment.patient?.email || 'cliente@exemplo.com',
-                complaint: parsedLegacy.complaint || appointment.patient?.notes || "Sessão agendada.",
-                transtornos: parsedLegacy.transtornos || [], doresFisicas: parsedLegacy.doresFisicas || [], temasFuturo: parsedLegacy.temasFuturo || []
-              };
-              setIntakeData(mockIntake);
+            // PRIORIDADE 2: appointment.notes (JSON salvo quando o cliente preencheu anamnese ligada ao appointment)
+            if (!loaded && appointment.notes) {
+              const fromApptNotes = tryParseAnamneseJSON(
+                typeof appointment.notes === 'string' ? appointment.notes : JSON.stringify(appointment.notes)
+              );
+              if (fromApptNotes) {
+                setIntakeData({
+                  nome: fromApptNotes.nome || appointment.patientName,
+                  email: fromApptNotes.email || '',
+                  ...fromApptNotes,
+                });
+                loaded = true;
+              }
             }
+
+            // PRIORIDADE 3: Formato legado (pipe-separated) em appointment.notes ou patient.notes
+            if (!loaded) {
+              const rawNotes = appointment.notes || (data.find((p: any) => p.id === patientId)?.notes) || '';
+              const legacySource = typeof rawNotes === 'string' ? rawNotes : '';
+              const parsedLegacy = parseLegacyNotes(legacySource);
+              setIntakeData({
+                nome: appointment.patientName,
+                email: appointment.patient?.email || '',
+                complaint: parsedLegacy.complaint || legacySource || 'Anamnese não preenchida.',
+                transtornos: parsedLegacy.transtornos || [],
+                doresFisicas: parsedLegacy.doresFisicas || [],
+                temasFuturo: parsedLegacy.temasFuturo || [],
+              } as ClientIntakeData);
+            }
+
           } else {
-            // Target appointment not found, fallback to patient
+            // Appointment não encontrado: fallback para patient do localStorage
             const savedPatientId = localStorage.getItem('TRG_CURRENT_PATIENT_ID');
             if (savedPatientId) loadFallbackPatient(savedPatientId);
           }
         } else {
-          // Fallback: If no specific appointment, try to load just the patient from LS
+          // Sem appointment: carrega patient do localStorage
           const savedPatientId = localStorage.getItem('TRG_CURRENT_PATIENT_ID');
           if (savedPatientId) loadFallbackPatient(savedPatientId);
         }
@@ -547,11 +666,44 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
       setAppointmentObj(null);
       localStorage.removeItem('TRG_CURRENT_APPOINTMENT_ID');
 
+      let parsedIntake: Partial<ClientIntakeData> | null = null;
+      
+      if (p.notes) {
+        if (typeof p.notes === 'string' && p.notes.trim().startsWith('{')) {
+          try {
+            const parsed = JSON.parse(p.notes);
+            if (typeof parsed === 'object' && parsed !== null) {
+              parsedIntake = {
+                ...parsed,
+                transtornos: parsed.transtornos || [],
+                doresFisicas: parsed.doresFisicas || [],
+                temasFuturo: parsed.temasFuturo || [],
+              };
+            }
+          } catch (_) {}
+        } else if (typeof p.notes === 'object') {
+           parsedIntake = {
+              ...p.notes,
+              transtornos: p.notes.transtornos || [],
+              doresFisicas: p.notes.doresFisicas || [],
+              temasFuturo: p.notes.temasFuturo || [],
+           };
+        } else if (typeof p.notes === 'string') {
+           // Fallback to legacy string parsing
+           const parts = p.notes.split('|').map((s: string) => s.trim());
+           parsedIntake = { complaint: parts.length > 1 ? p.notes : p.notes };
+        }
+      }
+
       setIntakeData({
-        nome: p.name,
-        email: p.email || '',
-        complaint: p.notes || '', // Use notes as complaint
-        // ... defaults
+        nome: parsedIntake?.nome || p.name,
+        email: parsedIntake?.email || p.email || '',
+        celular: parsedIntake?.celular || p.phone || '',
+        complaint: parsedIntake?.complaint || 'Anamnese não preenchida.',
+        transtornos: parsedIntake?.transtornos || [],
+        doresFisicas: parsedIntake?.doresFisicas || [],
+        temasFuturo: parsedIntake?.temasFuturo || [],
+        ...parsedIntake
       } as ClientIntakeData);
     }
     
@@ -839,18 +991,94 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
     setSelectedCycle(1);
     setMentalSud(0);
     setPhysicalSud(0);
+    const nextData = { ...sessionData, activeAgeRange: range };
+    saveSessionData(nextData);
   };
 
+  // Sincroniza os valores de SUD no painel ao mudar de ciclo, fase ou faixa etária
+  useEffect(() => {
+    let mentalHist: number[] = [];
+    let physicalHist: number[] = [];
+
+    if (phase === 'cronologico') {
+      mentalHist = (sessionData.mentalHistory || {})[selectedAgeRange] || [];
+      physicalHist = (sessionData.physicalHistory || {})[selectedAgeRange] || [];
+    } else if (phase === 'somatico') {
+      mentalHist = sessionData.somaticMentalHistory || [];
+      physicalHist = sessionData.somaticPhysicalHistory || [];
+    } else if (phase === 'tematico') {
+      mentalHist = sessionData.thematicMentalHistory || [];
+      physicalHist = sessionData.thematicPhysicalHistory || [];
+    } else if (phase === 'futuro') {
+      mentalHist = sessionData.futureMentalHistory || [];
+      physicalHist = sessionData.futurePhysicalHistory || [];
+    } else if (phase === 'potencializacao') {
+      mentalHist = sessionData.potentializationMentalHistory || [];
+      physicalHist = sessionData.potentializationPhysicalHistory || [];
+    } else {
+      mentalHist = sessionData[`${phase}MentalHistory`] || [];
+      physicalHist = sessionData[`${phase}PhysicalHistory`] || [];
+    }
+
+    const idx = selectedCycle - 1;
+    if (mentalHist[idx] !== undefined) setMentalSud(mentalHist[idx]);
+    else setMentalSud(0);
+
+    if (physicalHist[idx] !== undefined) setPhysicalSud(physicalHist[idx]);
+    else setPhysicalSud(0);
+  }, [
+    selectedCycle, phase, selectedAgeRange,
+    sessionData.mentalHistory, sessionData.physicalHistory,
+    sessionData.somaticMentalHistory, sessionData.somaticPhysicalHistory,
+    sessionData.thematicMentalHistory, sessionData.thematicPhysicalHistory,
+    sessionData.futureMentalHistory, sessionData.futurePhysicalHistory,
+    sessionData.potentializationMentalHistory, sessionData.potentializationPhysicalHistory
+  ]);
+
   const handleRegisterMentalSud = () => {
-    const prev = (sessionData.mentalHistory || {})[selectedAgeRange] || [];
-    const next = { ...(sessionData.mentalHistory || {}), [selectedAgeRange]: [...prev, mentalSud] };
-    saveSessionData({ ...sessionData, mentalHistory: next });
+    const idx = selectedCycle - 1;
+    const newSessionData = { ...sessionData };
+
+    if (phase === 'cronologico') {
+      const prev = (newSessionData.mentalHistory || {})[selectedAgeRange] || [];
+      const newHistory = [...prev];
+      newHistory[idx] = mentalSud;
+      newSessionData.mentalHistory = { ...(newSessionData.mentalHistory || {}), [selectedAgeRange]: newHistory };
+    } else {
+      const key = phase === 'somatico' ? 'somaticMentalHistory' :
+                  phase === 'tematico' ? 'thematicMentalHistory' :
+                  phase === 'futuro' ? 'futureMentalHistory' :
+                  phase === 'potencializacao' ? 'potentializationMentalHistory' :
+                  `${phase}MentalHistory`;
+      const prev = newSessionData[key] || [];
+      const newHistory = [...prev];
+      newHistory[idx] = mentalSud;
+      newSessionData[key] = newHistory;
+    }
+    saveSessionData(newSessionData);
   };
 
   const handleRegisterPhysicalSud = () => {
-    const prev = (sessionData.physicalHistory || {})[selectedAgeRange] || [];
-    const next = { ...(sessionData.physicalHistory || {}), [selectedAgeRange]: [...prev, physicalSud] };
-    saveSessionData({ ...sessionData, physicalHistory: next });
+    const idx = selectedCycle - 1;
+    const newSessionData = { ...sessionData };
+
+    if (phase === 'cronologico') {
+      const prev = (newSessionData.physicalHistory || {})[selectedAgeRange] || [];
+      const newHistory = [...prev];
+      newHistory[idx] = physicalSud;
+      newSessionData.physicalHistory = { ...(newSessionData.physicalHistory || {}), [selectedAgeRange]: newHistory };
+    } else {
+      const key = phase === 'somatico' ? 'somaticPhysicalHistory' :
+                  phase === 'tematico' ? 'thematicPhysicalHistory' :
+                  phase === 'futuro' ? 'futurePhysicalHistory' :
+                  phase === 'potencializacao' ? 'potentializationPhysicalHistory' :
+                  `${phase}PhysicalHistory`;
+      const prev = newSessionData[key] || [];
+      const newHistory = [...prev];
+      newHistory[idx] = physicalSud;
+      newSessionData[key] = newHistory;
+    }
+    saveSessionData(newSessionData);
   };
 
   const handleAdvancePhase = () => {
@@ -858,6 +1086,7 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
     if (idx < phases.length - 1) {
       const nextPhase = phases[idx + 1].id;
       setPhase(nextPhase);
+      setSelectedCycle(1);
       // Persiste a fase atual no banco para que um reload retome do ponto correto
       if (isSessionStarted) {
         saveSessionData({ ...sessionData, lastPhaseInProgress: nextPhase });
@@ -947,8 +1176,12 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
     <CockpitPanel
       mode="dual"
       phaseLabel={phases.find(p => p.id === phase)?.label || 'Fase'}
+      isKeyboardOpen={isKeyboardOpen}
       
       // Cronológico e outras Fases agora usam a mesma mecânica dual, mas gravam em propriedades diferentes
+      showAgeRanges={phase === 'cronologico'}
+      showMentalSud={phase !== 'somatico'}
+      showPhysicalSud={phase === 'cronologico' || phase === 'somatico' || phase === 'tematico' || phase === 'futuro'}
       ageRanges={AGE_RANGES}
       selectedAgeRange={selectedAgeRange}
       onAgeRangeChange={handleAgeRangeChange}
@@ -957,14 +1190,7 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
       
       mentalSud={mentalSud}
       onMentalSudChange={setMentalSud}
-      onRegisterMentalSud={() => {
-          if (phase === 'cronologico') handleRegisterMentalSud();
-          else if (phase === 'somatico') saveSessionData({ ...sessionData, somaticMentalHistory: [...(sessionData.somaticMentalHistory||[]), mentalSud] });
-          else if (phase === 'tematico') saveSessionData({ ...sessionData, thematicMentalHistory: [...(sessionData.thematicMentalHistory||[]), mentalSud] });
-          else if (phase === 'futuro') saveSessionData({ ...sessionData, futureMentalHistory: [...(sessionData.futureMentalHistory||[]), mentalSud] });
-          else if (phase === 'potencializacao') saveSessionData({ ...sessionData, potentializationMentalHistory: [...(sessionData.potentializationMentalHistory||[]), mentalSud] });
-          else saveSessionData({ ...sessionData, [phase + 'MentalHistory']: [...(sessionData[phase + 'MentalHistory']||[]), mentalSud] });
-      }}
+      onRegisterMentalSud={handleRegisterMentalSud}
       mentalHistory={
           phase === 'cronologico' ? ((sessionData.mentalHistory || {})[selectedAgeRange] || []) :
           phase === 'somatico' ? (sessionData.somaticMentalHistory || []) :
@@ -976,14 +1202,7 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
 
       physicalSud={physicalSud}
       onPhysicalSudChange={setPhysicalSud}
-      onRegisterPhysicalSud={() => {
-          if (phase === 'cronologico') handleRegisterPhysicalSud();
-          else if (phase === 'somatico') saveSessionData({ ...sessionData, somaticPhysicalHistory: [...(sessionData.somaticPhysicalHistory||[]), physicalSud] });
-          else if (phase === 'tematico') saveSessionData({ ...sessionData, thematicPhysicalHistory: [...(sessionData.thematicPhysicalHistory||[]), physicalSud] });
-          else if (phase === 'futuro') saveSessionData({ ...sessionData, futurePhysicalHistory: [...(sessionData.futurePhysicalHistory||[]), physicalSud] });
-          else if (phase === 'potencializacao') saveSessionData({ ...sessionData, potentializationPhysicalHistory: [...(sessionData.potentializationPhysicalHistory||[]), physicalSud] });
-          else saveSessionData({ ...sessionData, [phase + 'PhysicalHistory']: [...(sessionData[phase + 'PhysicalHistory']||[]), physicalSud] });
-      }}
+      onRegisterPhysicalSud={handleRegisterPhysicalSud}
       physicalHistory={
           phase === 'cronologico' ? ((sessionData.physicalHistory || {})[selectedAgeRange] || []) :
           phase === 'somatico' ? (sessionData.somaticPhysicalHistory || []) :
@@ -1000,11 +1219,21 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
       singleHistory={[]}
       isPositiveScale={phase === 'potencializacao'}
 
-      clinicalNotes={(sessionData.cycleNotes && sessionData.cycleNotes[selectedAgeRange] && sessionData.cycleNotes[selectedAgeRange][selectedCycle]) || ''}
+      clinicalNotes={
+          phase === 'cronologico' 
+              ? ((sessionData.cycleNotes && sessionData.cycleNotes[selectedAgeRange] && sessionData.cycleNotes[selectedAgeRange][selectedCycle]) || '')
+              : ((sessionData.phaseNotes && sessionData.phaseNotes[phase] && sessionData.phaseNotes[phase][selectedCycle]) || '')
+      }
       onClinicalNotesChange={(v) => {
-         const currentAgeNotes = sessionData.cycleNotes?.[selectedAgeRange] || {};
-         const newCycleNotes = { ...sessionData.cycleNotes, [selectedAgeRange]: { ...currentAgeNotes, [selectedCycle]: v } };
-         saveSessionData({ ...sessionData, cycleNotes: newCycleNotes });
+         if (phase === 'cronologico') {
+             const currentAgeNotes = sessionData.cycleNotes?.[selectedAgeRange] || {};
+             const newCycleNotes = { ...sessionData.cycleNotes, [selectedAgeRange]: { ...currentAgeNotes, [selectedCycle]: v } };
+             saveSessionData({ ...sessionData, cycleNotes: newCycleNotes });
+         } else {
+             const currentPhaseNotes = sessionData.phaseNotes?.[phase] || {};
+             const newPhaseNotes = { ...sessionData.phaseNotes, [phase]: { ...currentPhaseNotes, [selectedCycle]: v } };
+             saveSessionData({ ...sessionData, phaseNotes: newPhaseNotes });
+         }
       }}
       onSaveClinicalNotes={() => {}}
       onAdvancePhase={handleAdvancePhase}
@@ -1024,41 +1253,38 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
           >
             <ArrowLeft size={18} className="sm:w-5 sm:h-5" />
           </button>
-          <div className="flex flex-col min-w-0">
-            <h1 className="text-sm sm:text-lg font-bold text-slate-800 dark:text-white leading-tight flex items-center gap-1.5 sm:gap-2 whitespace-nowrap">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            <h1 className="text-sm sm:text-lg font-bold text-slate-800 dark:text-white leading-tight flex items-center gap-1.5 sm:gap-2 whitespace-nowrap shrink-0">
               <span className="hidden xs:inline">Sessão TeraNexus</span>
               <span className="xs:hidden">Sessão</span>
               <span className="px-1.5 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-[9px] sm:text-[10px] rounded-full uppercase tracking-wider font-extrabold border border-primary-200 dark:border-primary-800">TRG</span>
             </h1>
 
-            <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5 sm:mt-1 min-w-0">
-              <div className="relative group min-w-[110px] xs:min-w-[150px] sm:min-w-[180px] max-w-[130px] xs:max-w-[180px] sm:max-w-none">
-                <select
-                  value={selectedPatientId}
-                  onChange={handleManualPatientSelect}
-                  className="w-full appearance-none bg-transparent text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 pr-5 sm:pr-6 outline-none cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors py-0.5 rounded truncate"
-                >
-                  <option value="" disabled>Selecione o Cliente</option>
-                  {patients.map(p => (
-                    <option key={p.id} value={p.id} className="text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900">
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown size={12} className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none group-hover:text-primary-500 sm:w-3.5 sm:h-3.5" />
-              </div>
+            <span className="hidden sm:inline text-slate-300 dark:text-slate-700">|</span>
 
-              <span className="hidden xs:inline text-slate-300 dark:text-slate-700">•</span>
-              <span className="hidden xs:inline text-[10px] sm:text-xs text-slate-400">{new Date().toLocaleDateString()}</span>
-              
-              {/* Nexus AI Status Header */}
-              {isSessionStarted && (
-                <div className="hidden lg:flex items-center gap-1.5 ml-2 text-[10px] sm:text-[11px] font-bold text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1 rounded-full border border-indigo-100 dark:border-indigo-800 shadow-sm transition-all">
-                   <Sparkles size={12} className={aiSuggestions.length === 0 ? "animate-pulse" : ""} />
-                   <span>{aiSuggestions.length > 0 ? aiSuggestions[aiSuggestions.length - 1] : "Nexus AI ouvindo e analisando..."}</span>
-                </div>
-              )}
+            <div className="relative group min-w-[130px] xs:min-w-[160px] sm:min-w-[200px] max-w-[150px] xs:max-w-[200px] sm:max-w-none">
+              <select
+                value={selectedPatientId}
+                onChange={handleManualPatientSelect}
+                className="w-full appearance-none bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800/80 dark:hover:bg-slate-800 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 pl-3 pr-8 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/60 outline-none cursor-pointer hover:border-indigo-500/50 dark:hover:border-indigo-400/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shadow-sm"
+              >
+                <option value="" disabled>Selecione o Cliente</option>
+                {patients.map(p => (
+                  <option key={p.id} value={p.id} className="text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900">
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 pointer-events-none group-hover:text-indigo-500 transition-colors sm:w-4 sm:h-4" />
             </div>
+
+            {/* Nexus AI Status Header */}
+            {isSessionStarted && (
+              <div className="hidden lg:flex items-center gap-1.5 ml-2 text-[10px] sm:text-[11px] font-bold text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-2.5 py-1 rounded-full border border-indigo-100 dark:border-indigo-800 shadow-sm transition-all shrink-0">
+                 <Sparkles size={12} className={aiSuggestions.length === 0 ? "animate-pulse" : ""} />
+                 <span className="truncate max-w-[180px] xl:max-w-none">{aiSuggestions.length > 0 ? aiSuggestions[aiSuggestions.length - 1] : "Nexus AI ativo"}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1138,12 +1364,7 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
               isSafetyOpen={isSafetyOpen}
               aiSuggestions={[]}
               sentiment={sentiment}
-              setPhase={(newPhase: string) => {
-                setPhase(newPhase);
-                if (isSessionStarted) {
-                  saveSessionData({ ...sessionDataRef.current, lastPhaseInProgress: newPhase });
-                }
-              }}
+              setPhase={handlePhaseChange}
               toggleEditing={() => setIsEditingProtocol(!isEditingProtocol)}
               toggleSafety={() => setIsSafetyOpen(!isSafetyOpen)}
               onMovePhase={handleMovePhase}
@@ -1207,24 +1428,48 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
         </button>
 
         {/* ── COLUNA CENTRAL: Vídeo (flex-1, domina) + Gráfico (rodapé fixo) ── */}
-        <div className="flex-1 flex flex-col gap-2 min-w-0 min-h-0 overflow-y-auto lg:overflow-hidden custom-scrollbar">
+        <div className="flex-1 flex flex-col gap-2 min-w-0 min-h-0 overflow-y-auto lg:overflow-hidden custom-scrollbar relative">
 
-          {/* Vídeo — cresce para preencher o espaço (desktop) ou sticky no topo (mobile) */}
-          <div className={`sticky top-0 z-40 lg:relative lg:z-auto lg:flex-1 lg:min-h-0 shadow-xl lg:shadow-none bg-slate-950 pb-1 lg:pb-0 lg:bg-transparent -mx-3 px-3 lg:mx-0 lg:px-0 flex-col shrink-0 ${phase === 'anamnese' && isSessionStarted ? 'hidden lg:hidden' : 'flex'}`}>
-            {!isSessionStarted ? (
-              <div className="flex-1 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col items-center justify-center p-6 shadow-inner relative overflow-hidden min-h-[300px]">
-                {/* Backdrop escuro e textura para imersão */}
+          {/* OVERLAY DA SALA DE ESPERA */}
+          {!isSessionStarted && (
+            <div className="absolute inset-0 z-[60] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto custom-scrollbar rounded-2xl">
+              <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-2xl flex flex-col items-center justify-center p-8 shadow-[0_0_50px_rgba(0,0,0,0.5)] relative overflow-hidden m-auto animate-fade-in-up">
                 <div className="absolute inset-0 bg-gradient-to-b from-slate-800/20 to-slate-950/80 pointer-events-none"></div>
                 
-                <div className="relative z-10 flex flex-col items-center">
+                <div className="relative z-10 flex flex-col items-center w-full">
                   <div className="w-20 h-20 mb-6 rounded-full bg-slate-800 flex items-center justify-center shadow-lg border border-slate-700/50">
                     <VideoIcon size={32} className="text-slate-500" />
                   </div>
                   
-                  <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-2 tracking-tight">Sala de Espera</h2>
-                  <p className="text-slate-400 mb-10 max-w-sm text-center text-sm sm:text-base leading-relaxed">
+                  <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-2 tracking-tight text-center">Sala de Espera</h2>
+                  <p className="text-slate-400 mb-8 max-w-sm text-center text-sm sm:text-base leading-relaxed">
                     O ambiente está configurado e seguro. Clique abaixo para iniciar a sessão e revelar os painéis terapêuticos.
                   </p>
+                  
+                  {/* Marcador de Próximo Cliente e Seletor */}
+                  <div className="mb-8 p-1.5 bg-slate-800/80 border border-slate-700/50 rounded-2xl flex items-center shadow-lg w-full max-w-md relative z-20 transition-all hover:border-indigo-500/50">
+                    <div className="flex items-center justify-center pl-4 pr-2 shrink-0">
+                      <span className="relative flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                      </span>
+                    </div>
+                    <div className="relative group flex-1 min-w-0">
+                      <select
+                        value={selectedPatientId}
+                        onChange={handleManualPatientSelect}
+                        className="w-full appearance-none bg-transparent text-sm font-bold text-white pl-2 pr-10 py-3 rounded-xl outline-none cursor-pointer group-hover:text-indigo-300 transition-colors truncate"
+                      >
+                        <option value="" disabled>Selecione o Cliente</option>
+                        {patients.map(p => (
+                          <option key={p.id} value={p.id} className="text-slate-200 bg-slate-900 text-left">
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none group-hover:text-indigo-400 transition-colors" />
+                    </div>
+                  </div>
                   
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full">
                     <button
@@ -1233,16 +1478,7 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
                       title="Revisar dados da anamnese preenchida pelo cliente"
                     >
                       <FileText className="w-5 h-5" />
-                      Ler Anamnese
-                    </button>
-
-                    <button
-                      onClick={() => onNavigateToReports?.(selectedPatientId)}
-                      className="group bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm md:text-base font-bold py-3.5 px-6 rounded-full shadow-lg transition-all duration-300 hover:scale-[1.03] active:scale-95 flex items-center gap-2 border border-slate-700"
-                      title="Visualizar histórico e dados de sessões anteriores deste paciente"
-                    >
-                      <FileText className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors" />
-                      Sessões Anteriores
+                      Ver anamnese?
                     </button>
 
                     <button
@@ -1254,32 +1490,13 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
                     </button>
                   </div>
                 </div>
-
-                {/* Modal de Anamnese */}
-                {isAnamneseModalOpen && (
-                  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
-                    <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl animate-fade-in-up">
-                      <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-800/50 rounded-t-3xl">
-                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                          <FileText className="text-indigo-400" /> Revisão da Anamnese
-                        </h3>
-                        <button onClick={() => setIsAnamneseModalOpen(false)} className="p-2 rounded-full hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
-                          <X size={20} />
-                        </button>
-                      </div>
-                      <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-slate-950/50">
-                        <SessionNotes intakeData={intakeData} observation={observation} onObservationChange={setObservation} />
-                      </div>
-                      <div className="p-4 border-t border-slate-800 flex justify-end bg-slate-900 rounded-b-3xl">
-                        <button onClick={() => setIsAnamneseModalOpen(false)} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-lg transition-colors">
-                          Fechar e Voltar
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
-            ) : (
+            </div>
+          )}
+
+          {/* Vídeo — cresce para preencher o espaço (desktop) ou sticky no topo (mobile) */}
+          <div className={`sticky top-0 z-40 lg:relative lg:z-auto lg:flex-1 lg:min-h-0 shadow-xl lg:shadow-none bg-slate-950 pb-1 lg:pb-0 lg:bg-transparent -mx-3 px-3 lg:mx-0 lg:px-0 flex-col shrink-0 ${phase === 'anamnese' && isSessionStarted ? 'hidden lg:hidden' : 'flex'}`}>
+            {isSessionStarted && (
               <SessionVideo
                 isVideoActive={isVideoActive}
                 videoRef={videoRef}
@@ -1303,6 +1520,7 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
                 onSaveRecording={saveRecordingToGallery}
                 isProtocolCollapsed={isProtocolCollapsed}
                 onToggleProtocol={() => setIsProtocolCollapsed(!isProtocolCollapsed)}
+                isKeyboardOpen={isKeyboardOpen}
               />
             )}
           </div>
@@ -1316,7 +1534,7 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
                 isSafetyOpen={isSafetyOpen}
                 aiSuggestions={aiSuggestions}
                 sentiment={sentiment}
-                setPhase={setPhase}
+                setPhase={handlePhaseChange}
                 toggleEditing={() => setIsEditingProtocol(!isEditingProtocol)}
                 toggleSafety={() => setIsSafetyOpen(!isSafetyOpen)}
                 onMovePhase={handleMovePhase}
@@ -1335,7 +1553,7 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
           )}
 
           {/* Conteúdo da fase — gráfico como rodapé (altura fixa definida dentro do componente) */}
-          <div className={`shrink-0 bg-slate-900 rounded-2xl border border-slate-800 shadow-sm overflow-hidden transition-all duration-500 ${!isSessionStarted ? 'opacity-30 blur-[2px] pointer-events-none saturate-50' : ''}`}>
+          <div className={`shrink-0 bg-slate-900 rounded-2xl border border-slate-800 shadow-sm overflow-hidden transition-all duration-500 ${!isSessionStarted && phase !== 'anamnese' ? 'opacity-30 blur-[2px] pointer-events-none saturate-50' : ''}`}>
             <div className="lg:overflow-y-auto custom-scrollbar h-full">
               {renderPhaseContent()}
             </div>
@@ -1411,6 +1629,30 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
         )}
 
       </div>
+
+      {/* Modal de Anamnese */}
+      {isAnamneseModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl animate-fade-in-up">
+            <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-800/50 rounded-t-3xl">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <FileText className="text-indigo-400" /> Revisão da Anamnese
+              </h3>
+              <button onClick={() => setIsAnamneseModalOpen(false)} className="p-2 rounded-full hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-slate-950/50">
+              <SessionNotes intakeData={intakeData} observation={observation} onObservationChange={setObservation} />
+            </div>
+            <div className="p-4 border-t border-slate-800 flex justify-end bg-slate-900 rounded-b-3xl">
+              <button onClick={() => setIsAnamneseModalOpen(false)} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-lg transition-colors">
+                Fechar e Voltar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Onboarding Modal */}
       {showOnboardingModal && (

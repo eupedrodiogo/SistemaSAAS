@@ -167,6 +167,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         }
 
+        // 3. Enviar WhatsApp via Z-API (Cliente e Terapeuta)
+        try {
+            const { sendZApiMessage } = await import('../utils/zapi.js');
+
+            if (patientPhone) {
+                const clientMsg =
+                    `📅 *TeraNexus — Agendamento Confirmado!*\n\n` +
+                    `Olá, *${patientName}*! Seu agendamento foi confirmado.\n\n` +
+                    `*Detalhes da Sessão:*\n` +
+                    `📆 Data: *${date}*\n` +
+                    `⏰ Horário: *${time}*\n` +
+                    `👤 Terapeuta: *${therapistName || 'TeraNexus'}*\n` +
+                    `📍 Tipo: *${type || 'Regular'}*\n\n` +
+                    `🔗 Acesse seu portal:\n` +
+                    `https://www.teranexus.com.br/portal-paciente/dashboard\n\n` +
+                    `_TeraNexus_ 💙`;
+                
+                await sendZApiMessage(patientPhone, clientMsg);
+                results.push('ZAPI_Cliente ✓');
+            }
+
+            // Buscar telefone do terapeuta
+            if (therapistName) {
+                const { data: tData } = await supabase.from('therapists').select('phone').eq('email', therapistEmail).single();
+                if (tData && tData.phone) {
+                    const therapistMsg =
+                        `📅 *TeraNexus — Novo Agendamento (${type || 'Regular'})!*\n\n` +
+                        `Olá, *${therapistName}*!\n\n` +
+                        `👤 Cliente: *${patientName}*\n` +
+                        `📆 Data: *${date}*\n` +
+                        `⏰ Horário: *${time}*\n` +
+                        `📞 Telefone: *${patientPhone || 'Não informado'}*\n\n` +
+                        `🔗 Ver na agenda:\n` +
+                        `https://www.teranexus.com.br/dashboard`;
+                    
+                    await sendZApiMessage(tData.phone, therapistMsg);
+                    results.push('ZAPI_Terapeuta ✓');
+                }
+            }
+        } catch (zError: any) {
+            console.error('Erro ao enviar Z-API:', zError);
+            errors.push(`ZAPI: ${zError.message}`);
+        }
+
         return res.status(200).json({ results, errors });
 
     } catch (error: any) {

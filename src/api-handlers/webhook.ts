@@ -71,36 +71,67 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             console.log(`[Webhook] Appointment ${appointmentId} updated to 'scheduled'`);
 
-            // 2. Send Notification
-            // Fetch details first (Patient, Therapist)
+            // 2. Fetch appointment details (Patient + Therapist + session_data)
             const { data: appt, error: fetchError } = await supabase
                 .from('appointments')
                 .select(`
-                    date, time,
+                    date, time, therapist_id, patient_id, session_data,
                     patients (name, email, phone, notes),
                     therapists (name, email, phone)
                 `)
                 .eq('id', appointmentId)
                 .single();
 
+            // 3. Register transaction — upsert to avoid duplicates if manual-confirm ran first
             if (appt) {
-                const patient = appt.patients as any;
-                const therapist = appt.therapists as any;
-                console.log(`[Webhook] Preparing notifications for ${patient?.name}`);
+                const amountInReais = paymentIntent.amount / 100; // Stripe uses cents
+                // session_data.price is the source of truth for the agreed price;
+                // fallback to Stripe amount if not set.
+                const finalAmount = Number((appt as any).session_data?.price ?? amountInReais) || amountInReais;
 
-                await sendBookingNotification({
-                    name: patient.name,
-                    email: patient.email,
-                    phone: patient.phone,
-                    date: appt.date,
-                    time: appt.time,
-                    therapistName: therapist.name,
-                    therapistEmail: therapist.email,
-                    therapistPhone: therapist.phone
-                });
-                console.log('[Webhook] Notifications Sent Successfully');
+                const { error: txError } = await supabase
+                    .from('transactions')
+                    .upsert(
+                        {
+                            therapist_id: (appt as any).therapist_id,
+                            patient_id: (appt as any).patient_id,
+                            appointment_id: appointmentId,
+                            amount: finalAmount,
+                            type: 'income',
+                            status: 'paid',
+                            category: 'Sessão TRG',
+                            description: `Pagamento via Stripe — ${(appt as any).patients?.name ?? 'Paciente'}`,
+                            date: (appt as any).date,
+                        },
+                        { onConflict: 'appointment_id', ignoreDuplicates: true }
+                    );
+
+                if (txError) {
+                    // Non-fatal: log but don't fail the webhook response
+                    console.error('[Webhook] Failed to upsert transaction:', txError);
+                } else {
+                    console.log(`[Webhook] Transaction registered for appointment ${appointmentId} — R$ ${finalAmount}`);
+                }
+
+                // 4. Send booking notifications
+                const patient = (appt as any).patients;
+                const therapist = (appt as any).therapists;
+                if (patient) {
+                    console.log(`[Webhook] Preparing notifications for ${patient?.name}`);
+                    await sendBookingNotification({
+                        name: patient.name,
+                        email: patient.email,
+                        phone: patient.phone,
+                        date: appt.date,
+                        time: appt.time,
+                        therapistName: therapist?.name,
+                        therapistEmail: therapist?.email,
+                        therapistPhone: therapist?.phone
+                    });
+                    console.log('[Webhook] Notifications Sent Successfully');
+                }
             } else {
-                console.error('[Webhook] Could not fetch appointment details for notification. Fetch Error:', fetchError);
+                console.error('[Webhook] Could not fetch appointment details. Fetch Error:', fetchError);
             }
         } else {
             console.warn('[Webhook] No appointmentId found in PaymentIntent metadata.');

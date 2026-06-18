@@ -46,6 +46,7 @@ interface SessionVideoProps {
     onSaveRecording: () => void;
     isProtocolCollapsed?: boolean;
     onToggleProtocol?: () => void;
+    isKeyboardOpen?: boolean;
 }
 
 export const SessionVideo: React.FC<SessionVideoProps> = ({
@@ -70,7 +71,8 @@ export const SessionVideo: React.FC<SessionVideoProps> = ({
     onStopRecording,
     onSaveRecording,
     isProtocolCollapsed = false,
-    onToggleProtocol
+    onToggleProtocol,
+    isKeyboardOpen = false
 }) => {
     const [isChatOpen, setIsChatOpen] = React.useState(false);
     const [chatText, setChatText] = React.useState('');
@@ -78,7 +80,56 @@ export const SessionVideo: React.FC<SessionVideoProps> = ({
     const videoContainerRef = useRef<HTMLDivElement>(null);
     const [isFullScreen, setIsFullScreen] = useState(false);
     const [showControls, setShowControls] = useState(true);
+    const [isMobilePip, setIsMobilePip] = useState(false);
     const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    const [pipOffset, setPipOffset] = useState({ top: 16, right: 16 });
+
+    useEffect(() => {
+        if (window.innerWidth < 1024) {
+            setIsMobilePip(!!isKeyboardOpen);
+        }
+    }, [isKeyboardOpen]);
+
+    // Track textarea position and visual viewport to keep PIP right above notes
+    useEffect(() => {
+        if (!isMobilePip) return;
+
+        const updatePosition = () => {
+            const textarea = document.getElementById('clinical-notes-textarea');
+            if (textarea) {
+                const rect = textarea.getBoundingClientRect();
+                const pipHeight = 160; // approximate height of w-28 aspect-[3/4]
+                let calculatedTop = rect.top - pipHeight - 10;
+
+                // Ensure it doesn't go above the visual viewport
+                const vvTop = window.visualViewport ? window.visualViewport.offsetTop : 0;
+                if (calculatedTop < vvTop + 10) {
+                    calculatedTop = vvTop + 10;
+                }
+
+                setPipOffset({ top: calculatedTop, right: 16 });
+            } else if (window.visualViewport) {
+                setPipOffset({ top: window.visualViewport.offsetTop + 16, right: 16 });
+            }
+        };
+
+        // Initial update and small delay to allow scrollIntoView to finish
+        updatePosition();
+        const timeout = setTimeout(updatePosition, 300);
+
+        const scrollContainer = document.querySelector('.custom-scrollbar');
+        scrollContainer?.addEventListener('scroll', updatePosition);
+        window.visualViewport?.addEventListener('resize', updatePosition);
+        window.visualViewport?.addEventListener('scroll', updatePosition);
+
+        return () => {
+            clearTimeout(timeout);
+            scrollContainer?.removeEventListener('scroll', updatePosition);
+            window.visualViewport?.removeEventListener('resize', updatePosition);
+            window.visualViewport?.removeEventListener('scroll', updatePosition);
+        };
+    }, [isMobilePip]);
 
     // Adaptive video: detects remote aspect ratio and adjusts layout automatically
     const adaptiveRemote = useAdaptiveVideo(remoteVideoRef as React.RefObject<HTMLVideoElement | null>, remoteStream);
@@ -138,13 +189,27 @@ export const SessionVideo: React.FC<SessionVideoProps> = ({
     };
 
     return (
-        <div 
+        <DraggablePip 
             ref={videoContainerRef} 
+            disabled={!isMobilePip}
+            defaultPosition={isMobilePip ? { top: pipOffset.top, right: pipOffset.right } : undefined}
             onClick={handleVideoContainerClick}
             onMouseMove={() => showControls || resetControlsTimeout()}
-            className={`bg-slate-900 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-slate-700 relative flex flex-col transition-all duration-300 w-full min-h-[45vh] sm:aspect-video lg:min-h-0 lg:aspect-auto lg:flex-1 cursor-pointer`}
+            className={`${isMobilePip 
+                ? 'fixed z-[100] rounded-xl shadow-2xl overflow-hidden border border-indigo-500/50 bg-slate-900 cursor-pointer aspect-[3/4] w-28 sm:w-36 transition-all duration-75' 
+                : 'bg-slate-900 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-slate-700 relative flex flex-col transition-all duration-300 w-full h-[35dvh] min-h-[150px] sm:h-auto sm:aspect-video lg:min-h-0 lg:aspect-auto lg:flex-1 cursor-pointer'}`}
         >
-            <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/60 to-transparent z-20 flex justify-between pointer-events-none">
+            {isMobilePip && (
+                <button 
+                    onClick={(e) => { e.stopPropagation(); setIsMobilePip(false); }} 
+                    className="absolute top-2 right-2 bg-black/60 p-1.5 rounded-lg z-[60] text-white hover:bg-black/80 backdrop-blur-md transition-colors border border-white/10"
+                    title="Restaurar vídeo"
+                >
+                    <Maximize2 size={16} />
+                </button>
+            )}
+
+            <div className={`absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/60 to-transparent z-20 flex justify-between pointer-events-none transition-opacity ${isMobilePip ? 'opacity-0' : 'opacity-100'}`}>
                 <div className="flex items-center gap-2 px-3 py-1 bg-black/40 backdrop-blur-sm rounded-lg border border-white/10 pointer-events-auto">
                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                     <span className="text-xs font-bold text-white uppercase tracking-wider">Ao Vivo</span>
@@ -159,7 +224,7 @@ export const SessionVideo: React.FC<SessionVideoProps> = ({
 
             <div 
                 onClick={(e) => { e.stopPropagation(); resetControlsTimeout(); }}
-                className={`absolute bottom-4 w-[95%] max-w-fit left-1/2 -translate-x-1/2 z-20 flex items-center justify-center gap-2 sm:gap-3 bg-slate-950/80 backdrop-blur-md p-2 sm:p-2 rounded-2xl border border-white/10 shadow-lg transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                className={`absolute bottom-4 w-[95%] max-w-fit left-1/2 -translate-x-1/2 z-20 flex items-center justify-center gap-2 sm:gap-3 bg-slate-950/80 backdrop-blur-md p-2 sm:p-2 rounded-2xl border border-white/10 shadow-lg transition-opacity duration-300 ${(showControls && !isMobilePip) ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
             >
                 <button onClick={onToggleMic} className={`p-3 rounded-xl transition-all ${isMicMuted ? 'bg-red-500 text-white' : 'bg-slate-800 text-white hover:bg-slate-700'}`}>
                     {isMicMuted ? <MicOff size={20} /> : <Mic size={20} />}
@@ -320,7 +385,7 @@ export const SessionVideo: React.FC<SessionVideoProps> = ({
                 {/* PIP View: Local (Therapist) */}
                 <DraggablePip 
                     containerRef={videoContainerRef}
-                    className={`absolute z-10 aspect-[3/4] md:aspect-video bg-black rounded-xl overflow-hidden shadow-2xl border border-slate-700/50 transition-shadow duration-300 hover:shadow-black/50 ${isFullScreen ? 'w-32 md:w-64' : 'w-24 sm:w-28 md:w-48'}`}
+                    className={`absolute z-10 aspect-[3/4] md:aspect-video bg-black rounded-xl overflow-hidden shadow-2xl border border-slate-700/50 transition-shadow duration-300 hover:shadow-black/50 ${isFullScreen ? 'w-32 md:w-64' : (isMobilePip ? 'w-10' : 'w-24 sm:w-28 md:w-48')}`}
                     defaultPosition={{ top: '1rem', right: '1rem' }}
                 >
                     <video ref={videoRef} autoPlay playsInline muted className={`w-full h-full object-cover transform scale-x-[-1] transition-opacity duration-300 ${isVideoMuted ? 'opacity-0' : 'opacity-100'}`} />
@@ -328,6 +393,6 @@ export const SessionVideo: React.FC<SessionVideoProps> = ({
                     <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-0.5 rounded text-[10px] font-bold text-white backdrop-blur-sm pointer-events-none">Você</div>
                 </DraggablePip>
             </div>
-        </div>
+        </DraggablePip>
     );
 };

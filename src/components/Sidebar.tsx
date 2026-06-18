@@ -19,7 +19,9 @@ import {
   BarChart2,
   MessageSquareHeart,
   Lock,
-  Globe
+  Globe,
+  Network,
+  CheckCircle2
 } from 'lucide-react';
 import { AppView, NavItem } from 'types';
 import UpgradeModal from './Shared/UpgradeModal';
@@ -70,6 +72,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: AppView.AGENDA,    label: 'Agenda',              icon: Calendar },
     { id: AppView.PATIENTS,  label: 'Clientes',            icon: Users },
     { id: AppView.THERAPY,   label: 'Sessão TeraNexus',    icon: BrainCircuit },
+    { id: AppView.NETWORK,   label: 'Rede de Transbordo',  icon: Network },
     { id: AppView.FINANCIAL, label: 'Financeiro',          icon: Wallet },
     { id: AppView.MARKETING, label: 'Marketing & CRM',     icon: Megaphone },
     { id: AppView.SITE_BUILDER, label: 'Site Profissional', icon: Globe },
@@ -88,7 +91,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   // Determine width classes based on state
   const desktopWidthClass = isDesktopCollapsed ? 'md:w-20' : 'md:w-72';
-  const mobileTransformClass = isMobileOpen ? 'translate-x-0' : '-translate-x-full';
+  const mobileTransformClass = isMobileOpen ? 'translate-y-0' : 'translate-y-full';
 
   const getInitials = (name: string) => {
     return name
@@ -106,10 +109,11 @@ const Sidebar: React.FC<SidebarProps> = ({
     <>
       <aside
         className={`
-          fixed inset-y-0 left-0 z-50 
-          bg-slate-900 dark:bg-slate-950 text-white shadow-2xl 
+          fixed inset-x-0 bottom-0 z-50 
+          bg-slate-900 dark:bg-slate-950 text-white shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.5)]
           transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]
-          w-[85vw] max-w-[300px] sm:w-72 border-r border-slate-800 dark:border-slate-900
+          w-full rounded-t-3xl max-h-[85vh]
+          md:rounded-none md:max-h-none md:inset-y-0 md:left-0 md:bottom-auto md:w-72 md:border-r md:border-slate-800 md:dark:border-slate-900
           md:static md:shadow-none md:transform-none md:h-screen
           ${mobileTransformClass}
           ${desktopWidthClass}
@@ -121,20 +125,26 @@ const Sidebar: React.FC<SidebarProps> = ({
           {/* Mobile Close Button */}
           <button
             onClick={toggleMobile}
-            className="md:hidden p-2 text-slate-400 hover:text-white active:scale-95 transition-transform"
+            className="md:hidden p-2 text-slate-400 hover:text-white active:scale-95 transition-transform z-10"
           >
             <X size={24} />
           </button>
 
           {/* Logo Content */}
-          <div className={`flex items-center gap-3 ${isDesktopCollapsed ? 'md:hidden' : 'flex'}`}>
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden shadow-lg shadow-primary-500/20">
+          <div className={`flex-1 flex items-center justify-center md:justify-center gap-3 ${isDesktopCollapsed ? 'md:gap-0' : 'md:gap-3'}`}>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden shadow-lg shadow-primary-500/20 shrink-0">
               <img src="/logo-new.jpg" alt="TeraNexus" className="w-full h-full object-cover" />
             </div>
-            <span className="font-bold text-xl tracking-tight">
+            <span className={`
+              font-bold text-xl tracking-tight transition-all duration-300 whitespace-nowrap
+              ${isDesktopCollapsed ? 'md:w-0 md:opacity-0 md:overflow-hidden' : 'md:opacity-100'}
+            `}>
               Tera<span className="text-primary-500 dark:text-secondary-400">Nexus</span>
             </span>
           </div>
+          
+          {/* Mobile Spacer to balance the Close button */}
+          <div className="w-10 md:hidden" />
 
           {/* Desktop Collapse Toggle */}
           <button
@@ -147,7 +157,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Navigation Items */}
-        <nav className="flex-1 py-6 px-3 space-y-2 overflow-y-auto">
+        <nav className="flex-1 py-6 px-4 overflow-y-auto grid grid-cols-3 gap-3 content-start md:flex md:flex-col md:space-y-2 md:grid-cols-none md:gap-0 md:px-3">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentView === item.id;
@@ -167,29 +177,29 @@ const Sidebar: React.FC<SidebarProps> = ({
                 id={TOUR_IDS[item.id]}
                 onClick={handleClick}
                 className={`
-                  w-full flex items-center gap-4 px-3 py-3.5 md:py-3 rounded-xl transition-all duration-200 group
+                  w-full flex flex-col md:flex-row items-center justify-center md:justify-start gap-2 ${isDesktopCollapsed ? 'md:gap-0' : 'md:gap-4'} p-3 md:py-3 rounded-2xl md:rounded-xl transition-all duration-200 group
                   touch-manipulation relative
                   ${isActive && !isLocked
-                    ? 'bg-primary-600 dark:bg-secondary-600 text-white shadow-lg shadow-primary-600/20 dark:shadow-secondary-600/20'
+                    ? 'bg-primary-600 dark:bg-primary-600 text-white shadow-lg shadow-primary-600/20'
                     : isLocked
-                      ? 'text-slate-500 hover:bg-slate-800/50 dark:hover:bg-slate-900/50 cursor-not-allowed opacity-60'
-                      : 'text-slate-400 hover:bg-slate-800 dark:hover:bg-slate-900 hover:text-white'}
+                      ? 'bg-slate-100/50 dark:bg-slate-800/30 md:bg-transparent text-slate-500 hover:bg-slate-800/50 dark:hover:bg-slate-900/50 cursor-not-allowed opacity-60'
+                      : 'bg-slate-50 dark:bg-slate-800/50 md:bg-transparent text-slate-600 md:text-slate-400 hover:bg-slate-100 md:hover:bg-slate-800 dark:hover:bg-slate-900 hover:text-slate-900 md:hover:text-white'}
                   ${isDesktopCollapsed ? 'md:justify-center md:px-0' : ''}
                 `}
                 title={isDesktopCollapsed ? item.label : (isLocked ? `${item.label} (Plano Profissional)` : '')}
               >
-                <Icon size={24} className={`shrink-0 ${isActive && !isLocked ? 'text-white' : isLocked ? 'text-slate-500' : 'text-slate-400 group-hover:text-white'} md:w-[22px] md:h-[22px]`} />
+                <Icon size={24} className={`shrink-0 ${isActive && !isLocked ? 'text-white' : isLocked ? 'text-slate-500' : 'text-slate-500 md:text-slate-400 group-hover:text-primary-600 md:group-hover:text-white'} md:w-[22px] md:h-[22px]`} />
 
                 <span className={`
-                  whitespace-nowrap font-medium text-base md:text-sm transition-all duration-300 flex-1 text-left
-                  ${isDesktopCollapsed ? 'md:w-0 md:opacity-0 md:overflow-hidden' : 'md:w-auto md:opacity-100'}
+                  text-center md:text-left text-[11px] md:text-sm font-semibold md:font-medium leading-tight transition-all duration-300 flex-1 md:w-auto whitespace-nowrap
+                  ${isDesktopCollapsed ? 'md:w-0 md:opacity-0 md:overflow-hidden md:flex-none' : 'md:opacity-100'}
                 `}>
                   {item.label}
                 </span>
 
                 {/* Lock icon for restricted items */}
                 {isLocked && !isDesktopCollapsed && (
-                  <Lock size={14} className="text-slate-500 shrink-0" />
+                  <Lock size={12} className="absolute top-2 right-2 md:static text-slate-400 md:text-slate-500 shrink-0" />
                 )}
               </button>
             );
@@ -262,7 +272,12 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
 
             <div className={`flex flex-col min-w-0 transition-opacity duration-200 ${isDesktopCollapsed ? 'md:hidden' : 'flex'}`}>
-              <span className="text-sm font-medium text-white truncate">{userName}</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-medium text-white truncate">{userName}</span>
+                {user?.user_metadata?.is_verified && (
+                  <span title="Terapeuta Verificado" className="flex items-center"><CheckCircle2 size={14} className="text-green-500 shrink-0" /></span>
+                )}
+              </div>
               <span className="text-xs text-slate-400 truncate">Terapeuta TRG</span>
             </div>
 

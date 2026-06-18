@@ -271,26 +271,31 @@ export const api = {
         const transactions = transactionsRes.data ?? [];
         const summary = summaryRes.data;
 
-        // Monta timeline combinada (sessões + financeiro)
-        const timeline = [
-          ...appointments.map((a: any) => ({
+        // Monta timeline (Apenas sessões)
+        const timeline = appointments.map((a: any) => {
+          let desc = a.notes || a.session_data?.notes || 'Sem anotações';
+          // Tenta parsear caso seja um JSON salvo diretamente
+          if (typeof desc === 'string' && desc.trim().startsWith('{')) {
+            try {
+              const parsed = JSON.parse(desc);
+              // Caso o JSON não tenha um campo `notes`, usamos uma descrição padrão
+              desc = parsed.notes || 'Sessão registrada (Estrutura de dados salva)';
+            } catch (e) {
+              // Se não for JSON válido, mantém a string original
+            }
+          } else if (typeof desc === 'object') {
+            desc = desc.notes || 'Sessão registrada (Estrutura de dados salva)';
+          }
+
+          return {
             id: a.id,
             type: 'session',
             date: a.date,
             title: `Sessão — ${a.type || 'TRG'}`,
-            desc: a.notes || a.session_data?.notes || 'Sem anotações',
+            desc,
             sessionData: a.session_data || {},
-          })),
-          ...transactions
-            .filter((t: Transaction) => t.type === 'income')
-            .map((t: Transaction) => ({
-              id: t.id,
-              type: 'financial',
-              date: t.date,
-              title: `Pagamento — ${t.category}`,
-              desc: `R$ ${Number(t.amount).toFixed(2)} · ${t.status === 'paid' ? 'Pago' : 'Pendente'}`,
-            })),
-        ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          };
+        }).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         return {
           timeline,

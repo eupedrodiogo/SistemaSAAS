@@ -231,7 +231,7 @@ const ClientsList: React.FC<PatientsListProps> = ({ highlightPatientId, onNaviga
       try {
         const newClient = await api.patients.create({
           ...editForm,
-          status: editForm.status || 'active',
+          status: editForm.status || 'Ativo',
         });
         if (newClient) {
           setPatients(prev => [newClient, ...prev]);
@@ -243,9 +243,13 @@ const ClientsList: React.FC<PatientsListProps> = ({ highlightPatientId, onNaviga
       }
     } else if (editingClient && editForm) {
       try {
-        const updated = await api.patients.update(editingClient.id, editForm);
+        // Remove os campos virtuais antes de enviar para o banco de dados
+        const { total_invested, pending_amount, nextSession, ...updateData } = editForm as any;
+        
+        const updated = await api.patients.update(editingClient.id, updateData);
         if (updated) {
-          setPatients(prev => prev.map(p => p.id === editingClient.id ? updated : p));
+          // Mantém os campos virtuais existentes no estado local
+          setPatients(prev => prev.map(p => p.id === editingClient.id ? { ...p, ...updated } : p));
           setEditingClient(null);
         }
       } catch (error) {
@@ -256,7 +260,7 @@ const ClientsList: React.FC<PatientsListProps> = ({ highlightPatientId, onNaviga
   };
 
   const handleAddNewClient = () => {
-    setEditForm({ name: '', email: '', phone: '', status: 'active' });
+    setEditForm({ name: '', email: '', phone: '', status: 'Ativo' });
     setIsAddingClient(true);
   };
 
@@ -756,107 +760,110 @@ const ClientsList: React.FC<PatientsListProps> = ({ highlightPatientId, onNaviga
               )}
 
               {activeTab === 'history' && (
-                <div className="space-y-6 animate-fade-in">
-                  {/* SUD Chart Section */}
-                  <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm relative z-20">
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                        <Activity size={16} className="text-indigo-500" />
-                        Monitoramento de SUD (Nível de Desconforto)
+                <div className="space-y-4 animate-fade-in">
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Activity size={16} className="text-primary-500 dark:text-secondary-400" />
+                      <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                        Histórico de Sessões
                       </h3>
-                      <button
-                        onClick={() => setIsSUDModalOpen(true)}
-                        className="text-xs bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-bold px-3 py-1.5 rounded-lg transition-colors border border-indigo-200 dark:border-indigo-800"
-                      >
-                        + Novo Registro
-                      </button>
+                      {!loadingDetails && (clientDetails?.timeline?.length || 0) > 0 && (
+                        <span className="px-2 py-0.5 rounded-full bg-primary-100 dark:bg-secondary-900/30 text-primary-700 dark:text-secondary-400 text-xs font-bold">
+                          {clientDetails.timeline.length} sessão(ões)
+                        </span>
+                      )}
                     </div>
-
-                    {sudHistory.length > 0 ? (
-                      <div className="h-[200px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={sudHistory}>
-                            <defs>
-                              <linearGradient id="colorSud" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                                <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.3} />
-                            <XAxis
-                              dataKey="date"
-                              tickFormatter={(date) => new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                              axisLine={false}
-                              tickLine={false}
-                              tick={{ fontSize: 10, fill: '#94a3b8' }}
-                              dy={10}
-                            />
-                            <YAxis
-                              domain={[0, 10]}
-                              axisLine={false}
-                              tickLine={false}
-                              tick={{ fontSize: 10, fill: '#94a3b8' }}
-                            />
-                            <Tooltip
-                              contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: '#1e293b', color: '#fff' }}
-                              labelFormatter={(date) => new Date(date).toLocaleDateString('pt-BR')}
-                            />
-                            <Area
-                              type="monotone"
-                              dataKey="score"
-                              stroke="#6366f1"
-                              strokeWidth={3}
-                              fillOpacity={1}
-                              fill="url(#colorSud)"
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      </div>
-                    ) : (
-                      <div className="h-[150px] flex flex-col items-center justify-center text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-900/50">
-                        <Activity size={32} className="mb-2 opacity-20" />
-                        <p className="text-sm">Sem registros de SUD ainda.</p>
-                        <button
-                          onClick={() => setIsSUDModalOpen(true)}
-                          className="mt-2 text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-bold"
-                        >
-                          Registrar primeiro ponto
-                        </button>
-                      </div>
-                    )}
                   </div>
 
-                  <div className="relative space-y-6">
-                    {/* Vertical Line */}
-                    <div className="absolute left-[19px] top-2 bottom-0 w-px bg-slate-200 dark:bg-slate-800"></div>
-
-                    {loadingDetails ? <p className="p-4 text-slate-500">Carregando histórico...</p> : clientDetails.timeline.length === 0 ? <p className="p-4 text-slate-500">Nenhum histórico encontrado.</p> : clientDetails.timeline.map((event: any) => (
-                      <div
-                        key={event.id}
-                        className={`flex gap-4 relative ${event.type === 'session' ? 'cursor-pointer group' : ''}`}
-                        onClick={() => event.type === 'session' ? setViewingSession(event) : null}
-                      >
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border-4 border-white dark:border-slate-900 z-10 transition-transform ${event.type === 'session' ? 'group-hover:scale-110' : ''} ${event.type === 'session' ? 'bg-primary-100 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400' :
-                          event.type === 'financial' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' :
-                            'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                          }`}>
-                          {event.type === 'session' ? <Briefcase size={16} /> : event.type === 'financial' ? <DollarSign size={16} /> : <MessageCircle size={16} />}
+                  {/* Loading State */}
+                  {loadingDetails && (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map(i => (
+                        <div key={i} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-800 p-5 animate-pulse">
+                          <div className="flex gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-700 shrink-0" />
+                            <div className="flex-1 space-y-2">
+                              <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded w-1/3" />
+                              <div className="h-3 bg-slate-100 dark:bg-slate-700 rounded w-2/3" />
+                              <div className="h-3 bg-slate-100 dark:bg-slate-700 rounded w-1/2" />
+                            </div>
+                          </div>
                         </div>
-                        <div className="pt-1 pb-6">
-                          <span className="text-xs font-bold text-slate-400">{new Date(event.date).toLocaleDateString('pt-BR')}</span>
-                          <h4 className={`font-bold text-slate-800 dark:text-white mt-0.5 ${event.type === 'session' ? 'group-hover:text-primary-600 dark:group-hover:text-secondary-400 transition-colors' : ''}`}>
-                            {event.title}
-                          </h4>
-                          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{event.desc}</p>
-                          {event.type === 'session' && (
-                            <span className="inline-flex items-center gap-1 mt-2 text-xs font-bold text-primary-600 dark:text-secondary-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                              Ver Detalhes <ChevronRight size={12} />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Empty State */}
+                  {!loadingDetails && (clientDetails?.timeline?.length || 0) === 0 && (
+                    <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                      <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-full mb-4">
+                        <Calendar size={32} className="text-slate-400" />
+                      </div>
+                      <p className="font-bold text-slate-600 dark:text-slate-300">Nenhuma sessão registrada</p>
+                      <p className="text-sm text-slate-400 mt-1">As sessões concluídas aparecerão aqui.</p>
+                    </div>
+                  )}
+
+                  {/* Session Cards */}
+                  {!loadingDetails && (clientDetails?.timeline || []).map((event: any, index: number) => (
+                    <div
+                      key={event.id}
+                      className="group bg-white dark:bg-slate-800/80 rounded-xl border border-slate-100 dark:border-slate-700/50 shadow-sm hover:shadow-md hover:border-primary-200 dark:hover:border-secondary-700/50 transition-all cursor-pointer"
+                      onClick={() => setViewingSession(event)}
+                    >
+                      <div className="p-5 flex gap-4">
+                        {/* Session Number Badge */}
+                        <div className="shrink-0 w-12 h-12 rounded-xl bg-primary-50 dark:bg-primary-900/20 border border-primary-100 dark:border-primary-800/30 flex flex-col items-center justify-center group-hover:bg-primary-100 dark:group-hover:bg-primary-900/40 transition-colors">
+                          <span className="text-[10px] font-bold text-primary-400 dark:text-primary-500 uppercase leading-none">Nº</span>
+                          <span className="text-lg font-black text-primary-600 dark:text-secondary-400 leading-none">
+                            {(clientDetails?.timeline?.length || 0) - index}
+                          </span>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2 flex-wrap">
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-slate-800 dark:text-white text-sm group-hover:text-primary-600 dark:group-hover:text-secondary-400 transition-colors">
+                                  {event.title}
+                                </span>
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/30">
+                                  TRG
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Clock size={11} className="text-slate-400 shrink-0" />
+                                <span className="text-xs text-slate-400">
+                                  {new Date(event.date).toLocaleDateString('pt-BR', {
+                                    weekday: 'long',
+                                    day: '2-digit',
+                                    month: 'long',
+                                    year: 'numeric'
+                                  })}
+                                </span>
+                              </div>
+                            </div>
+                            <span className="inline-flex items-center gap-1 text-xs font-bold text-primary-500 dark:text-secondary-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                              Ver detalhes <ChevronRight size={12} />
                             </span>
+                          </div>
+
+                          {/* Notes Preview */}
+                          {event.desc && event.desc !== 'Sem anotações' && (
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 line-clamp-2 leading-relaxed bg-slate-50 dark:bg-slate-900/50 px-3 py-2 rounded-lg border border-slate-100 dark:border-slate-800">
+                              <span className="font-semibold text-slate-600 dark:text-slate-300">Anotações: </span>
+                              {event.desc}
+                            </p>
+                          )}
+                          {(!event.desc || event.desc === 'Sem anotações') && (
+                            <p className="text-xs text-slate-400 mt-2 italic">Sem anotações registradas para esta sessão.</p>
                           )}
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -880,7 +887,7 @@ const ClientsList: React.FC<PatientsListProps> = ({ highlightPatientId, onNaviga
                       Histórico de Transações
                     </div>
                     <div className="divide-y divide-slate-100 dark:divide-slate-700">
-                      {clientDetails.financial.history.length === 0 ? <p className="p-4 text-slate-500 text-sm">Nenhuma transação registrada.</p> : clientDetails.financial.history.map((t: any) => (
+                      {(clientDetails?.financial?.history?.length || 0) === 0 ? <p className="p-4 text-slate-500 text-sm">Nenhuma transação registrada.</p> : (clientDetails?.financial?.history || []).map((t: any) => (
                         <div key={t.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                           <div>
                             <p className="font-bold text-slate-800 dark:text-white text-sm">{t.desc}</p>

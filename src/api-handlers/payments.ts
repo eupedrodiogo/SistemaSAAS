@@ -46,7 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
 
             const sessionParams: Stripe.Checkout.SessionCreateParams = {
-                payment_method_types: ['card', 'pix'],
+                // payment_method_types omitido para usar a configuração do Dashboard do Stripe automaticamente
                 line_items: [lineItem],
                 mode: mode as Stripe.Checkout.Session.Mode,
                 success_url: successUrl,

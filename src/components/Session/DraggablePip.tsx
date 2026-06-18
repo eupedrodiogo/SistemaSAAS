@@ -1,30 +1,60 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 
 interface DraggablePipProps {
     children: React.ReactNode;
     className?: string;
-    containerRef: React.RefObject<HTMLElement | null>;
+    containerRef?: React.RefObject<HTMLElement | null>;
     defaultPosition?: { top?: number | string; right?: number | string; bottom?: number | string; left?: number | string };
+    disabled?: boolean;
+    style?: React.CSSProperties;
+    onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
+    onMouseMove?: (e: React.MouseEvent<HTMLDivElement>) => void;
 }
 
-export const DraggablePip: React.FC<DraggablePipProps> = ({ children, className = '', containerRef, defaultPosition }) => {
+export const DraggablePip = forwardRef<HTMLDivElement, DraggablePipProps>(({ 
+    children, 
+    className = '', 
+    containerRef, 
+    defaultPosition,
+    disabled = false,
+    style,
+    onClick,
+    onMouseMove
+}, ref) => {
     const pipRef = useRef<HTMLDivElement>(null);
+    useImperativeHandle(ref, () => pipRef.current as HTMLDivElement);
+
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [size, setSize] = useState({ width: 0, height: 0 }); // 0 means default
-    const draggingInfo = useRef({ isDragging: false, startX: 0, startY: 0, initX: 0, initY: 0, bounds: { minX: -1000, maxX: 1000, minY: -1000, maxY: 1000 } });
+    const draggingInfo = useRef({ isDragging: false, startX: 0, startY: 0, initX: 0, initY: 0, bounds: { minX: -5000, maxX: 5000, minY: -5000, maxY: 5000 } });
     const resizeInfo = useRef({ isResizing: false, startX: 0, startY: 0, initWidth: 0, initHeight: 0 });
 
+    useEffect(() => {
+        if (disabled) {
+            setPosition({ x: 0, y: 0 });
+            setSize({ width: 0, height: 0 });
+        }
+    }, [disabled]);
+
     const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-        if (!containerRef.current || !pipRef.current) return;
+        if (disabled || !pipRef.current) return;
         
-        const containerRect = containerRef.current.getBoundingClientRect();
+        let minX = -5000, maxX = 5000, minY = -5000, maxY = 5000;
         const pipRect = pipRef.current.getBoundingClientRect();
 
-        // Calculate maximum movement allowed in each direction based on current position and container
-        const minX = containerRect.left - pipRect.left + position.x;
-        const maxX = containerRect.right - pipRect.right + position.x;
-        const minY = containerRect.top - pipRect.top + position.y;
-        const maxY = containerRect.bottom - pipRect.bottom + position.y;
+        if (containerRef && containerRef.current) {
+            const containerRect = containerRef.current.getBoundingClientRect();
+            minX = containerRect.left - pipRect.left + position.x;
+            maxX = containerRect.right - pipRect.right + position.x;
+            minY = containerRect.top - pipRect.top + position.y;
+            maxY = containerRect.bottom - pipRect.bottom + position.y;
+        } else {
+            // Fallback to window bounds with a margin
+            minX = 0 - pipRect.left + position.x;
+            maxX = window.innerWidth - pipRect.right + position.x;
+            minY = 0 - pipRect.top + position.y;
+            maxY = window.innerHeight - pipRect.bottom + position.y;
+        }
 
         draggingInfo.current = {
             isDragging: true,
@@ -39,14 +69,13 @@ export const DraggablePip: React.FC<DraggablePipProps> = ({ children, className 
     };
 
     const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-        if (!draggingInfo.current.isDragging) return;
+        if (disabled || !draggingInfo.current.isDragging) return;
         
         let newX = draggingInfo.current.initX + (e.clientX - draggingInfo.current.startX);
         let newY = draggingInfo.current.initY + (e.clientY - draggingInfo.current.startY);
 
         const { minX, maxX, minY, maxY } = draggingInfo.current.bounds;
         
-        // Clamp to container bounds
         newX = Math.max(minX, Math.min(maxX, newX));
         newY = Math.max(minY, Math.min(maxY, newY));
 
@@ -54,13 +83,13 @@ export const DraggablePip: React.FC<DraggablePipProps> = ({ children, className 
     };
 
     const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-        if (!draggingInfo.current.isDragging) return;
+        if (disabled || !draggingInfo.current.isDragging) return;
         draggingInfo.current.isDragging = false;
         e.currentTarget.releasePointerCapture(e.pointerId);
     };
 
     const onResizeStart = (e: React.PointerEvent<HTMLDivElement>) => {
-        if (!pipRef.current) return;
+        if (disabled || !pipRef.current) return;
         e.stopPropagation();
         const rect = pipRef.current.getBoundingClientRect();
         resizeInfo.current = {
@@ -74,68 +103,72 @@ export const DraggablePip: React.FC<DraggablePipProps> = ({ children, className 
     };
 
     const onResizeMove = (e: React.PointerEvent<HTMLDivElement>) => {
-        if (!resizeInfo.current.isResizing) return;
+        if (disabled || !resizeInfo.current.isResizing) return;
         e.stopPropagation();
         
-        // Let's only change width, the height will scale automatically with aspect-ratio
         let newWidth = resizeInfo.current.initWidth + (e.clientX - resizeInfo.current.startX);
-        newWidth = Math.max(80, newWidth); // min 80px
+        newWidth = Math.max(80, newWidth); 
         
-        // Optional: limit max width to window innerWidth or container
-        if (containerRef.current) {
-            const maxW = containerRef.current.getBoundingClientRect().width * 0.8;
+        if (containerRef && containerRef.current) {
+            const maxW = containerRef.current.getBoundingClientRect().width * 0.9;
             newWidth = Math.min(newWidth, maxW);
+        } else {
+            newWidth = Math.min(newWidth, window.innerWidth * 0.9);
         }
 
         setSize({ width: newWidth, height: 0 });
     };
 
     const onResizeEnd = (e: React.PointerEvent<HTMLDivElement>) => {
-        if (!resizeInfo.current.isResizing) return;
+        if (disabled || !resizeInfo.current.isResizing) return;
         e.stopPropagation();
         resizeInfo.current.isResizing = false;
         e.currentTarget.releasePointerCapture(e.pointerId);
     };
 
-    // If window resizes, we might want to reset or re-clamp, but resetting is easier
     useEffect(() => {
         const handleResize = () => {
-            setPosition({ x: 0, y: 0 });
-            // keep size if user wants, or reset it:
-            // setSize({ width: 0, height: 0 });
+            if (!disabled) {
+                // Ao rotacionar ou redimensionar a tela, voltamos a zero para evitar que saia da tela
+                setPosition({ x: 0, y: 0 });
+            }
         };
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
-    }, []);
+    }, [disabled]);
 
     return (
         <div 
             ref={pipRef}
+            onClick={onClick}
+            onMouseMove={onMouseMove}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
-            className={`cursor-grab active:cursor-grabbing select-none ${className}`}
+            className={`${!disabled ? 'cursor-grab active:cursor-grabbing' : ''} select-none ${className}`}
             style={{ 
+                ...style,
                 ...defaultPosition,
-                transform: `translate(${position.x}px, ${position.y}px)`,
-                width: size.width > 0 ? `${size.width}px` : undefined,
-                touchAction: 'none' // Prevent scrolling while dragging on mobile
+                transform: !disabled ? `translate(${position.x}px, ${position.y}px)` : undefined,
+                width: (!disabled && size.width > 0) ? `${size.width}px` : undefined,
+                touchAction: !disabled ? 'none' : undefined 
             }}
         >
             {children}
             
-            {/* Resize handle */}
-            <div 
-                className="absolute bottom-0 right-0 w-8 h-8 bg-transparent cursor-nwse-resize z-50 flex items-end justify-end p-1.5"
-                onPointerDown={onResizeStart}
-                onPointerMove={onResizeMove}
-                onPointerUp={onResizeEnd}
-                onPointerCancel={onResizeEnd}
-            >
-                {/* Visual indicator for resize handle */}
-                <div className="w-3 h-3 border-r-2 border-b-2 border-white/50 rounded-br-sm shadow-sm" />
-            </div>
+            {!disabled && (
+                <div 
+                    className="absolute bottom-0 right-0 w-8 h-8 bg-transparent cursor-nwse-resize z-50 flex items-end justify-end p-1.5"
+                    onPointerDown={onResizeStart}
+                    onPointerMove={onResizeMove}
+                    onPointerUp={onResizeEnd}
+                    onPointerCancel={onResizeEnd}
+                >
+                    <div className="w-3 h-3 border-r-2 border-b-2 border-white/50 rounded-br-sm shadow-sm" />
+                </div>
+            )}
         </div>
     );
-};
+});
+

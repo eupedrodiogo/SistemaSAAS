@@ -40,7 +40,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             // 1. Busca o agendamento para pegar therapist_id
             const { data: appt, error: apptError } = await supabaseAdmin
                 .from('appointments')
-                .select('id, therapist_id, patient_id, patient_name')
+                .select('id, therapist_id, patient_id, date, time')
                 .eq('id', appointmentId)
                 .single();
 
@@ -109,15 +109,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 }
             }
 
-            // 4. Atualiza o agendamento com o patient_id e nome real
+            // 4. Atualiza o agendamento com o patient_id
             await supabaseAdmin
                 .from('appointments')
                 .update({
                     patient_id: finalPatientId,
-                    patient_name: finalPatientName,
                     status: 'scheduled'
                 })
                 .eq('id', appointmentId);
+
+            // 5. Enviar Notificação para o Terapeuta
+            try {
+                // Obter dados adicionais do terapeuta
+                const { data: therapistData } = await supabaseAdmin
+                    .from('therapists')
+                    .select('name, email, phone')
+                    .eq('id', appt.therapist_id)
+                    .single();
+
+                if (therapistData) {
+                    const { sendBookingNotification } = await import('../utils/notifications.js');
+                    await sendBookingNotification({
+                        name: finalPatientName,
+                        email: cleanEmail,
+                        phone: '', // Paciente Anjo pode não ter telefone preenchido neste passo
+                        date: appt.date || new Date().toISOString().split('T')[0],
+                        time: appt.time || 'A definir',
+                        therapistName: therapistData.name,
+                        therapistEmail: therapistData.email,
+                        therapistPhone: therapistData.phone,
+                        mainComplaint: 'Sessão Anjo (Gratuita)',
+                        location: 'Sessão Online'
+                    });
+                }
+            } catch (notifyErr) {
+                console.error('Erro ao notificar terapeuta sobre Sessão Anjo:', notifyErr);
+            }
 
             return res.status(200).json({
                 success: true,

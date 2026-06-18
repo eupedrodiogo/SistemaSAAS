@@ -62,7 +62,9 @@ const BookingWizard: React.FC = () => {
                     setFormData(prev => ({
                         ...prev,
                         price: prev.isAnjo ? 0 : (therapist.price || 100), // Default to 100 if not set
-                        therapistName: therapist.name
+                        therapistName: therapist.name,
+                        pixKey: therapist.pix_key || therapist.pixKey || '',
+                        pixType: therapist.pix_type || therapist.pixType || 'cpf',
                     }));
                 }
             } catch (error) {
@@ -214,7 +216,8 @@ const BookingWizard: React.FC = () => {
         if (isCompleted && !(formData as any).isAnjo) {
             const timer = setTimeout(() => {
                 // Redirect to login page so client can set up credentials
-                window.location.href = '/portal-paciente/cadastro';
+                const emailParam = (formData as any).email ? `?email=${encodeURIComponent((formData as any).email)}&name=${encodeURIComponent((formData as any).name || '')}&appointmentId=${appointmentId || ''}` : '';
+                window.location.href = `/portal-paciente/cadastro${emailParam}`;
             }, 6000); // 6 seconds
             return () => clearTimeout(timer);
         }
@@ -254,7 +257,7 @@ const BookingWizard: React.FC = () => {
                             </div>
                             
                             <a
-                                href="/portal-paciente/cadastro"
+                                href={`/portal-paciente/cadastro?email=${encodeURIComponent((formData as any).email || '')}&name=${encodeURIComponent((formData as any).name || '')}&appointmentId=${appointmentId || ''}`}
                                 className="block w-full py-4 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-primary-500/30 hover:shadow-primary-500/40"
                             >
                                 Sim, criar conta e acessar recursos
@@ -275,7 +278,7 @@ const BookingWizard: React.FC = () => {
                             </div>
 
                             <a
-                                href="/portal-paciente/cadastro"
+                                href={`/portal-paciente/cadastro?email=${encodeURIComponent((formData as any).email || '')}&name=${encodeURIComponent((formData as any).name || '')}&appointmentId=${appointmentId || ''}`}
                                 className="block w-full py-4 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-primary-500/30 mb-3"
                             >
                                 Acessar Portal Agora

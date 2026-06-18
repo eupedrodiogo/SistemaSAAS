@@ -19,12 +19,16 @@ const ClientRegister: React.FC = () => {
         const params = new URLSearchParams(window.location.search);
         const apptId = params.get('appointmentId');
         const urlEmail = params.get('email');
+        const urlName = params.get('name');
         if (apptId) {
             setAppointmentId(apptId);
             setIsAnjoFlow(true);
         }
         if (urlEmail) {
             setEmail(urlEmail);
+        }
+        if (urlName) {
+            setName(urlName);
         }
 
         // Try to get patient ID from localStorage (set during booking)
@@ -130,7 +134,7 @@ const ClientRegister: React.FC = () => {
                 {/* Card */}
                 <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-2xl">
                     <h1 className="text-2xl font-bold text-slate-800 dark:text-white mb-2 text-center">
-                        {isAnjoFlow ? '💗 Criar Conta Anjo' : 'Crie sua Senha'}
+                        {isAnjoFlow ? 'Criar Conta' : 'Crie sua Senha'}
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400 text-center mb-6">
                         {isAnjoFlow

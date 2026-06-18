@@ -1,6 +1,8 @@
 import nodemailer from 'nodemailer';
 import { WHATSAPP_TEMPLATES } from '../notifications/templates.js';
-// removed twilio import as it was unused in the original file view or replaced by Meta API logic
+import { sendZApiMessage } from './zapi.js';
+// Z-API é o canal principal de WhatsApp (sem templates aprovados)
+// Meta WhatsApp API permanece como fallback para booking notifications
 
 
 interface BookingNotificationData {
@@ -223,40 +225,55 @@ export async function sendBookingNotification(data: BookingNotificationData) {
         result.error = error.message || error;
     }
 
-    // 2. WhatsApp Notification (Meta WhatsApp API)
+    // 2. WhatsApp via Z-API — Confirmação de Agendamento
     try {
-        const { therapistPhone, name, date, time, therapistName, mainComplaint } = data as any;
+        const { therapistPhone, name, date, time, therapistName } = data as any;
 
-        // A. Client Message
+        // A. Mensagem para o Cliente
         if (data.phone) {
-            const template = WHATSAPP_TEMPLATES.SESSION_NOTIFICATION_CLIENT(
-                name,
-                therapistName || 'Terapeuta TRG',
-                date,
-                time
-            );
-            await sendMetaWhatsApp(data.phone, template.name, template.language.code, template.components);
+            const clientMsg =
+                `📅 *TeraNexus — Agendamento Confirmado!*\n\n` +
+                `Olá, *${name}*! Seu agendamento foi confirmado com sucesso.\n\n` +
+                `*Detalhes da Sessão:*\n` +
+                `📆 Data: *${date}*\n` +
+                `⏰ Horário: *${time}*\n` +
+                `👤 Terapeuta: *${therapistName || 'TeraNexus'}*\n\n` +
+                `🔗 Acesse seu portal:\n` +
+                `https://www.teranexus.com.br/portal-paciente/dashboard\n\n` +
+                `_Entre na sala de espera alguns minutos antes do horário._\n\n` +
+                `Até a sessão! 💙`;
+
+            await sendZApiMessage(data.phone, clientMsg);
+            console.log('[Notification] WhatsApp de confirmação enviado ao cliente:', name);
         }
 
-        // B. Therapist Message
+        // B. Mensagem para o Terapeuta
         if (therapistPhone) {
-            const template = WHATSAPP_TEMPLATES.BOOKING_CONFIRMATION(
-                therapistName || 'Terapeuta',
-                name,
-                date,
-                time
-            );
-            await sendMetaWhatsApp(therapistPhone, template.name, template.language.code, template.components);
+            const therapistMsg =
+                `📅 *TeraNexus — Novo Agendamento!*\n\n` +
+                `Olá, *${therapistName || 'Terapeuta'}*!\n\n` +
+                `Você tem um novo agendamento confirmado:\n\n` +
+                `👤 Cliente: *${name}*\n` +
+                `📆 Data: *${date}*\n` +
+                `⏰ Horário: *${time}*\n` +
+                `📞 Telefone: *${data.phone || 'Não informado'}*\n\n` +
+                `🔗 Ver na sua agenda:\n` +
+                `https://www.teranexus.com.br/dashboard\n\n` +
+                `_TeraNexus_ 💙`;
+
+            await sendZApiMessage(therapistPhone, therapistMsg);
+            console.log('[Notification] WhatsApp de confirmação enviado ao terapeuta:', therapistName);
         }
 
-        result.status = 'sent_meta_whatsapp';
+        result.status = 'sent_zapi_whatsapp';
 
     } catch (error: any) {
-        console.error('Error sending WhatsApp (Meta):', error);
-        result.status = 'error_meta';
+        console.error('[Notification] Erro ao enviar WhatsApp (Z-API):', error);
+        result.status = 'error_zapi';
         result.error = error;
     }
 }
+
 
 export async function sendBookingCancellation(data: { name: string, email: string, phone: string, date: string, time: string, therapistName?: string }) {
     console.log('[Notification] Sending Cancellation to:', data.email);
@@ -272,11 +289,30 @@ export async function sendBookingCancellation(data: { name: string, email: strin
 }
 
 export async function sendSessionReminder(data: { name: string, phone: string, date: string, time: string }) {
-    console.log('[Notification] Sending Reminder to:', data.name);
+    console.log('[Notification] Sending Reminder via Z-API to:', data.name);
 
-    if (data.phone) {
-        const template = WHATSAPP_TEMPLATES.SESSION_REMINDER_15MIN(data.name);
-        await sendMetaWhatsApp(data.phone, template.name, template.language.code, template.components);
+    if (!data.phone) return;
+
+    const message =
+        `🌿 *TeraNexus — Lembrete de Sessão*\n\n` +
+        `Olá, *${data.name}*! Tudo bem?\n\n` +
+        `⏰ Sua sessão está marcada para *hoje às ${data.time}*.\n\n` +
+        `🔗 Acesse o portal pelo link abaixo e entre na sala de espera alguns minutinhos antes:\n` +
+        `https://www.teranexus.com.br/portal-paciente/dashboard\n\n` +
+        `_Caso precise reagendar, entre em contato com seu terapeuta._\n\n` +
+        `Até logo! 💙`;
+
+    const result = await sendZApiMessage(data.phone, message);
+
+    if (!result.success) {
+        console.warn('[Notification] Z-API falhou para reminder, tentando Meta API como fallback...');
+        // Fallback: Meta API com template (requer templates aprovados)
+        try {
+            const template = WHATSAPP_TEMPLATES.SESSION_REMINDER_15MIN(data.name);
+            await sendMetaWhatsApp(data.phone, template.name, template.language.code, template.components);
+        } catch (err) {
+            console.error('[Notification] Fallback Meta API também falhou:', err);
+        }
     }
 }
 
@@ -332,6 +368,189 @@ export async function sendMetaWhatsApp(to: string, templateName: string, languag
 
     } catch (error: any) {
         console.error('Meta WhatsApp Network Error:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+// ─── E-mail Automations (Lembretes e Cobrança) ──────────────────────────────
+
+export async function sendSessionReminderEmail(data: { name: string, email: string, date: string, time: string, therapistName: string }) {
+    console.log('[Notification] Sending Session Reminder Email to:', data.email);
+
+    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        console.warn('SMTP credentials not found. Skipping reminder email.');
+        return { success: false, error: 'missing_credentials' };
+    }
+
+    try {
+        const port = Number(process.env.SMTP_PORT) || 587;
+        const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST.trim(),
+            port: port,
+            secure: port === 465,
+            auth: {
+                user: process.env.SMTP_USER.trim(),
+                pass: process.env.SMTP_PASS.trim(),
+            },
+        });
+
+        const mailOptions = {
+            from: '"TRG Nexus" <noreply@trgnexus.com>',
+            to: data.email,
+            subject: 'Lembrete: Sua Sessão é Amanhã! - TRG Nexus',
+            html: `
+                <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto;">
+                    <div style="background-color: #f8fafc; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+                        <h2 style="color: #0f172a; margin: 0;">Lembrete de Sessão 🌿</h2>
+                    </div>
+                    <div style="padding: 20px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 10px 10px;">
+                        <p>Olá, <strong>${data.name}</strong>! Tudo bem?</p>
+                        <p>Passando para lembrar que sua sessão com <strong>${data.therapistName || 'seu terapeuta'}</strong> está confirmada para amanhã!</p>
+                        
+                        <div style="background-color: #f1f5f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                            <p style="margin: 5px 0;"><strong>Data:</strong> amanhã, ${data.date}</p>
+                            <p style="margin: 5px 0;"><strong>Horário:</strong> ${data.time}</p>
+                        </div>
+
+                        <p>🔗 Acesse o portal pelo botão abaixo e entre na sala de espera alguns minutinhos antes do horário combinado:</p>
+                        
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="https://www.teranexus.com.br/portal-paciente/dashboard" style="background-color: #2563eb; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+                                Acessar Meu Portal
+                            </a>
+                        </div>
+
+                        <p><em>Caso precise reagendar, entre em contato o quanto antes.</em></p>
+                        <p>Até logo! 💙</p>
+                    </div>
+                </div>
+            `
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log('[Notification] Reminder email sent:', info.messageId);
+        return { success: true, id: info.messageId };
+    } catch (error: any) {
+        console.error('[Notification] Error sending reminder email:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+export async function sendBillingReminderEmail(data: { name: string, email: string, date: string, time: string, therapistName: string }) {
+    console.log('[Notification] Sending Billing Reminder Email to:', data.email);
+
+    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        console.warn('SMTP credentials not found. Skipping billing email.');
+        return { success: false, error: 'missing_credentials' };
+    }
+
+    try {
+        const port = Number(process.env.SMTP_PORT) || 587;
+        const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST.trim(),
+            port: port,
+            secure: port === 465,
+            auth: {
+                user: process.env.SMTP_USER.trim(),
+                pass: process.env.SMTP_PASS.trim(),
+            },
+        });
+
+        const mailOptions = {
+            from: '"TRG Nexus" <noreply@trgnexus.com>',
+            to: data.email,
+            subject: '⚠️ Pagamento Pendente - TRG Nexus',
+            html: `
+                <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto;">
+                    <div style="background-color: #fffbeb; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; border: 1px solid #fde68a;">
+                        <h2 style="color: #b45309; margin: 0;">Atenção: Pagamento Pendente</h2>
+                    </div>
+                    <div style="padding: 20px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 10px 10px;">
+                        <p>Olá, <strong>${data.name}</strong>!</p>
+                        <p>Sua sessão com <strong>${data.therapistName || 'seu terapeuta'}</strong> está pré-agendada para <strong>amanhã, ${data.date} às ${data.time}</strong>, mas notamos que o pagamento ainda não foi confirmado. 😔</p>
+                        
+                        <p>Para garantir a sua vaga na agenda, por favor realize o pagamento ou envie o comprovante (caso já tenha pago via PIX Direto) o quanto antes.</p>
+
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="https://www.teranexus.com.br/portal-paciente/dashboard" style="background-color: #ea580c; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+                                Realizar Pagamento Agora
+                            </a>
+                        </div>
+
+                        <p><em>🔗 Você também pode acessar seu agendamento no link enviado anteriormente.</em></p>
+                        <p>Equipe TeraNexus 💙</p>
+                    </div>
+                </div>
+            `
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log('[Notification] Billing email sent:', info.messageId);
+        return { success: true, id: info.messageId };
+    } catch (error: any) {
+        console.error('[Notification] Error sending billing email:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+export async function sendPaymentLinkEmail(data: { name: string, email: string, checkoutUrl: string, price: string, therapistName: string }) {
+    console.log('[Notification] Sending Payment Link Email to:', data.email);
+
+    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        console.warn('SMTP credentials not found. Skipping payment link email.');
+        return { success: false, error: 'missing_credentials' };
+    }
+
+    try {
+        const port = Number(process.env.SMTP_PORT) || 587;
+        const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST.trim(),
+            port: port,
+            secure: port === 465,
+            auth: {
+                user: process.env.SMTP_USER.trim(),
+                pass: process.env.SMTP_PASS.trim(),
+            },
+        });
+
+        const mailOptions = {
+            from: '"TRG Nexus" <noreply@trgnexus.com>',
+            to: data.email,
+            subject: 'Finalize seu Agendamento: Link de Pagamento - TRG Nexus',
+            html: `
+                <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto;">
+                    <div style="background-color: #f8fafc; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+                        <h2 style="color: #0f172a; margin: 0;">Link de Pagamento Seguro 💳</h2>
+                    </div>
+                    <div style="padding: 20px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 10px 10px;">
+                        <p>Olá, <strong>${data.name}</strong>!</p>
+                        <p>Falta muito pouco para confirmarmos o seu agendamento com <strong>${data.therapistName || 'seu terapeuta'}</strong>.</p>
+                        
+                        <div style="background-color: #f1f5f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                            <p style="margin: 5px 0;"><strong>Valor:</strong> ${data.price}</p>
+                            <p style="margin: 5px 0;"><strong>Meios Aceitos:</strong> Cartão, Boleto ou PIX (se habilitado pelo terapeuta)</p>
+                        </div>
+
+                        <p>Para garantir a sua vaga na agenda, realize o pagamento clicando no botão abaixo:</p>
+                        
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="${data.checkoutUrl}" style="background-color: #10b981; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+                                Pagar Agora com Segurança
+                            </a>
+                        </div>
+
+                        <p><em>Após a confirmação do pagamento, você receberá um recibo da plataforma.</em></p>
+                        <p>Até logo! 💙</p>
+                    </div>
+                </div>
+            `
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log('[Notification] Payment Link email sent:', info.messageId);
+        return { success: true, id: info.messageId };
+    } catch (error: any) {
+        console.error('[Notification] Error sending payment link email:', error);
         return { success: false, error: error.message };
     }
 }

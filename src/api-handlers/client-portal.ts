@@ -115,13 +115,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             
             const anamnesisData = req.body;
             
-            // Format notes for patient
-            const patientNotes = `Queixa: ${anamnesisData.complaint || 'Não informado'} | Transtornos: ${(anamnesisData.transtornos || []).map((t: any) => `${t.name} (${t.level})`).join(', ')}`;
-
-            // 1. Update patient
+            // Salva a anamnese completa em JSON no campo notes do paciente
+            // Isso garante que o terapeuta possa ler TODOS os campos preenchidos
             const { error: pUpdateError } = await supabase
                 .from('patients')
-                .update({ notes: patientNotes })
+                .update({ notes: JSON.stringify(anamnesisData) })
                 .eq('id', patientId);
 
             if (pUpdateError) throw pUpdateError;

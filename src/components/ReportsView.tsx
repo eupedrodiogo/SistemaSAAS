@@ -62,11 +62,20 @@ interface SessionRecord {
    mentalHistory?: Record<string, number[]>;
    physicalHistory?: Record<string, number[]>;
    cycleNotes?: Record<string, Record<string, string>>;
+   phaseNotes?: Record<string, Record<string, string>>;
    somaticHistory?: number[];
    thematicHistory?: number[];
    futureHistory?: number[];
    potentializationHistory?: number[];
 }
+
+// Helper to avoid timezone shifts when parsing YYYY-MM-DD strings
+const parseSafeDate = (dateStr: string | undefined | Date) => {
+   if (!dateStr) return new Date();
+   if (dateStr instanceof Date) return dateStr;
+   if (dateStr.length === 10) return new Date(`${dateStr}T12:00:00`);
+   return new Date(dateStr);
+};
 
 function SessionExpandedDetails({ record }: { record: SessionRecord }) {
    // 1. Identificar quais Fases têm dados
@@ -120,6 +129,8 @@ function SessionExpandedDetails({ record }: { record: SessionRecord }) {
          }
       };
 
+      const isPositiveScale = selectedPhase === 'Potencialização';
+
       return (
          <div className="space-y-6">
             {maxLen > 0 ? (
@@ -132,11 +143,14 @@ function SessionExpandedDetails({ record }: { record: SessionRecord }) {
                         <div key={idx} className="bg-white dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700/50 shadow-sm">
                            <p className={`text-[10px] font-bold uppercase tracking-wider mb-3 ${list.textColor}`}>{list.label} (Histórico)</p>
                            <div className="flex flex-wrap gap-2">
-                              {list.data.map((val, i) => (
-                                 <span key={i} className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-bold shadow-sm ${val >= 7 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800' : val >= 4 ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'}`}>
+                              {list.data.map((val, i) => {
+                                 const isHigh = isPositiveScale ? val < 4 : val >= 7;
+                                 const isMedium = isPositiveScale ? (val >= 4 && val <= 6) : (val >= 4 && val < 7);
+                                 return (
+                                 <span key={i} className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-bold shadow-sm ${isHigh ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800' : isMedium ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'}`}>
                                     {val}
                                  </span>
-                              ))}
+                              )})}
                               {list.data.length === 0 && <span className="text-xs text-slate-400 mt-1">Sem registros</span>}
                            </div>
                         </div>
@@ -232,21 +246,22 @@ function SessionExpandedDetails({ record }: { record: SessionRecord }) {
       let mentalData: number[] = [];
       let physicalData: number[] = [];
 
+      const r = record as any;
       if (selectedPhase === 'Somática') { 
-         mentalData = record.somaticMentalHistory || record.somaticHistory || [];
-         physicalData = record.somaticPhysicalHistory || [];
+         mentalData = r.somaticMentalHistory || r.somaticHistory || [];
+         physicalData = r.somaticPhysicalHistory || [];
       }
       if (selectedPhase === 'Temática') { 
-         mentalData = record.thematicMentalHistory || record.thematicHistory || [];
-         physicalData = record.thematicPhysicalHistory || [];
+         mentalData = r.thematicMentalHistory || r.thematicHistory || [];
+         physicalData = r.thematicPhysicalHistory || [];
       }
       if (selectedPhase === 'Futuro') { 
-         mentalData = record.futureMentalHistory || record.futureHistory || [];
-         physicalData = record.futurePhysicalHistory || [];
+         mentalData = r.futureMentalHistory || r.futureHistory || [];
+         physicalData = r.futurePhysicalHistory || [];
       }
       if (selectedPhase === 'Potencialização') { 
-         mentalData = record.potentializationMentalHistory || record.potentializationHistory || [];
-         physicalData = record.potentializationPhysicalHistory || [];
+         mentalData = r.potentializationMentalHistory || r.potentializationHistory || [];
+         physicalData = r.potentializationPhysicalHistory || [];
       }
 
       const maxLen = Math.max(mentalData.length, physicalData.length);
@@ -262,11 +277,16 @@ function SessionExpandedDetails({ record }: { record: SessionRecord }) {
 
       // O bloco de anotações (Notas Clínicas) precisa aparecer em todas as fases, conforme solicitado
       const allNotes: { ciclo: string; nota: string }[] = [];
-      if (record.cycleNotes) {
-         Object.values(record.cycleNotes).forEach((ciclos) => {
-            Object.entries(ciclos).forEach(([ciclo, nota]) => {
-               allNotes.push({ ciclo, nota });
-            });
+      const phaseKeyMap: Record<string, string> = {
+         'Somática': 'somatico',
+         'Temática': 'tematico',
+         'Futuro': 'futuro',
+         'Potencialização': 'potencializacao'
+      };
+      const pKey = phaseKeyMap[selectedPhase] || '';
+      if (pKey && record.phaseNotes && record.phaseNotes[pKey]) {
+         Object.entries(record.phaseNotes[pKey]).forEach(([ciclo, nota]) => {
+            allNotes.push({ ciclo, nota: nota as string });
          });
       }
 
@@ -321,12 +341,16 @@ function SessionExpandedDetails({ record }: { record: SessionRecord }) {
                <div>
                   <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2"><FiActivity /> SUD Final por Fase</p>
                   <div className="grid grid-cols-2 gap-3">
-                     {Object.entries(record.sudLevels).filter(([,v]) => v > 0).map(([fase, val]) => (
+                     {Object.entries(record.sudLevels).filter(([,v]) => v > 0).map(([fase, val]) => {
+                        const isPos = fase.toLowerCase().includes('potencializacao');
+                        const isHigh = isPos ? val < 4 : val >= 7;
+                        const isMed = isPos ? (val >= 4 && val <= 6) : (val >= 4 && val < 7);
+                        return (
                         <div key={fase} className="flex items-center justify-between bg-white dark:bg-slate-800 rounded-xl px-4 py-3 border border-slate-100 dark:border-slate-700 shadow-sm">
                            <span className="text-xs text-slate-500 font-bold uppercase">{fase.replace('Cronologico',' Cronológico').replace('fisico','Físico').replace('mental','Emocional')}</span>
-                           <span className={`font-black text-lg ${val >= 7 ? 'text-red-500' : val >= 4 ? 'text-amber-500' : 'text-emerald-500'}`}>{val}</span>
+                           <span className={`font-black text-lg ${isHigh ? 'text-red-500' : isMed ? 'text-amber-500' : 'text-emerald-500'}`}>{val}</span>
                         </div>
-                     ))}
+                     )})}
                   </div>
                </div>
             )}
@@ -398,6 +422,8 @@ export function ReportsView({ initialPatientId, onParamsConsumed }: ReportsViewP
                   ageRange: clinical.ageRange || a.sessionData?.selectedAgeRange,
                   mentalHistory: a.sessionData?.mentalHistory || {},
                   physicalHistory: a.sessionData?.physicalHistory || {},
+                  cycleNotes: a.sessionData?.cycleNotes || {},
+                  phaseNotes: a.sessionData?.phaseNotes || {},
                   somaticHistory: a.sessionData?.somaticHistory || [],
                   thematicHistory: a.sessionData?.thematicHistory || [],
                   futureHistory: a.sessionData?.futureHistory || [],
@@ -408,7 +434,7 @@ export function ReportsView({ initialPatientId, onParamsConsumed }: ReportsViewP
             
             // Monta os dados do gráfico a partir das sessões reais salvas
             if (records.length > 0) {
-               const labels = records.map(r => `S${r.sessionNumber} - ${new Date(r.date).toLocaleDateString()}`);
+               const labels = records.map(r => `S${r.sessionNumber} - ${parseSafeDate(r.date).toLocaleDateString()}`);
                const avgSud = records.map(r => {
                   const vals = Object.values(r.sudLevels || {}).filter((v: any) => typeof v === 'number' && v > 0) as number[];
                   return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
@@ -471,7 +497,7 @@ export function ReportsView({ initialPatientId, onParamsConsumed }: ReportsViewP
          if (sudRes.ok) {
             const sudRecords = await sudRes.json();
             // Format for Chart
-            const labels = sudRecords.map((r: any) => new Date(r.date || r.created_at).toLocaleDateString());
+            const labels = sudRecords.map((r: any) => parseSafeDate(r.date || r.created_at).toLocaleDateString());
             const data = sudRecords.map((r: any) => r.score);
             setSudLabels(labels);
             setSudData(data);
@@ -810,7 +836,7 @@ export function ReportsView({ initialPatientId, onParamsConsumed }: ReportsViewP
                               <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col justify-center">
                                  <p className="text-[10px] uppercase font-extrabold text-slate-400 mb-1">Última Sessão</p>
                                  <p className="text-xl font-black text-slate-700 dark:text-slate-200 mt-1">
-                                    {new Date(sessionHistory[0]?.date).toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric' })}
+                                    {parseSafeDate(sessionHistory[0]?.date).toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric' })}
                                  </p>
                               </div>
                               <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col justify-center">
@@ -859,7 +885,7 @@ export function ReportsView({ initialPatientId, onParamsConsumed }: ReportsViewP
                                           <p className="font-bold text-sm text-slate-700 dark:text-slate-200">Sessão #{record.sessionNumber}</p>
                                           <div className="flex items-center gap-3 mt-1">
                                              <span className="text-xs text-slate-400">
-                                                {new Date(record.date).toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric' })}
+                                                {parseSafeDate(record.date).toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric' })}
                                              </span>
                                              <span className="text-xs text-slate-400">⏱ {fmt(record.durationSeconds)}</span>
                                               {(() => {

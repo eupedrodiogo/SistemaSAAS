@@ -27,11 +27,11 @@ const AnjoInvitationPage: React.FC = () => {
                 // Verifica se é um agendamento Anjo
                 const { data: appt } = await supabase
                     .from('appointments')
-                    .select('id, date, time, therapist_id, type, therapists(name)')
+                    .select('id, date, time, therapist_id, type, session_data, therapists(name)')
                     .eq('id', paramId)
                     .single();
 
-                if (appt && (appt.type === 'Anjo' || appt.session_data?.price === 0)) {
+                if (appt && (appt.type === 'Anjo' || (appt as any).session_data?.price === 0)) {
                     setIsAnjoAppointment(true);
                     setAppointmentId(appt.id);
                     setAppointmentDate(appt.date);
@@ -73,7 +73,7 @@ const AnjoInvitationPage: React.FC = () => {
                 setSuccessMsg('Encontrando sua sala... Redirecionando...');
                 const destination = appointmentId
                     ? `/sessao-cliente/${appointmentId}`
-                    : `/sessao-cliente/${therapistId}`;
+                    : `/sessao-cliente/${paramId}`;
                 setTimeout(() => { window.location.href = destination; }, 1200);
             }
         } catch (err: any) {
