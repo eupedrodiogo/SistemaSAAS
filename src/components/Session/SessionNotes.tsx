@@ -84,7 +84,7 @@ export const SessionNotes: React.FC<SessionNotesProps> = ({ intakeData, observat
     };
 
     return (
-        <div className="p-6 space-y-8 animate-fade-in pb-20">
+        <div className="p-4 sm:p-6 space-y-6 sm:space-y-8 animate-fade-in pb-20">
             {/* Header / Context */}
             <div className="flex items-center justify-between mb-2">
                 <div>

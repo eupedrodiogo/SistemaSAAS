@@ -1632,20 +1632,20 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
 
       {/* Modal de Anamnese */}
       {isAnamneseModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl animate-fade-in-up">
-            <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-800/50 rounded-t-3xl">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <FileText className="text-indigo-400" /> Revisão da Anamnese
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 dark:bg-slate-950/80 backdrop-blur-md p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl animate-fade-in-up">
+            <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50 rounded-t-3xl">
+              <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <FileText className="text-indigo-600 dark:text-indigo-400" /> Revisão da Anamnese
               </h3>
-              <button onClick={() => setIsAnamneseModalOpen(false)} className="p-2 rounded-full hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+              <button onClick={() => setIsAnamneseModalOpen(false)} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors">
                 <X size={20} />
               </button>
             </div>
-            <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-slate-950/50">
+            <div className="p-0 sm:p-2 overflow-y-auto custom-scrollbar flex-1 bg-white dark:bg-slate-950/50">
               <SessionNotes intakeData={intakeData} observation={observation} onObservationChange={setObservation} />
             </div>
-            <div className="p-4 border-t border-slate-800 flex justify-end bg-slate-900 rounded-b-3xl">
+            <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex justify-end bg-slate-50 dark:bg-slate-900 rounded-b-3xl">
               <button onClick={() => setIsAnamneseModalOpen(false)} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-lg transition-colors">
                 Fechar e Voltar
               </button>

@@ -176,10 +176,13 @@ var init_zapi = __esm({
 // src/api-handlers/utils/notifications.ts
 var notifications_exports = {};
 __export(notifications_exports, {
+  sendBillingReminderEmail: () => sendBillingReminderEmail,
   sendBookingCancellation: () => sendBookingCancellation,
   sendBookingNotification: () => sendBookingNotification,
   sendMetaWhatsApp: () => sendMetaWhatsApp,
-  sendSessionReminder: () => sendSessionReminder
+  sendPaymentLinkEmail: () => sendPaymentLinkEmail,
+  sendSessionReminder: () => sendSessionReminder,
+  sendSessionReminderEmail: () => sendSessionReminderEmail
 });
 import nodemailer from "nodemailer";
 function generateIcsContent(data) {
@@ -266,7 +269,7 @@ async function sendBookingNotification(data) {
         }
       });
       const mailOptions = {
-        from: '"TRG Nexus" <noreply@trgnexus.com>',
+        from: `"TRG Nexus" <${process.env.SMTP_USER}>`,
         to: data.email,
         subject: "Confirma\xE7\xE3o de Agendamento - TRG Nexus",
         html: `
@@ -345,7 +348,7 @@ async function sendBookingNotification(data) {
                     </html>
                 `;
         await transporter.sendMail({
-          from: '"TRG Nexus System" <noreply@trgnexus.com>',
+          from: `"TRG Nexus System" <${process.env.SMTP_USER}>`,
           to: data.therapistEmail,
           subject: `\u{1F4C5} Novo Agendamento: ${data.name}`,
           html: therapistHtml,
@@ -488,6 +491,172 @@ async function sendMetaWhatsApp(to, templateName, languageCode = "pt_BR", compon
     return { success: false, error: error.message };
   }
 }
+async function sendSessionReminderEmail(data) {
+  console.log("[Notification] Sending Session Reminder Email to:", data.email);
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn("SMTP credentials not found. Skipping reminder email.");
+    return { success: false, error: "missing_credentials" };
+  }
+  try {
+    const port = Number(process.env.SMTP_PORT) || 587;
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST.trim(),
+      port,
+      secure: port === 465,
+      auth: {
+        user: process.env.SMTP_USER.trim(),
+        pass: process.env.SMTP_PASS.trim()
+      }
+    });
+    const mailOptions = {
+      from: `"TRG Nexus" <${process.env.SMTP_USER}>`,
+      to: data.email,
+      subject: "Lembrete: Sua Sess\xE3o \xE9 Amanh\xE3! - TRG Nexus",
+      html: `
+                <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto;">
+                    <div style="background-color: #f8fafc; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+                        <h2 style="color: #0f172a; margin: 0;">Lembrete de Sess\xE3o \u{1F33F}</h2>
+                    </div>
+                    <div style="padding: 20px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 10px 10px;">
+                        <p>Ol\xE1, <strong>${data.name}</strong>! Tudo bem?</p>
+                        <p>Passando para lembrar que sua sess\xE3o com <strong>${data.therapistName || "seu terapeuta"}</strong> est\xE1 confirmada para amanh\xE3!</p>
+                        
+                        <div style="background-color: #f1f5f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                            <p style="margin: 5px 0;"><strong>Data:</strong> amanh\xE3, ${data.date}</p>
+                            <p style="margin: 5px 0;"><strong>Hor\xE1rio:</strong> ${data.time}</p>
+                        </div>
+
+                        <p>\u{1F517} Acesse o portal pelo bot\xE3o abaixo e entre na sala de espera alguns minutinhos antes do hor\xE1rio combinado:</p>
+                        
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="https://www.teranexus.com.br/portal-paciente/dashboard" style="background-color: #2563eb; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+                                Acessar Meu Portal
+                            </a>
+                        </div>
+
+                        <p><em>Caso precise reagendar, entre em contato o quanto antes.</em></p>
+                        <p>At\xE9 logo! \u{1F499}</p>
+                    </div>
+                </div>
+            `
+    };
+    const info = await transporter.sendMail(mailOptions);
+    console.log("[Notification] Reminder email sent:", info.messageId);
+    return { success: true, id: info.messageId };
+  } catch (error) {
+    console.error("[Notification] Error sending reminder email:", error);
+    return { success: false, error: error.message };
+  }
+}
+async function sendBillingReminderEmail(data) {
+  console.log("[Notification] Sending Billing Reminder Email to:", data.email);
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn("SMTP credentials not found. Skipping billing email.");
+    return { success: false, error: "missing_credentials" };
+  }
+  try {
+    const port = Number(process.env.SMTP_PORT) || 587;
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST.trim(),
+      port,
+      secure: port === 465,
+      auth: {
+        user: process.env.SMTP_USER.trim(),
+        pass: process.env.SMTP_PASS.trim()
+      }
+    });
+    const mailOptions = {
+      from: `"TRG Nexus" <${process.env.SMTP_USER}>`,
+      to: data.email,
+      subject: "\u26A0\uFE0F Pagamento Pendente - TRG Nexus",
+      html: `
+                <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto;">
+                    <div style="background-color: #fffbeb; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; border: 1px solid #fde68a;">
+                        <h2 style="color: #b45309; margin: 0;">Aten\xE7\xE3o: Pagamento Pendente</h2>
+                    </div>
+                    <div style="padding: 20px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 10px 10px;">
+                        <p>Ol\xE1, <strong>${data.name}</strong>!</p>
+                        <p>Sua sess\xE3o com <strong>${data.therapistName || "seu terapeuta"}</strong> est\xE1 pr\xE9-agendada para <strong>amanh\xE3, ${data.date} \xE0s ${data.time}</strong>, mas notamos que o pagamento ainda n\xE3o foi confirmado. \u{1F614}</p>
+                        
+                        <p>Para garantir a sua vaga na agenda, por favor realize o pagamento ou envie o comprovante (caso j\xE1 tenha pago via PIX Direto) o quanto antes.</p>
+
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="https://www.teranexus.com.br/portal-paciente/dashboard" style="background-color: #ea580c; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+                                Realizar Pagamento Agora
+                            </a>
+                        </div>
+
+                        <p><em>\u{1F517} Voc\xEA tamb\xE9m pode acessar seu agendamento no link enviado anteriormente.</em></p>
+                        <p>Equipe TeraNexus \u{1F499}</p>
+                    </div>
+                </div>
+            `
+    };
+    const info = await transporter.sendMail(mailOptions);
+    console.log("[Notification] Billing email sent:", info.messageId);
+    return { success: true, id: info.messageId };
+  } catch (error) {
+    console.error("[Notification] Error sending billing email:", error);
+    return { success: false, error: error.message };
+  }
+}
+async function sendPaymentLinkEmail(data) {
+  console.log("[Notification] Sending Payment Link Email to:", data.email);
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn("SMTP credentials not found. Skipping payment link email.");
+    return { success: false, error: "missing_credentials" };
+  }
+  try {
+    const port = Number(process.env.SMTP_PORT) || 587;
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST.trim(),
+      port,
+      secure: port === 465,
+      auth: {
+        user: process.env.SMTP_USER.trim(),
+        pass: process.env.SMTP_PASS.trim()
+      }
+    });
+    const mailOptions = {
+      from: `"TRG Nexus" <${process.env.SMTP_USER}>`,
+      to: data.email,
+      subject: "Finalize seu Agendamento: Link de Pagamento - TRG Nexus",
+      html: `
+                <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto;">
+                    <div style="background-color: #f8fafc; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+                        <h2 style="color: #0f172a; margin: 0;">Link de Pagamento Seguro \u{1F4B3}</h2>
+                    </div>
+                    <div style="padding: 20px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 10px 10px;">
+                        <p>Ol\xE1, <strong>${data.name}</strong>!</p>
+                        <p>Falta muito pouco para confirmarmos o seu agendamento com <strong>${data.therapistName || "seu terapeuta"}</strong>.</p>
+                        
+                        <div style="background-color: #f1f5f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                            <p style="margin: 5px 0;"><strong>Valor:</strong> ${data.price}</p>
+                            <p style="margin: 5px 0;"><strong>Meios Aceitos:</strong> Cart\xE3o, Boleto ou PIX (se habilitado pelo terapeuta)</p>
+                        </div>
+
+                        <p>Para garantir a sua vaga na agenda, realize o pagamento clicando no bot\xE3o abaixo:</p>
+                        
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="${data.checkoutUrl}" style="background-color: #10b981; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+                                Pagar Agora com Seguran\xE7a
+                            </a>
+                        </div>
+
+                        <p><em>Ap\xF3s a confirma\xE7\xE3o do pagamento, voc\xEA receber\xE1 um recibo da plataforma.</em></p>
+                        <p>At\xE9 logo! \u{1F499}</p>
+                    </div>
+                </div>
+            `
+    };
+    const info = await transporter.sendMail(mailOptions);
+    console.log("[Notification] Payment Link email sent:", info.messageId);
+    return { success: true, id: info.messageId };
+  } catch (error) {
+    console.error("[Notification] Error sending payment link email:", error);
+    return { success: false, error: error.message };
+  }
+}
 var init_notifications = __esm({
   "src/api-handlers/utils/notifications.ts"() {
     init_templates();
@@ -511,8 +680,8 @@ async function verifyAuth(req, res) {
     res.status(500).json({ message: "Server Configuration Error" });
     return null;
   }
-  const supabase6 = createClient(supabaseUrl12, supabaseKey);
-  const { data: { user }, error } = await supabase6.auth.getUser(token);
+  const supabase9 = createClient(supabaseUrl12, supabaseKey);
+  const { data: { user }, error } = await supabase9.auth.getUser(token);
   if (error || !user) {
     console.warn("Auth Failed:", error?.message);
     res.status(403).json({ message: "Token inv\xE1lido ou expirado" });
@@ -528,13 +697,13 @@ async function handler(req, res) {
   if (!supabaseUrl12 || !supabaseKey) {
     return res.status(500).json({ error: "Database configuration missing" });
   }
-  const supabase6 = createClient(supabaseUrl12, supabaseKey);
+  const supabase9 = createClient(supabaseUrl12, supabaseKey);
   const { id } = req.query;
   try {
     if (id) {
       const appointmentId = Array.isArray(id) ? id[0] : id;
       if (req.method === "GET") {
-        const { data, error } = await supabase6.from("appointments").select("*, patients(name, email, phone)").eq("id", appointmentId).eq("therapist_id", user.id).single();
+        const { data, error } = await supabase9.from("appointments").select("*, patients(name, email, phone)").eq("id", appointmentId).eq("therapist_id", user.id).single();
         if (error || !data) {
           return res.status(404).json({ error: "Appointment not found" });
         }
@@ -560,7 +729,7 @@ async function handler(req, res) {
         let shouldNotify = dbStatus === "cancelled" || status === "Cancelado";
         let existingAppointment = null;
         if (shouldNotify) {
-          const { data: existing } = await supabase6.from("appointments").select("*, patients(name, email, phone), therapists(id, name)").eq("id", appointmentId).single();
+          const { data: existing } = await supabase9.from("appointments").select("*, patients(name, email, phone), therapists(id, name)").eq("id", appointmentId).single();
           existingAppointment = existing;
         }
         const updatePayload = {
@@ -573,7 +742,7 @@ async function handler(req, res) {
         if (sessionData !== void 0) {
           updatePayload.session_data = sessionData;
         }
-        const { data, error } = await supabase6.from("appointments").update(updatePayload).eq("id", appointmentId).eq("therapist_id", user.id).select().single();
+        const { data, error } = await supabase9.from("appointments").update(updatePayload).eq("id", appointmentId).eq("therapist_id", user.id).select().single();
         if (error) throw error;
         if (!data) return res.status(404).json({ error: "Appointment not found or unauthorized" });
         if (shouldNotify && existingAppointment && existingAppointment.patients) {
@@ -598,11 +767,11 @@ async function handler(req, res) {
         }
         return res.status(200).json(data);
       } else if (req.method === "DELETE") {
-        const { error } = await supabase6.from("appointments").delete().eq("id", appointmentId).eq("therapist_id", user.id);
+        const { error } = await supabase9.from("appointments").delete().eq("id", appointmentId).eq("therapist_id", user.id);
         if (error) throw error;
         return res.status(200).json({ message: "Deleted successfully" });
       } else if (req.method === "GET") {
-        const { data, error } = await supabase6.from("appointments").select("*, patients(name, email, phone)").eq("id", appointmentId).single();
+        const { data, error } = await supabase9.from("appointments").select("*, patients(name, email, phone)").eq("id", appointmentId).single();
         if (error) throw error;
         if (!data) return res.status(404).json({ error: "Appointment not found" });
         const formatted = {
@@ -623,7 +792,7 @@ async function handler(req, res) {
       }
     } else {
       if (req.method === "GET") {
-        const { data, error } = await supabase6.from("appointments").select("*, patients(name)").eq("therapist_id", user.id).order("date", { ascending: true }).order("time", { ascending: true });
+        const { data, error } = await supabase9.from("appointments").select("*, patients(name)").eq("therapist_id", user.id).order("date", { ascending: true }).order("time", { ascending: true });
         if (error) throw error;
         const formatted = (data || []).map((row) => {
           let dateStr = row.date;
@@ -644,7 +813,7 @@ async function handler(req, res) {
         const { patientId, date, time, status, type, notes, sessionData } = req.body;
         let dbStatus = status;
         if (status === "Agendado") dbStatus = "scheduled";
-        const { data, error } = await supabase6.from("appointments").insert([{
+        const { data, error } = await supabase9.from("appointments").insert([{
           patient_id: patientId,
           date,
           time,
@@ -682,7 +851,7 @@ async function handler2(req, res) {
   if (!date) {
     return res.status(400).json({ error: "Missing date parameter" });
   }
-  const supabase6 = createClient2(supabaseUrl, supabaseServiceKey);
+  const supabase9 = createClient2(supabaseUrl, supabaseServiceKey);
   try {
     const targetDate = new Date(date);
     const dayOfWeek = targetDate.getDay();
@@ -690,7 +859,7 @@ async function handler2(req, res) {
     let endHour = 18;
     let isActive = true;
     if (therapistId) {
-      const { data: settings } = await supabase6.from("availability_settings").select("start_time, end_time, is_active").eq("therapist_id", therapistId).eq("day_of_week", dayOfWeek).single();
+      const { data: settings } = await supabase9.from("availability_settings").select("start_time, end_time, is_active").eq("therapist_id", therapistId).eq("day_of_week", dayOfWeek).single();
       if (settings) {
         isActive = settings.is_active;
         startHour = parseInt(settings.start_time.split(":")[0]);
@@ -704,7 +873,7 @@ async function handler2(req, res) {
     for (let h = startHour; h < endHour; h++) {
       allSlots.push(`${h.toString().padStart(2, "0")}:00`);
     }
-    let query = supabase6.from("appointments").select("time").eq("date", date).neq("status", "Cancelado");
+    let query = supabase9.from("appointments").select("time").eq("date", date).neq("status", "Cancelado");
     if (therapistId) {
       query = query.eq("therapist_id", therapistId);
     }
@@ -737,8 +906,8 @@ async function handler3(req, res) {
   if (!supabaseUrl12 || !supabaseKey) {
     return res.status(500).json({ error: "Configura\xE7\xE3o de Auth ausente no servidor" });
   }
-  const supabase6 = createClient3(supabaseUrl12, supabaseKey);
-  const { data: { user }, error: authError } = await supabase6.auth.getUser(token);
+  const supabase9 = createClient3(supabaseUrl12, supabaseKey);
+  const { data: { user }, error: authError } = await supabase9.auth.getUser(token);
   if (authError || !user) {
     return res.status(403).json({ error: "Token inv\xE1lido ou expirado" });
   }
@@ -803,7 +972,7 @@ async function handler4(req, res) {
   if (!supabaseUrl2 || !supabaseServiceKey2) {
     return res.status(500).json({ error: "Server Misconfiguration" });
   }
-  const supabase6 = createClient4(supabaseUrl2, supabaseServiceKey2);
+  const supabase9 = createClient4(supabaseUrl2, supabaseServiceKey2);
   const { name, email, phone, date, time, therapistId, status = "scheduled", price, ...restData } = req.body || {};
   const anamnesisData = {
     ...restData,
@@ -818,16 +987,16 @@ async function handler4(req, res) {
     console.log(`[Booking] Processing for ${email} with ${therapistId || "System"} (Status: ${status})`);
     let therapistName = "Terapeuta TRG";
     if (therapistId) {
-      const { data: t } = await supabase6.from("therapists").select("name").eq("id", therapistId).single();
+      const { data: t } = await supabase9.from("therapists").select("name").eq("id", therapistId).single();
       if (t) therapistName = t.name;
     }
     let patientId;
-    const { data: existing } = await supabase6.from("patients").select("id").eq("email", email).eq("therapist_id", therapistId).limit(1);
+    const { data: existing } = await supabase9.from("patients").select("id").eq("email", email).eq("therapist_id", therapistId).limit(1);
     if (existing && existing.length > 0) {
       patientId = existing[0].id;
-      await supabase6.from("patients").update({ name, phone }).eq("id", patientId);
+      await supabase9.from("patients").update({ name, phone }).eq("id", patientId);
     } else {
-      const { data: newP, error: pError } = await supabase6.from("patients").insert({
+      const { data: newP, error: pError } = await supabase9.from("patients").insert({
         name,
         email,
         phone,
@@ -838,7 +1007,7 @@ async function handler4(req, res) {
       if (pError) throw pError;
       patientId = newP.id;
     }
-    const appointmentQuery = supabase6.from("appointments").insert({
+    const appointmentQuery = supabase9.from("appointments").insert({
       patient_id: patientId,
       therapist_id: therapistId,
       date,
@@ -853,7 +1022,7 @@ async function handler4(req, res) {
     if (aError) throw aError;
     if (status === "scheduled") {
       console.log("[Booking] Starting notifications...");
-      const { data: therapistData } = await supabase6.from("therapists").select("email, name, phone").eq("id", therapistId).single();
+      const { data: therapistData } = await supabase9.from("therapists").select("email, name, phone").eq("id", therapistId).single();
       const notificationData = {
         name,
         email,
@@ -892,13 +1061,13 @@ async function handler5(req, res) {
   if (!supabaseUrl3 || !supabaseServiceKey3) {
     return res.status(500).json({ error: "Server Misconfiguration" });
   }
-  const supabase6 = createClient5(supabaseUrl3, supabaseServiceKey3);
+  const supabase9 = createClient5(supabaseUrl3, supabaseServiceKey3);
   const { action, patientId } = req.query;
   try {
     if (req.method === "POST" && action === "login") {
       const { email, password } = req.body;
       if (!email) return res.status(400).json({ error: "Email required" });
-      const { data: patients, error } = await supabase6.from("patients").select("id, name, email, password_hash").eq("email", email.toLowerCase());
+      const { data: patients, error } = await supabase9.from("patients").select("id, name, email, password_hash").eq("email", email.toLowerCase());
       if (error) throw error;
       if (patients && patients.length > 0) {
         const patient = patients[0];
@@ -923,13 +1092,13 @@ async function handler5(req, res) {
     }
     if (req.method === "GET" && action === "data") {
       if (!patientId) return res.status(400).json({ error: "Patient ID required" });
-      const { data: patient, error: pError } = await supabase6.from("patients").select("*, therapists(name)").eq("id", patientId).single();
+      const { data: patient, error: pError } = await supabase9.from("patients").select("*, therapists(name)").eq("id", patientId).single();
       if (pError) return res.status(404).json({ error: "Patient not found" });
       const patientData = {
         ...patient,
         therapist_name: patient.therapists?.name
       };
-      const { data: appointments, error: aError } = await supabase6.from("appointments").select("*").eq("patient_id", patientId).order("date", { ascending: false }).order("time", { ascending: false });
+      const { data: appointments, error: aError } = await supabase9.from("appointments").select("*").eq("patient_id", patientId).order("date", { ascending: false }).order("time", { ascending: false });
       if (aError) throw aError;
       const mappedAppointments = (appointments || []).map((appt) => ({
         ...appt,
@@ -942,18 +1111,18 @@ async function handler5(req, res) {
     }
     if (req.method === "GET" && action === "recordings") {
       if (!patientId) return res.status(400).json({ error: "Patient ID required" });
-      const { data: recordings, error: rError } = await supabase6.from("recordings").select("*").eq("patient_id", patientId).order("created_at", { ascending: false });
+      const { data: recordings, error: rError } = await supabase9.from("recordings").select("*").eq("patient_id", patientId).order("created_at", { ascending: false });
       if (rError) throw rError;
       return res.status(200).json(recordings || []);
     }
     if (req.method === "POST" && action === "save_anamnesis") {
       if (!patientId) return res.status(400).json({ error: "Patient ID required" });
       const anamnesisData = req.body;
-      const { error: pUpdateError } = await supabase6.from("patients").update({ notes: JSON.stringify(anamnesisData) }).eq("id", patientId);
+      const { error: pUpdateError } = await supabase9.from("patients").update({ notes: JSON.stringify(anamnesisData) }).eq("id", patientId);
       if (pUpdateError) throw pUpdateError;
-      const { data: recentAppt, error: recentApptError } = await supabase6.from("appointments").select("id").eq("patient_id", patientId).in("status", ["scheduled", "agendado", "active", "ativo", "pending_payment"]).order("date", { ascending: true }).limit(1).single();
+      const { data: recentAppt, error: recentApptError } = await supabase9.from("appointments").select("id").eq("patient_id", patientId).in("status", ["scheduled", "agendado", "active", "ativo", "pending_payment"]).order("date", { ascending: true }).limit(1).single();
       if (!recentApptError && recentAppt) {
-        await supabase6.from("appointments").update({ notes: JSON.stringify(anamnesisData) }).eq("id", recentAppt.id);
+        await supabase9.from("appointments").update({ notes: JSON.stringify(anamnesisData) }).eq("id", recentAppt.id);
       }
       return res.status(200).json({ success: true });
     }
@@ -995,14 +1164,14 @@ async function handler6(req, res) {
   const user = verifyAuth2(req, res);
   if (!user) return;
   const therapistId = user.id;
-  const supabase6 = createClient6(supabaseUrl4, supabaseServiceKey4);
+  const supabase9 = createClient6(supabaseUrl4, supabaseServiceKey4);
   try {
-    const { count: totalPatients, error: pError } = await supabase6.from("patients").select("*", { count: "exact", head: true }).eq("therapist_id", therapistId);
+    const { count: totalPatients, error: pError } = await supabase9.from("patients").select("*", { count: "exact", head: true }).eq("therapist_id", therapistId);
     if (pError) throw pError;
     const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-    const { count: sessionsToday, error: sError } = await supabase6.from("appointments").select("*", { count: "exact", head: true }).eq("therapist_id", therapistId).eq("date", today);
+    const { count: sessionsToday, error: sError } = await supabase9.from("appointments").select("*", { count: "exact", head: true }).eq("therapist_id", therapistId).eq("date", today);
     if (sError) throw sError;
-    const { data: allAppointments, error: allAppError } = await supabase6.from("appointments").select("date").eq("therapist_id", therapistId);
+    const { data: allAppointments, error: allAppError } = await supabase9.from("appointments").select("date").eq("therapist_id", therapistId);
     if (allAppError) throw allAppError;
     const totalSessions = allAppointments?.length || 0;
     const revenueMonth = totalSessions * 250;
@@ -1474,17 +1643,17 @@ async function handler12(req, res) {
   if (!supabaseUrl12 || !supabaseKey) {
     return res.status(500).json({ error: "Database configuration missing" });
   }
-  const supabase6 = createClient9(supabaseUrl12, supabaseKey);
+  const supabase9 = createClient9(supabaseUrl12, supabaseKey);
   try {
     if (req.method !== "GET") {
       return res.status(405).json({ error: "Method not allowed" });
     }
     const pId = Array.isArray(patientId) ? patientId[0] : patientId;
-    const { data: patient, error: pError } = await supabase6.from("patients").select("id").eq("id", pId).eq("therapist_id", user.id).single();
+    const { data: patient, error: pError } = await supabase9.from("patients").select("id").eq("id", pId).eq("therapist_id", user.id).single();
     if (pError || !patient) {
       return res.status(403).json({ error: "Unauthorized access or patient not found" });
     }
-    const { data: appointments, error: aError } = await supabase6.from("appointments").select("*").eq("patient_id", pId).eq("therapist_id", user.id).order("date", { ascending: false });
+    const { data: appointments, error: aError } = await supabase9.from("appointments").select("*").eq("patient_id", pId).eq("therapist_id", user.id).order("date", { ascending: false });
     if (aError) throw aError;
     const timeline = appointments.map((apt) => ({
       id: apt.id,
@@ -1551,7 +1720,7 @@ async function handler13(req, res) {
   if (!supabaseUrl12 || !supabaseKey) {
     return res.status(500).json({ error: "Database configuration missing" });
   }
-  const supabase6 = createClient10(supabaseUrl12, supabaseKey);
+  const supabase9 = createClient10(supabaseUrl12, supabaseKey);
   const { id } = req.query;
   try {
     if (id) {
@@ -1559,11 +1728,11 @@ async function handler13(req, res) {
       if (req.method === "PUT") {
         const { name, email, phone, status, notes } = req.body;
         const cleanEmail = email ? email.trim() : email;
-        const { data, error } = await supabase6.from("patients").update({ name, email: cleanEmail, phone, status, notes }).eq("id", patientId).eq("therapist_id", user.id).select().single();
+        const { data, error } = await supabase9.from("patients").update({ name, email: cleanEmail, phone, status, notes }).eq("id", patientId).eq("therapist_id", user.id).select().single();
         if (error || !data) return res.status(404).json({ error: "Patient not found or unauthorized" });
         return res.status(200).json(data);
       } else if (req.method === "DELETE") {
-        const { error } = await supabase6.from("patients").delete().eq("id", patientId).eq("therapist_id", user.id);
+        const { error } = await supabase9.from("patients").delete().eq("id", patientId).eq("therapist_id", user.id);
         if (error) throw error;
         return res.status(200).json({ message: "Deleted successfully" });
       } else {
@@ -1572,7 +1741,7 @@ async function handler13(req, res) {
       }
     } else {
       if (req.method === "GET") {
-        const { data, error } = await supabase6.from("patients").select("*, appointments(status)").eq("therapist_id", user.id).order("created_at", { ascending: false });
+        const { data, error } = await supabase9.from("patients").select("*, appointments(status)").eq("therapist_id", user.id).order("created_at", { ascending: false });
         if (error) throw error;
         const enrichedData = data.map((p) => {
           const completedApts = p.appointments?.filter((a) => a.status === "Conclu\xEDda" || a.status === "completed").length || 0;
@@ -1586,7 +1755,7 @@ async function handler13(req, res) {
       } else if (req.method === "POST") {
         const { name, email, phone, status, notes } = req.body;
         const cleanEmail = email ? email.trim() : email;
-        const { data, error } = await supabase6.from("patients").insert([{
+        const { data, error } = await supabase9.from("patients").insert([{
           name,
           email: cleanEmail,
           phone,
@@ -2398,15 +2567,15 @@ async function handler25(req, res) {
     if (!supabaseUrl12 || !supabaseKey) {
       throw new Error("Supabase configuration missing");
     }
-    const supabase6 = createClient12(supabaseUrl12, supabaseKey);
-    const { data: authData, error: authError } = await supabase6.auth.signInWithPassword({
+    const supabase9 = createClient12(supabaseUrl12, supabaseKey);
+    const { data: authData, error: authError } = await supabase9.auth.signInWithPassword({
       email,
       password
     });
     if (authError || !authData.user) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
-    const { data: therapist, error: dbError } = await supabase6.from("therapists").select("*").eq("email", email).single();
+    const { data: therapist, error: dbError } = await supabase9.from("therapists").select("*").eq("email", email).single();
     const therapistId = therapist?.id || authData.user.id;
     const token = signToken({
       id: therapistId,
@@ -2956,8 +3125,8 @@ async function handler29(req, res) {
     return res.status(500).json({ error: "Missing Supabase credentials" });
   }
   try {
-    const supabase6 = createClient16(supabaseUrl12, supabaseKey);
-    const { data, error } = await supabase6.from("therapists").select("id").limit(1);
+    const supabase9 = createClient16(supabaseUrl12, supabaseKey);
+    const { data, error } = await supabase9.from("therapists").select("id").limit(1);
     if (error) throw error;
     console.log(`[Keep-Alive] Supabase ping OK \xE0s ${(/* @__PURE__ */ new Date()).toISOString()}`);
     return res.status(200).json({
@@ -2984,7 +3153,7 @@ async function handler30(req, res) {
   if (!supabaseUrl7 || !supabaseServiceKey7) {
     return res.status(500).json({ error: "Missing Supabase Config" });
   }
-  const supabase6 = createClient17(supabaseUrl7, supabaseServiceKey7);
+  const supabase9 = createClient17(supabaseUrl7, supabaseServiceKey7);
   try {
     const now = /* @__PURE__ */ new Date();
     const windowStart = new Date(now.getTime() + 50 * 60 * 1e3);
@@ -2993,7 +3162,7 @@ async function handler30(req, res) {
     const timeStart = windowStart.toTimeString().slice(0, 5);
     const timeEnd = windowEnd.toTimeString().slice(0, 5);
     console.log(`[Cron Reminders] Janela: ${todayStr} ${timeStart} \u2192 ${timeEnd}`);
-    const { data: appointments, error } = await supabase6.from("appointments").select(`
+    const { data: appointments, error } = await supabase9.from("appointments").select(`
                 id, date, time, reminder_sent,
                 patients!inner (name, email, phone),
                 therapists!inner (name)
@@ -3030,7 +3199,7 @@ async function handler30(req, res) {
       }
     }
     if (successIds.length > 0) {
-      const { error: updateError } = await supabase6.from("appointments").update({ reminder_sent: true }).in("id", successIds);
+      const { error: updateError } = await supabase9.from("appointments").update({ reminder_sent: true }).in("id", successIds);
       if (updateError) throw updateError;
       console.log(`[Cron] ${successIds.length} agendamento(s) marcado(s) como lembrado(s).`);
     }
@@ -3048,59 +3217,10 @@ async function handler30(req, res) {
 }
 
 // src/api-handlers/cron/reminders-24h.ts
+init_notifications();
 import { createClient as createClient18 } from "@supabase/supabase-js";
 var supabaseUrl8 = process.env.VITE_SUPABASE_URL;
 var supabaseServiceKey8 = process.env.SUPABASE_SERVICE_ROLE_KEY;
-var ZAPI_BASE2 = "https://api.z-api.io/instances";
-function formatPhoneBR2(phone) {
-  let clean = phone.replace(/\D/g, "");
-  if (!clean.startsWith("55") && clean.length <= 11) clean = "55" + clean;
-  return clean;
-}
-async function sendZApiText(phone, message) {
-  const instanceId = process.env.ZAPI_INSTANCE_ID;
-  const instanceToken = process.env.ZAPI_INSTANCE_TOKEN;
-  const clientToken = process.env.ZAPI_CLIENT_TOKEN;
-  if (!instanceId || !instanceToken) {
-    console.warn("[Z-API 24h] Credenciais n\xE3o configuradas.");
-    return { success: false, error: "missing_credentials" };
-  }
-  const cleanPhone = formatPhoneBR2(phone);
-  const url = `${ZAPI_BASE2}/${instanceId}/token/${instanceToken}/send-text`;
-  const headers = { "Content-Type": "application/json" };
-  if (clientToken) headers["Client-Token"] = clientToken;
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ phone: cleanPhone, message })
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      console.error("[Z-API 24h] Erro no envio:", JSON.stringify(data));
-      return { success: false, error: data };
-    }
-    console.log(`[Z-API 24h] Mensagem enviada para ${cleanPhone} \u2192 ID: ${data.zaapId || data.messageId}`);
-    return { success: true, id: data.zaapId || data.messageId };
-  } catch (err) {
-    console.error("[Z-API 24h] Erro de rede:", err);
-    return { success: false, error: err.message };
-  }
-}
-function buildMessage(patientName, therapistName, date, time) {
-  return `\u{1F33F} *TeraNexus \u2014 Lembrete de Sess\xE3o*
-
-Ol\xE1, *${patientName}*! Tudo bem?
-
-Passando para lembrar que sua sess\xE3o com *${therapistName}* est\xE1 confirmada para *amanh\xE3, ${date} \xE0s ${time}*. \u2728
-
-\u{1F517} Acesse seu portal com anteced\xEAncia:
-https://www.teranexus.com.br/portal-paciente/dashboard
-
-_Caso precise reagendar, entre em contato o quanto antes._
-
-At\xE9 logo! \u{1F499}`;
-}
 async function handler31(req, res) {
   const authHeader = req.headers["authorization"];
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -3109,17 +3229,17 @@ async function handler31(req, res) {
   if (!supabaseUrl8 || !supabaseServiceKey8) {
     return res.status(500).json({ error: "Missing Supabase Config" });
   }
-  const supabase6 = createClient18(supabaseUrl8, supabaseServiceKey8);
+  const supabase9 = createClient18(supabaseUrl8, supabaseServiceKey8);
   try {
     const now = /* @__PURE__ */ new Date();
     const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1e3);
     const tomorrowStr = tomorrow.toLocaleDateString("pt-BR");
     console.log(`[Cron 24h] Buscando sess\xF5es de amanh\xE3: ${tomorrowStr}`);
-    const { data: appointments, error } = await supabase6.from("appointments").select(`
-        id, date, time, reminder_24h_sent,
-        patients!inner(name, phone),
+    const { data: appointments, error } = await supabase9.from("appointments").select(`
+        id, date, time, status, reminder_24h_sent,
+        patients!inner(name, phone, email),
         therapists!inner(name, reminder_24h_enabled)
-      `).eq("status", "scheduled").eq("date", tomorrowStr).is("reminder_24h_sent", false);
+      `).in("status", ["scheduled", "pending_payment"]).eq("date", tomorrowStr).is("reminder_24h_sent", false);
     if (error) throw error;
     console.log(`[Cron 24h] ${appointments?.length || 0} agendamento(s) encontrado(s).`);
     if (!appointments || appointments.length === 0) {
@@ -3136,25 +3256,26 @@ async function handler31(req, res) {
       const therapist = Array.isArray(appt.therapists) ? appt.therapists[0] : appt.therapists;
       const pName = patient?.name || "Paciente";
       const pPhone = patient?.phone;
+      const pEmail = patient?.email;
       const tName = therapist?.name || "TeraNexus";
       if (therapist?.reminder_24h_enabled === false) {
         console.log(`[Cron 24h] Terapeuta "${tName}" com lembrete 24h desativado \u2014 pulando "${pName}".`);
         skippedIds.push(appt.id);
         continue;
       }
-      if (!pPhone) {
-        console.warn(`[Cron 24h] Sem telefone para "${pName}" (id: ${appt.id}) \u2014 pulando.`);
+      if (!pEmail) {
+        console.warn(`[Cron 24h] Sem e-mail para "${pName}" (id: ${appt.id}) \u2014 pulando.`);
         skippedIds.push(appt.id);
         continue;
       }
-      console.log(`[Cron 24h] Lembrando: ${pName} (${pPhone}) \u2192 sess\xE3o em ${appt.date} \xE0s ${appt.time}`);
+      console.log(`[Cron 24h] Lembrando (${appt.status}): ${pName} (${pEmail}) \u2192 sess\xE3o em ${appt.date} \xE0s ${appt.time}`);
       try {
-        const message = buildMessage(pName, tName, appt.date, appt.time);
-        const result = await sendZApiText(pPhone, message);
+        const dataPayload = { name: pName, email: pEmail, date: appt.date, time: appt.time, therapistName: tName };
+        const result = appt.status === "pending_payment" ? await sendBillingReminderEmail(dataPayload) : await sendSessionReminderEmail(dataPayload);
         if (result.success) {
           successIds.push(appt.id);
         } else {
-          console.error(`[Cron 24h] Falha para "${pName}":`, result.error);
+          console.error(`[Cron 24h] Falha de e-mail para "${pName}":`, result.error);
           failedIds.push(appt.id);
         }
       } catch (err) {
@@ -3163,7 +3284,7 @@ async function handler31(req, res) {
       }
     }
     if (successIds.length > 0) {
-      const { error: updateError } = await supabase6.from("appointments").update({ reminder_24h_sent: true }).in("id", successIds);
+      const { error: updateError } = await supabase9.from("appointments").update({ reminder_24h_sent: true }).in("id", successIds);
       if (updateError) throw updateError;
       console.log(`[Cron 24h] ${successIds.length} lembrete(s) marcado(s) no banco.`);
     }
@@ -3219,11 +3340,11 @@ async function handler33(req, res) {
     return res.status(401).json({ error: "Authorization header missing" });
   }
   const supabaseToken = (Array.isArray(authHeader) ? authHeader[0] : authHeader).split(" ")[1];
-  const supabase6 = createClient19(
+  const supabase9 = createClient19(
     process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "",
     process.env.VITE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
   );
-  const { data: { user }, error: authError } = await supabase6.auth.getUser(supabaseToken);
+  const { data: { user }, error: authError } = await supabase9.auth.getUser(supabaseToken);
   if (authError || !user) {
     return res.status(401).json({ error: "Invalid or expired token" });
   }
@@ -3651,10 +3772,10 @@ async function handler35(req, res) {
     return res.status(500).json({ error: "Missing Supabase Config" });
   }
   const { sourceTherapistId, patientNeeds } = req.body;
-  const supabase6 = createClient21(supabaseUrl9, supabaseServiceKey9);
+  const supabase9 = createClient21(supabaseUrl9, supabaseServiceKey9);
   try {
     console.log(`\u{1F501} Finding match for source: ${sourceTherapistId}, needs: ${patientNeeds}`);
-    let query = supabase6.from("therapists").select("id, name, specialty, rating, phone").eq("is_verified", true).eq("is_overflow_target", true).neq("id", sourceTherapistId);
+    let query = supabase9.from("therapists").select("id, name, specialty, rating, phone").eq("is_verified", true).eq("is_overflow_target", true).neq("id", sourceTherapistId);
     if (patientNeeds) {
       query = query.eq("specialty", patientNeeds);
     }
@@ -3697,12 +3818,12 @@ async function handler36(req, res) {
     patientNeeds,
     sessionPrice
   } = req.body;
-  const supabase6 = createClient22(supabaseUrl10, supabaseServiceKey10);
+  const supabase9 = createClient22(supabaseUrl10, supabaseServiceKey10);
   try {
     console.log(`Processing Referral: ${sourceTherapistId} -> ${targetTherapistId}`);
     const price = Number(sessionPrice) || 150;
     const commission = price * 0.1;
-    const { data: referral, error } = await supabase6.from("referrals").insert({
+    const { data: referral, error } = await supabase9.from("referrals").insert({
       source_therapist_id: sourceTherapistId,
       target_therapist_id: targetTherapistId,
       patient_name: patientName,
@@ -3713,7 +3834,7 @@ async function handler36(req, res) {
       commission_amount: commission
     }).select().single();
     if (error) throw error;
-    const { data: targetTherapist } = await supabase6.from("therapists").select("phone, name, email").eq("id", targetTherapistId).single();
+    const { data: targetTherapist } = await supabase9.from("therapists").select("phone, name, email").eq("id", targetTherapistId).single();
     if (targetTherapist?.phone) {
       console.log(`Notifying Target: ${targetTherapist.name}`);
       await sendBookingNotification({
@@ -3982,9 +4103,9 @@ async function handler41(req, res) {
   if (!supabaseUrl11 || !supabaseServiceKey11) {
     return res.status(500).json({ error: "Server Misconfiguration" });
   }
-  const supabase6 = createClient25(supabaseUrl11, supabaseServiceKey11);
+  const supabase9 = createClient25(supabaseUrl11, supabaseServiceKey11);
   try {
-    let query = supabase6.from("therapists").select(`
+    let query = supabase9.from("therapists").select(`
                 id,
                 name,
                 bio,
@@ -4217,8 +4338,245 @@ _Sistema TeraNexus_ \u{1F499}`;
   });
 }
 
-// api/index.ts
+// src/api-handlers/system/send-email-link.ts
+init_notifications();
 async function handler48(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+  try {
+    const { email, name, checkoutUrl, price, therapistName } = req.body;
+    if (!email || !name || !checkoutUrl) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+    const result = await sendPaymentLinkEmail({
+      email,
+      name,
+      checkoutUrl,
+      price: price || "R$ 0,00",
+      therapistName: therapistName || "Terapeuta TRG"
+    });
+    if (!result.success) {
+      return res.status(500).json({ error: result.error });
+    }
+    return res.status(200).json({ success: true, message: "Email sent successfully" });
+  } catch (err) {
+    console.error("[SendEmailLink API] Error:", err);
+    return res.status(500).json({ error: err.message || "Internal Server Error" });
+  }
+}
+
+// src/api-handlers/system/migrate-pix-columns.ts
+import { createClient as createClient26 } from "@supabase/supabase-js";
+var supabase6 = createClient26(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+);
+async function handler49(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "M\xE9todo n\xE3o permitido." });
+  try {
+    await supabase6.rpc("exec_sql", {
+      sql: `
+                ALTER TABLE appointments 
+                ADD COLUMN IF NOT EXISTS pix_txid TEXT,
+                ADD COLUMN IF NOT EXISTS pix_end_to_end_id TEXT,
+                ADD COLUMN IF NOT EXISTS pix_paid_at TIMESTAMPTZ;
+            `
+    });
+    return res.status(200).json({ ok: true, message: "Colunas PIX adicionadas com sucesso." });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+}
+
+// src/api-handlers/pix/create-charge.ts
+import { createClient as createClient27 } from "@supabase/supabase-js";
+var supabase7;
+function getSupabase() {
+  if (!supabase7) {
+    supabase7 = createClient27(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_KEY
+    );
+  }
+  return supabase7;
+}
+var MP_BASE_URL = "https://api.mercadopago.com";
+async function mpRequest(path4, options = {}) {
+  const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
+  if (!token) throw new Error("MERCADOPAGO_ACCESS_TOKEN n\xE3o configurado.");
+  const res = await fetch(`${MP_BASE_URL}${path4}`, {
+    ...options,
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "X-Idempotency-Key": `${Date.now()}-${Math.random()}`,
+      ...options.headers
+    }
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    const msg = data?.message || data?.error || JSON.stringify(data);
+    throw new Error(`MercadoPago Error: ${msg}`);
+  }
+  return data;
+}
+async function handler50(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "M\xE9todo n\xE3o permitido." });
+  const { amount, appointmentId, patientEmail, patientName } = req.body;
+  if (!amount || !appointmentId || !patientEmail) {
+    return res.status(400).json({ error: "amount, appointmentId e patientEmail s\xE3o obrigat\xF3rios." });
+  }
+  try {
+    const payment = await mpRequest("/v1/payments", {
+      method: "POST",
+      body: JSON.stringify({
+        transaction_amount: Number(amount),
+        payment_method_id: "pix",
+        payer: {
+          email: patientEmail,
+          first_name: patientName?.split(" ")[0] || "Paciente",
+          last_name: patientName?.split(" ").slice(1).join(" ") || ""
+        },
+        description: `Sess\xE3o TeraNexus - Agendamento #${appointmentId}`,
+        external_reference: appointmentId,
+        date_of_expiration: new Date(Date.now() + 30 * 60 * 1e3).toISOString()
+        // 30 min
+      })
+    });
+    const txData = payment.point_of_interaction?.transaction_data;
+    if (!txData?.qr_code) throw new Error("QR Code n\xE3o retornado pelo MercadoPago.");
+    const sb = getSupabase();
+    await sb.from("appointments").update({ pix_txid: String(payment.id) }).eq("id", appointmentId);
+    console.log(`[MP PIX] Pagamento criado. id: ${payment.id}, status: ${payment.status}`);
+    return res.status(200).json({
+      paymentId: String(payment.id),
+      qrcode: `data:image/png;base64,${txData.qr_code_base64}`,
+      copiaecola: txData.qr_code,
+      expiresAt: new Date(Date.now() + 30 * 60 * 1e3).toISOString(),
+      status: payment.status
+    });
+  } catch (error) {
+    console.error("[MP PIX] Erro ao criar pagamento:", error);
+    return res.status(500).json({ error: error.message });
+  }
+}
+
+// src/api-handlers/pix/check-status.ts
+var MP_BASE_URL2 = "https://api.mercadopago.com";
+async function handler51(req, res) {
+  if (req.method !== "GET") return res.status(405).json({ error: "M\xE9todo n\xE3o permitido." });
+  const { txid } = req.query;
+  if (!txid || typeof txid !== "string") return res.status(400).json({ error: "txid (paymentId) \xE9 obrigat\xF3rio." });
+  const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
+  if (!token) return res.status(500).json({ error: "MERCADOPAGO_ACCESS_TOKEN n\xE3o configurado." });
+  try {
+    const res2 = await fetch(`${MP_BASE_URL2}/v1/payments/${txid}`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    const data = await res2.json();
+    if (!res2.ok) throw new Error(data.message || "Erro ao consultar pagamento.");
+    const statusMap = {
+      approved: "CONCLUIDA",
+      pending: "ATIVA",
+      in_process: "ATIVA",
+      cancelled: "EXPIRADA",
+      rejected: "EXPIRADA"
+    };
+    console.log(`[MP PIX] Status do pagamento ${txid}: ${data.status}`);
+    return res.status(200).json({
+      txid,
+      status: statusMap[data.status] || "ATIVA",
+      mpStatus: data.status,
+      valor: data.transaction_amount
+    });
+  } catch (error) {
+    console.error("[MP PIX] check-status error:", error);
+    return res.status(500).json({ error: error.message });
+  }
+}
+
+// src/api-handlers/pix/webhook.ts
+init_notifications();
+import { createClient as createClient28 } from "@supabase/supabase-js";
+var supabase8;
+function getSupabase2() {
+  if (!supabase8) {
+    supabase8 = createClient28(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_KEY
+    );
+  }
+  return supabase8;
+}
+async function handler52(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "M\xE9todo n\xE3o permitido." });
+  try {
+    const body = req.body;
+    console.log("[MP Webhook] Evento recebido:", JSON.stringify(body));
+    const { type, data } = body;
+    if (type !== "payment" || !data?.id) {
+      console.log("[MP Webhook] Evento ignorado:", type);
+      return res.status(200).json({ ok: true });
+    }
+    const paymentId = String(data.id);
+    const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
+    if (!token) throw new Error("MERCADOPAGO_ACCESS_TOKEN n\xE3o configurado.");
+    const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    const payment = await mpRes.json();
+    if (!mpRes.ok) throw new Error(`Erro ao buscar pagamento ${paymentId}`);
+    console.log(`[MP Webhook] Payment ${paymentId} status: ${payment.status}`);
+    if (payment.status !== "approved") {
+      console.log(`[MP Webhook] Pagamento n\xE3o aprovado (${payment.status}), ignorando.`);
+      return res.status(200).json({ ok: true });
+    }
+    const sb = getSupabase2();
+    const { data: appointment, error: fetchError } = await sb.from("appointments").select("*, therapists(name, email), patients(name, email)").eq("pix_txid", paymentId).single();
+    if (fetchError || !appointment) {
+      console.warn(`[MP Webhook] Agendamento n\xE3o encontrado para paymentId: ${paymentId}`);
+      return res.status(200).json({ ok: true });
+    }
+    if (appointment.status === "confirmed") {
+      console.log(`[MP Webhook] Agendamento ${appointment.id} j\xE1 confirmado.`);
+      return res.status(200).json({ ok: true });
+    }
+    const { error: updateError } = await sb.from("appointments").update({
+      status: "confirmed",
+      payment_status: "paid",
+      payment_method: "pix_mercadopago",
+      pix_end_to_end_id: payment.id,
+      pix_paid_at: payment.date_approved || (/* @__PURE__ */ new Date()).toISOString()
+    }).eq("id", appointment.id);
+    if (updateError) {
+      console.error(`[MP Webhook] Erro ao confirmar agendamento ${appointment.id}:`, updateError);
+      return res.status(200).json({ ok: true });
+    }
+    console.log(`[MP Webhook] \u2705 Agendamento ${appointment.id} confirmado via PIX MercadoPago!`);
+    try {
+      await sendBookingNotification({
+        name: appointment.patients?.name || "Paciente",
+        email: appointment.patients?.email || "",
+        therapistEmail: appointment.therapists?.email || "",
+        therapistName: appointment.therapists?.name || "Terapeuta",
+        date: appointment.date,
+        time: appointment.time,
+        price: appointment.price,
+        status: "confirmed"
+      });
+    } catch (emailErr) {
+      console.error("[MP Webhook] Erro ao enviar e-mails:", emailErr.message);
+    }
+    return res.status(200).json({ ok: true });
+  } catch (error) {
+    console.error("[MP Webhook] Erro geral:", error);
+    return res.status(200).json({ ok: true });
+  }
+}
+
+// api/index.ts
+async function handler53(req, res) {
   const url = req.url || "";
   const cleanUrl = url.split("?")[0].replace(/^\/api\//, "").replace(/\/$/, "");
   console.log(`[API Router] Clean URL: ${cleanUrl}`);
@@ -4321,10 +4679,20 @@ async function handler48(req, res) {
       return handler46(req, res);
     case "system/test-zapi":
       return handler47(req, res);
+    case "system/send-email-link":
+      return handler48(req, res);
+    case "system/migrate-pix-columns":
+      return handler49(req, res);
+    case "pix/create-charge":
+      return handler50(req, res);
+    case "pix/check-status":
+      return handler51(req, res);
+    case "pix/webhook":
+      return handler52(req, res);
     default:
       res.status(404).json({ error: `Route not found: /api/${cleanUrl}` });
   }
 }
 export {
-  handler48 as default
+  handler53 as default
 };

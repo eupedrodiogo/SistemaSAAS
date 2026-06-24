@@ -123,7 +123,7 @@ export async function sendBookingNotification(data: BookingNotificationData) {
 
             // Send Client Email
             const mailOptions = {
-                from: '"TRG Nexus" <noreply@trgnexus.com>',
+                from: `"TRG Nexus" <${process.env.SMTP_USER}>`,
                 to: data.email,
                 subject: 'Confirmação de Agendamento - TRG Nexus',
                 html: `
@@ -206,7 +206,7 @@ export async function sendBookingNotification(data: BookingNotificationData) {
                 `;
 
                 await transporter.sendMail({
-                    from: '"TRG Nexus System" <noreply@trgnexus.com>',
+                    from: `"TRG Nexus System" <${process.env.SMTP_USER}>`,
                     to: data.therapistEmail,
                     subject: `📅 Novo Agendamento: ${data.name}`,
                     html: therapistHtml,
@@ -395,7 +395,7 @@ export async function sendSessionReminderEmail(data: { name: string, email: stri
         });
 
         const mailOptions = {
-            from: '"TRG Nexus" <noreply@trgnexus.com>',
+            from: `"TRG Nexus" <${process.env.SMTP_USER}>`,
             to: data.email,
             subject: 'Lembrete: Sua Sessão é Amanhã! - TRG Nexus',
             html: `
@@ -457,7 +457,7 @@ export async function sendBillingReminderEmail(data: { name: string, email: stri
         });
 
         const mailOptions = {
-            from: '"TRG Nexus" <noreply@trgnexus.com>',
+            from: `"TRG Nexus" <${process.env.SMTP_USER}>`,
             to: data.email,
             subject: '⚠️ Pagamento Pendente - TRG Nexus',
             html: `
@@ -514,7 +514,7 @@ export async function sendPaymentLinkEmail(data: { name: string, email: string, 
         });
 
         const mailOptions = {
-            from: '"TRG Nexus" <noreply@trgnexus.com>',
+            from: `"TRG Nexus" <${process.env.SMTP_USER}>`,
             to: data.email,
             subject: 'Finalize seu Agendamento: Link de Pagamento - TRG Nexus',
             html: `

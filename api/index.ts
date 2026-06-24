@@ -70,6 +70,14 @@ import systemMigrateReminders from '../src/api-handlers/system/migrate-reminders
 import systemSimpleTest from '../src/api-handlers/system/simple-test';
 import systemTestWhatsapp from '../src/api-handlers/system/test-whatsapp';
 import systemTestZapi from '../src/api-handlers/system/test-zapi';
+import systemSendEmailLink from '../src/api-handlers/system/send-email-link';
+import systemMigratePixColumns from '../src/api-handlers/system/migrate-pix-columns';
+
+// pix
+import pixCreateCharge from '../src/api-handlers/pix/create-charge';
+import pixCheckStatus from '../src/api-handlers/pix/check-status';
+import pixWebhook from '../src/api-handlers/pix/webhook';
+import pixProcessCard from '../src/api-handlers/pix/process-card';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     const url = req.url || '';
@@ -137,6 +145,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         case 'system/simple-test': return systemSimpleTest(req, res);
         case 'system/test-whatsapp': return systemTestWhatsapp(req, res);
         case 'system/test-zapi': return systemTestZapi(req, res);
+        case 'system/send-email-link': return systemSendEmailLink(req, res);
+        case 'system/migrate-pix-columns': return systemMigratePixColumns(req, res);
+
+        case 'pix/create-charge': return pixCreateCharge(req, res);
+        case 'pix/check-status': return pixCheckStatus(req, res);
+        case 'pix/webhook': return pixWebhook(req, res);
+        case 'pix/process-card': return pixProcessCard(req, res);
 
         default:
             res.status(404).json({ error: `Route not found: /api/${cleanUrl}` });
