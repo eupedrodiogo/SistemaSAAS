@@ -1,6 +1,8 @@
 
 import React, { useState } from 'react';
 import { X, TrendingDown, Save } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 interface AddSUDModalProps {
     isOpen: boolean;
@@ -21,18 +23,16 @@ const AddSUDModal: React.FC<AddSUDModalProps> = ({ isOpen, onClose, onSave, load
     };
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative w-full max-w-sm bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 ring-1 ring-slate-200 dark:ring-slate-800 animate-scale-up">
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="sm:max-w-sm p-6 bg-white dark:bg-slate-900 border-0 shadow-2xl ring-1 ring-slate-200 dark:ring-slate-800">
+                <DialogTitle className="sr-only">Registrar SUD</DialogTitle>
+                <DialogDescription className="sr-only">Formulário para registrar nível de desconforto.</DialogDescription>
 
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
                         <TrendingDown className="text-indigo-500" size={20} />
                         Registrar SUD
                     </h3>
-                    <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-500">
-                        <X size={20} />
-                    </button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
@@ -68,17 +68,17 @@ const AddSUDModal: React.FC<AddSUDModalProps> = ({ isOpen, onClose, onSave, load
                         />
                     </div>
 
-                    <button
+                    <Button
                         type="submit"
                         disabled={loading}
-                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/20 transition-all flex items-center justify-center gap-2"
+                        className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/20 transition-all flex items-center justify-center gap-2 text-base"
                     >
                         {loading ? 'Salvando...' : 'Salvar Registro'}
                         {!loading && <Save size={18} />}
-                    </button>
+                    </Button>
                 </form>
-            </div>
-        </div>
+            </DialogContent>
+        </Dialog>
     );
 };
 

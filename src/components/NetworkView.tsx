@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { toast } from 'sonner';
 import { Network, ArrowDownRight, ArrowUpRight, CheckCircle2, XCircle, Clock, MessageCircle, ExternalLink, Loader2 } from 'lucide-react';
 
 interface Referral {
@@ -85,7 +86,10 @@ const NetworkView: React.FC = () => {
 
     const handleWhatsApp = (contact: string, name: string) => {
         const phone = contact.replace(/\D/g, '');
-        if (phone.length < 10) return alert('Número inválido');
+        if (phone.length < 10) {
+          toast.error('Número de telefone inválido.');
+          return;
+        }
         const message = `Olá ${name}, recebi sua indicação através da rede de transbordo TeraNexus. Como posso ajudar?`;
         window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(message)}`, '_blank');
         

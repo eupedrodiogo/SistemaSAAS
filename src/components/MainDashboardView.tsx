@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AppView } from '../enums';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
+import { toast } from 'sonner';
 import {
   Users,
   Calendar,
@@ -349,10 +350,9 @@ const MainDashboardView: React.FC<MainDashboardViewProps> = ({ onChangeView, the
               const url = `${window.location.origin}/agendar/u/${therapist?.id}`;
               if (navigator.clipboard && window.isSecureContext) {
                 navigator.clipboard.writeText(url)
-                  .then(() => alert('Link de agendamento (Pagantes) copiado para a área de transferência!\n' + url))
-                  .catch(() => alert('Não foi possível copiar. Copie manualmente:\n' + url));
+                  .then(() => toast.success('Link de agendamento copiado!'))
+                  .catch(() => toast.error('Não foi possível copiar. URL: ' + url));
               } else {
-                // Fallback para HTTP (ex: 192.168.1.29)
                 const textArea = document.createElement("textarea");
                 textArea.value = url;
                 textArea.style.position = "fixed";
@@ -362,9 +362,9 @@ const MainDashboardView: React.FC<MainDashboardViewProps> = ({ onChangeView, the
                 textArea.select();
                 try {
                   document.execCommand('copy');
-                  alert('Link de agendamento (Pagantes) copiado para a área de transferência!\n' + url);
+                  toast.success('Link de agendamento copiado!');
                 } catch (err) {
-                  alert('Copie este link manualmente:\n' + url);
+                  toast.error('Copie manualmente: ' + url);
                 }
                 textArea.remove();
               }
@@ -382,8 +382,8 @@ const MainDashboardView: React.FC<MainDashboardViewProps> = ({ onChangeView, the
               const url = `${window.location.origin}/convite-anjo/${therapist?.id}`;
               if (navigator.clipboard && window.isSecureContext) {
                 navigator.clipboard.writeText(url)
-                  .then(() => alert('Link Anjo (Atendimento Gratuito) copiado para a área de transferência!\n' + url))
-                  .catch(() => alert('Não foi possível copiar. Copie manualmente:\n' + url));
+                  .then(() => toast.success('Link Anjo copiado!'))
+                  .catch(() => toast.error('Não foi possível copiar. URL: ' + url));
               } else {
                 const textArea = document.createElement("textarea");
                 textArea.value = url;
@@ -394,9 +394,9 @@ const MainDashboardView: React.FC<MainDashboardViewProps> = ({ onChangeView, the
                 textArea.select();
                 try {
                   document.execCommand('copy');
-                  alert('Link Anjo copiado para a área de transferência!\n' + url);
+                  toast.success('Link Anjo copiado!');
                 } catch (err) {
-                  alert('Copie este link manualmente:\n' + url);
+                  toast.error('Copie manualmente: ' + url);
                 }
                 textArea.remove();
               }

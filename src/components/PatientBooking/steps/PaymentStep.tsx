@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CreditCard, Lock, CheckCircle2, AlertCircle, Mail, QrCode, Copy } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { toast } from 'sonner';
 import { useTheme } from '../../../contexts/ThemeContext';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
@@ -383,7 +384,7 @@ const PaymentStep: React.FC<PaymentStepProps> = ({ data, appointmentId, onBack, 
                                         onClick={(e) => (e.target as HTMLInputElement).select()}
                                     />
                                     <button
-                                        onClick={() => { navigator.clipboard.writeText(pixData.copiaecola); alert('Código PIX copiado!'); }}
+                                        onClick={() => { navigator.clipboard.writeText(pixData.copiaecola); toast.success('C\u00f3digo PIX copiado!'); }}
                                         className="bg-green-600 hover:bg-green-500 text-white p-3 rounded-lg flex-shrink-0"
                                     >
                                         <Copy size={20} />

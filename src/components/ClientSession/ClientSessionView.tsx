@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { toast } from 'sonner';
 import {
     Mic,
     MicOff,
@@ -257,7 +258,7 @@ const ClientSessionView: React.FC = () => {
 
     const startRecording = () => {
         if (!stream || !remoteStream) {
-            alert("Aguarde a conexão com o terapeuta para iniciar a gravação.");
+            toast.warning('Aguarde a conexão com o terapeuta para iniciar a gravação.');
             return;
         }
         setRecordedChunks([]);
@@ -335,7 +336,7 @@ const ClientSessionView: React.FC = () => {
 
         } catch (e) {
             console.error(e);
-            alert("Erro ao iniciar gravação.");
+            toast.error('Erro ao iniciar gravação.');
         }
     };
 
@@ -399,7 +400,7 @@ const ClientSessionView: React.FC = () => {
 
             setRecordedChunks([]);
             setRecordingTime(0);
-            alert('Gravação salva na nuvem com sucesso! Você pode acessá-la na sua galeria.');
+            toast.success('Gravação salva na nuvem com sucesso! Acesse-a na sua galeria.');
 
             // Refresh recordings list
             if (patientId) {
@@ -422,7 +423,7 @@ const ClientSessionView: React.FC = () => {
 
         } catch (error: any) {
             console.error(error);
-            alert(`Erro ao salvar gravação: ${error.message}`);
+            toast.error(`Erro ao salvar gravação: ${error.message}`);
         } finally {
             setIsUploading(false);
         }

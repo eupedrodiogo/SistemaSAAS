@@ -90,12 +90,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             await sendBookingNotification({
                 name: appointment.patients?.name || 'Paciente',
                 email: appointment.patients?.email || '',
+                phone: appointment.patients?.phone || '',
                 therapistEmail: appointment.therapists?.email || '',
                 therapistName: appointment.therapists?.name || 'Terapeuta',
                 date: appointment.date,
                 time: appointment.time,
-                price: appointment.price,
-                status: 'confirmed',
             });
         } catch (emailErr: any) {
             console.error('[MP Webhook] Erro ao enviar e-mails:', emailErr.message);

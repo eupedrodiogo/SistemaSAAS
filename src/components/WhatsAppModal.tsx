@@ -1,7 +1,9 @@
-
 import React, { useState } from 'react';
 import { X, MessageCircle, Send, CheckCircle2, User, Calendar, Clock } from 'lucide-react';
 import { Patient } from 'types';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 interface WhatsAppModalProps {
     isOpen: boolean;
@@ -66,16 +68,16 @@ export default function WhatsAppModal({ isOpen, onClose, patient, therapistName 
     };
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md animate-slide-up overflow-hidden ring-1 ring-slate-200 dark:ring-slate-800">
-
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="p-0 overflow-hidden sm:max-w-md bg-white dark:bg-slate-900 border-0 shadow-2xl ring-1 ring-slate-200 dark:ring-slate-800 flex flex-col gap-0">
+                <DialogTitle className="sr-only">Enviar WhatsApp</DialogTitle>
+                <DialogDescription className="sr-only">Envie mensagens de WhatsApp para o paciente.</DialogDescription>
+                
                 {/* Header */}
                 <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-[#25D366]/10">
                     <h3 className="font-bold text-[#075E54] dark:text-[#25D366] flex items-center gap-2">
                         <MessageCircle size={20} /> Enviar WhatsApp
                     </h3>
-                    <button onClick={onClose}><X size={20} className="text-slate-400 hover:text-slate-600" /></button>
                 </div>
 
                 <div className="p-6 space-y-6">
@@ -114,11 +116,11 @@ export default function WhatsAppModal({ isOpen, onClose, patient, therapistName 
                                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5">Data</label>
                                 <div className="relative">
                                     <Calendar size={14} className="absolute left-3 top-3 text-slate-400" />
-                                    <input
+                                    <Input
                                         type="text"
                                         value={date}
                                         onChange={(e) => setDate(e.target.value)}
-                                        className="w-full pl-9 p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
+                                        className="h-auto py-2.5 w-full pl-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm"
                                     />
                                 </div>
                             </div>
@@ -126,11 +128,11 @@ export default function WhatsAppModal({ isOpen, onClose, patient, therapistName 
                                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5">Horário</label>
                                 <div className="relative">
                                     <Clock size={14} className="absolute left-3 top-3 text-slate-400" />
-                                    <input
+                                    <Input
                                         type="text"
                                         value={time}
                                         onChange={(e) => setTime(e.target.value)}
-                                        className="w-full pl-9 p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
+                                        className="h-auto py-2.5 w-full pl-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm"
                                     />
                                 </div>
                             </div>
@@ -142,17 +144,17 @@ export default function WhatsAppModal({ isOpen, onClose, patient, therapistName 
                     {success && <p className="text-green-600 text-sm text-center bg-green-50 p-2 rounded-lg flex items-center justify-center gap-2"><CheckCircle2 size={16} /> Enviado com sucesso!</p>}
 
                     {/* Action Button */}
-                    <button
+                    <Button
                         onClick={handleSend}
                         disabled={loading || success}
-                        className={`w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all ${success ? 'bg-green-500' : 'bg-[#25D366] hover:bg-[#128C7E]'
+                        className={`w-full h-12 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all ${success ? 'bg-green-500 hover:bg-green-600' : 'bg-[#25D366] hover:bg-[#128C7E]'
                             } ${loading ? 'opacity-70 cursor-wait' : ''}`}
                     >
                         {loading ? 'Enviando...' : success ? 'Enviado!' : <><Send size={18} /> Enviar Mensagem</>}
-                    </button>
+                    </Button>
 
                 </div>
-            </div>
-        </div>
+            </DialogContent>
+        </Dialog>
     );
 }

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { toast } from 'sonner';
 import { ArrowLeft, Check, Loader2, Send, Clock, ShieldAlert, Laptop, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -54,7 +55,7 @@ export default function ValidatorSurvey() {
             setSuccess(true);
         } catch (error) {
             console.error('Error saving response:', error);
-            alert('Erro ao enviar resposta. Verifique se você rodou o script de atualização do banco de dados.');
+            toast.error('Erro ao enviar resposta. Verifique se você rodou o script de atualização do banco de dados.');
         } finally {
             setLoading(false);
         }

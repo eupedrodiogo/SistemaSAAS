@@ -1,4 +1,5 @@
 import React from 'react';
+import { toast } from 'sonner';
 import {
   BrainCircuit,
   CheckCircle2,
@@ -43,7 +44,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLoginClick, isDarkMode, tog
   const handleCheckout = async (priceId: string, mode: 'payment' | 'subscription', couponId?: string) => {
     try {
       if (priceId.includes('WAITING_FOR_USER')) {
-        alert('Configuração pendente: STRIPE_SECRET_KEY ausente ou produtos não criados.');
+        toast.error('Configuração pendente: STRIPE_SECRET_KEY ausente ou produtos não criados.');
         return;
       }
 
@@ -83,7 +84,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLoginClick, isDarkMode, tog
       }
     } catch (e: any) {
       console.error('Checkout Error:', e);
-      alert(`Erro: ${e.message || 'Erro de conexão.'}`);
+      toast.error(`Erro: ${e.message || 'Erro de conexão.'}`);
       // Reset button state (simplified)
       const btns = document.querySelectorAll('button');
       btns.forEach(b => {

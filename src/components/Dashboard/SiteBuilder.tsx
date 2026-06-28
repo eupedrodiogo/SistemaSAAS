@@ -17,6 +17,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { SiteConfig } from '../PatientBooking/TherapistPersonalPage';
 import { supabase } from '../../lib/supabase';
+import { toast } from 'sonner';
 
 const SiteBuilder: React.FC = () => {
     const { user } = useAuth();
@@ -137,10 +138,10 @@ const SiteBuilder: React.FC = () => {
                 }, { onConflict: 'therapist_id' });
 
             if (error) throw error;
-            alert('Site salvo e publicado com sucesso!');
+            toast.success('Site salvo e publicado com sucesso!');
         } catch (err) {
             console.error('Error saving site:', err);
-            alert('Erro ao salvar o site. Tente novamente.');
+            toast.error('Erro ao salvar o site. Tente novamente.');
         } finally {
             setSaving(false);
         }

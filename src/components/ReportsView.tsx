@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import {
    FiFileText, FiDownload, FiShare2, FiClock, FiCheckCircle,
    FiAlertCircle, FiRefreshCw, FiBook, FiList, FiTrash2, FiUser, FiActivity
@@ -552,11 +553,11 @@ export function ReportsView({ initialPatientId, onParamsConsumed }: ReportsViewP
             setCurrentReport(data.report);
             await saveReport(data.report, patient?.name);
          } else {
-            alert('Erro ao gerar relatório. Tente novamente.');
+            toast.error('Erro ao gerar relatório. Tente novamente.');
          }
       } catch (error) {
          console.error('AI generation error:', error);
-         alert('Erro de conexão com a IA.');
+         toast.error('Erro de conexão com a IA.');
       } finally {
          setGenerating(false);
       }

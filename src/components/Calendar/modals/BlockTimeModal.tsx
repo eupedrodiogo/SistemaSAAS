@@ -2,6 +2,9 @@ import React from 'react';
 import { Ban, CalendarIcon, Clock, X } from 'lucide-react';
 import { useCalendarContext } from '../CalendarContext';
 import { api } from '../../../services/api';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 export const BlockTimeModal: React.FC = () => {
    const {
@@ -29,18 +32,16 @@ export const BlockTimeModal: React.FC = () => {
    };
 
    return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-         <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsBlockModalOpen(false)} />
-         <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden relative z-10 animate-slide-up ring-1 ring-slate-200 dark:ring-slate-800">
+      <Dialog open={isBlockModalOpen} onOpenChange={(open) => !open && setIsBlockModalOpen(false)}>
+         <DialogContent className="p-0 overflow-hidden sm:max-w-md bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col gap-0">
+            <DialogTitle className="sr-only">Bloquear Horário</DialogTitle>
+            <DialogDescription className="sr-only">Formulário para bloquear horários na agenda.</DialogDescription>
             <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950">
                <div>
                   <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                      <Ban className="text-red-500" /> Bloquear Horário
                   </h3>
                </div>
-               <button onClick={() => setIsBlockModalOpen(false)} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400">
-                  <X size={20} />
-               </button>
             </div>
             <form onSubmit={handleAddBlock} className="p-6 space-y-4">
                <div>
@@ -59,7 +60,7 @@ export const BlockTimeModal: React.FC = () => {
                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Data</label>
                      <div className="relative">
                         <CalendarIcon size={16} className="absolute left-3 top-3 text-slate-400" />
-                        <input type="date" required value={blockForm.date} onChange={e => setBlockForm({...blockForm, date: e.target.value})} className="w-full pl-10 p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none font-medium text-slate-700 dark:text-white" />
+                        <Input type="date" required value={blockForm.date} onChange={e => setBlockForm({...blockForm, date: e.target.value})} className="h-auto py-2.5 w-full pl-10 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-700 dark:text-white" />
                      </div>
                   </div>
                ) : (
@@ -74,23 +75,23 @@ export const BlockTimeModal: React.FC = () => {
                <div className="flex gap-4">
                   <div className="flex-1">
                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Início</label>
-                     <div className="relative"><Clock size={16} className="absolute left-3 top-3 text-slate-400" /><input type="time" required value={blockForm.startTime} onChange={e => setBlockForm({...blockForm, startTime: e.target.value})} className="w-full pl-10 p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none font-medium text-slate-700 dark:text-white" /></div>
+                     <div className="relative"><Clock size={16} className="absolute left-3 top-3 text-slate-400" /><Input type="time" required value={blockForm.startTime} onChange={e => setBlockForm({...blockForm, startTime: e.target.value})} className="h-auto py-2.5 w-full pl-10 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-700 dark:text-white" /></div>
                   </div>
                   <div className="flex-1">
                      <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Fim</label>
-                     <div className="relative"><Clock size={16} className="absolute left-3 top-3 text-slate-400" /><input type="time" required value={blockForm.endTime} onChange={e => setBlockForm({...blockForm, endTime: e.target.value})} className="w-full pl-10 p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none font-medium text-slate-700 dark:text-white" /></div>
+                     <div className="relative"><Clock size={16} className="absolute left-3 top-3 text-slate-400" /><Input type="time" required value={blockForm.endTime} onChange={e => setBlockForm({...blockForm, endTime: e.target.value})} className="h-auto py-2.5 w-full pl-10 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-700 dark:text-white" /></div>
                   </div>
                </div>
                <div>
                   <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Motivo (Opcional)</label>
-                  <input type="text" placeholder="Ex: Almoço, Reunião" value={blockForm.label} onChange={e => setBlockForm({...blockForm, label: e.target.value})} className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none font-medium text-slate-700 dark:text-white" />
+                  <Input type="text" placeholder="Ex: Almoço, Reunião" value={blockForm.label} onChange={e => setBlockForm({...blockForm, label: e.target.value})} className="h-auto py-2.5 w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-700 dark:text-white" />
                </div>
                <div className="flex gap-2 pt-2">
-                  <button type="button" onClick={() => setIsBlockModalOpen(false)} className="flex-1 py-2.5 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800">Cancelar</button>
-                  <button type="submit" className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl shadow-lg">Salvar Bloqueio</button>
+                  <Button variant="outline" type="button" onClick={() => setIsBlockModalOpen(false)} className="flex-1 h-10 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800">Cancelar</Button>
+                  <Button type="submit" className="flex-1 h-10 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl shadow-lg">Salvar Bloqueio</Button>
                </div>
             </form>
-         </div>
-      </div>
+         </DialogContent>
+      </Dialog>
    );
 };

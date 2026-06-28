@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { toast } from 'sonner';
 import { BrainCircuit, Check } from 'lucide-react';
 import RegisterStep from './steps/RegisterStep';
 import AnamnesisStep from './steps/AnamnesisStep';
@@ -305,7 +306,7 @@ const BookingWizard: React.FC = () => {
                 nextStep();
             }
         } else {
-            alert('Erro ao criar agendamento. Por favor, tente novamente.');
+            toast.error('Erro ao criar agendamento. Por favor, tente novamente.');
         }
     };
 

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useClientData } from './ClientContext';
 import AnamnesisStep from '../PatientBooking/steps/AnamnesisStep';
 import { ClientIntakeData } from '../../../types';
+import { toast } from 'sonner';
 import { ArrowLeft, FileText, CheckCircle } from 'lucide-react';
 
 const ClientAnamnesis: React.FC = () => {
@@ -46,13 +47,13 @@ const ClientAnamnesis: React.FC = () => {
             if (response.ok) {
                 localStorage.setItem('anamnese_completed', 'true');
                 setIsSuccess(true);
-                refreshData(); // atualiza o contexto para não pedir mais a anamnese
+                refreshData();
             } else {
-                alert('Ocorreu um erro ao salvar a anamnese. Tente novamente.');
+                toast.error('Ocorreu um erro ao salvar a anamnese. Tente novamente.');
             }
         } catch (e) {
             console.error(e);
-            alert('Erro de conexão ao salvar.');
+            toast.error('Erro de conexão ao salvar.');
         } finally {
             setIsLoading(false);
         }

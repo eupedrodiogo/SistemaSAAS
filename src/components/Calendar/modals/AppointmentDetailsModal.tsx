@@ -4,6 +4,9 @@ import { useCalendarContext } from '../CalendarContext';
 import { api } from '../../../services/api';
 import { supabase } from '../../../lib/supabase';
 import { AddToCalendar } from '../../AddToCalendar';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 export const AppointmentDetailsModal: React.FC<{ onNavigateToPatient?: (id: string) => void }> = ({ onNavigateToPatient }) => {
    const {
@@ -45,8 +48,10 @@ export const AppointmentDetailsModal: React.FC<{ onNavigateToPatient?: (id: stri
    };
 
    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-         <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-slide-up ring-1 ring-slate-200 dark:ring-slate-800 flex flex-col max-h-[90vh]">
+      <Dialog open={!!selectedAppointment} onOpenChange={(open) => !open && setSelectedAppointment(null)}>
+         <DialogContent className="p-0 overflow-hidden sm:max-w-md bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col max-h-[90vh] gap-0">
+            <DialogTitle className="sr-only">Detalhes do Agendamento</DialogTitle>
+            <DialogDescription className="sr-only">Visualize e gerencie os detalhes do agendamento.</DialogDescription>
             <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-start bg-slate-50 dark:bg-slate-950">
                <div>
                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider mb-2 inline-block ${(selectedAppointment.status === 'scheduled' || selectedAppointment.status === 'Agendado') ? 'bg-blue-100 text-blue-700' :
@@ -61,7 +66,6 @@ export const AppointmentDetailsModal: React.FC<{ onNavigateToPatient?: (id: stri
                   <h3 className="text-xl font-bold text-slate-800 dark:text-white">{selectedAppointment.patientName}</h3>
                   <p className="text-sm text-slate-500">{selectedAppointment.type}</p>
                </div>
-               <button onClick={() => setSelectedAppointment(null)} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400"><X size={20} /></button>
             </div>
             
             <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar">
@@ -80,9 +84,9 @@ export const AppointmentDetailsModal: React.FC<{ onNavigateToPatient?: (id: stri
                   <p className="text-xs text-slate-400 font-bold uppercase mb-1">Financeiro</p>
                   <div className="flex items-center gap-2">
                      <span className="text-slate-500 font-bold">R$</span>
-                     <input
+                     <Input
                         type="number"
-                        className="w-full bg-transparent font-semibold text-slate-800 dark:text-white outline-none placeholder-slate-400"
+                        className="h-auto py-0 px-0 w-full bg-transparent border-0 shadow-none focus-visible:ring-0 font-semibold text-slate-800 dark:text-white placeholder-slate-400"
                         placeholder="0,00"
                         defaultValue={selectedAppointment.sessionData?.price || ''}
                         onBlur={(e) => handleUpdatePrice(Number(e.target.value))}
@@ -103,21 +107,22 @@ export const AppointmentDetailsModal: React.FC<{ onNavigateToPatient?: (id: stri
 
                {/* Botão Link Anjo */}
                {((selectedAppointment as any).type === 'Anjo' || selectedAppointment.sessionData?.price === 0) && selectedAppointment.patientId === 'unregistered' && (
-                  <button
+                  <Button
                      onClick={() => {
                         const link = `${window.location.origin}/convite-anjo/${selectedAppointment.id}`;
                         navigator.clipboard.writeText(link);
                         showNotification('💗 Link Anjo copiado! Envie ao cliente.', 'success');
                      }}
-                     className="w-full py-2.5 mb-2 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 font-bold rounded-xl hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors text-sm flex items-center justify-center gap-2 border border-rose-200 dark:border-rose-800"
+                     variant="outline"
+                     className="w-full h-10 mb-2 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 font-bold rounded-xl hover:bg-rose-100 dark:hover:bg-rose-900/40 text-sm flex items-center justify-center gap-2 border border-rose-200 dark:border-rose-800 hover:text-rose-700"
                   >
                      <Heart size={16} fill="currentColor" /> Copiar Link Anjo
-                  </button>
+                  </Button>
                )}
 
                {selectedAppointment.patientId !== 'unregistered' && (
                   <>
-                     <button 
+                     <Button 
                         onClick={async () => {
                             const link = `${window.location.origin}/portal-paciente/cadastro?email=${encodeURIComponent(selectedAppointment.patientEmail || '')}&appointmentId=${selectedAppointment.id}`;
                             navigator.clipboard.writeText(`Olá ${selectedAppointment.patientName}! Preencha sua ficha de anamnese: ${link}`);
@@ -125,14 +130,15 @@ export const AppointmentDetailsModal: React.FC<{ onNavigateToPatient?: (id: stri
                             
                             // Send Backend Emails / WhatsApp (Omitted detailed implementation here to save space, assuming it calls backend similar to original)
                          }}
-                        className="w-full py-2.5 mb-3 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-bold rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors text-sm flex items-center justify-center gap-2"
+                        variant="secondary"
+                        className="w-full h-10 mb-3 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-bold rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-sm flex items-center justify-center gap-2"
                      >
                         <ClipboardCopy size={16} /> Solicitar Anamnese
-                     </button>
+                     </Button>
 
                      <div className="flex flex-wrap gap-2">
                         {selectedAppointment.status === 'pending_payment' && (
-                           <button 
+                           <Button 
                               onClick={async () => {
                                  try {
                                     await api.appointments.update(selectedAppointment.id, { status: 'scheduled' });
@@ -143,13 +149,14 @@ export const AppointmentDetailsModal: React.FC<{ onNavigateToPatient?: (id: stri
                                      showNotification('Erro ao confirmar PIX: ' + err.message, 'error');
                                   }
                                }}
-                               className="w-full py-2.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-bold rounded-xl hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition-colors text-sm flex items-center justify-center gap-2 mb-1"
+                               className="w-full h-10 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-bold rounded-xl hover:bg-emerald-200 dark:hover:bg-emerald-900/50 text-sm flex items-center justify-center gap-2 mb-1"
                             >
                                <CheckCircle2 size={16} /> Confirmar PIX
-                            </button>
+                            </Button>
                          )}
-                        <button onClick={() => onNavigateToPatient?.(selectedAppointment.patientId)} className="flex-1 py-2.5 bg-slate-800 dark:bg-slate-700 text-white font-bold rounded-xl hover:bg-slate-900 transition-colors text-sm flex items-center justify-center gap-2"><User size={16} /> Ver Ficha</button>
-                        <button 
+                        <Button onClick={() => onNavigateToPatient?.(selectedAppointment.patientId)} className="flex-1 h-10 bg-slate-800 dark:bg-slate-700 text-white font-bold rounded-xl hover:bg-slate-900 text-sm flex items-center justify-center gap-2"><User size={16} /> Ver Ficha</Button>
+                        <Button 
+                           variant="secondary"
                            onClick={() => {
                               setSelectedAppointment(null);
                               setIsRescheduling(true);
@@ -163,21 +170,21 @@ export const AppointmentDetailsModal: React.FC<{ onNavigateToPatient?: (id: stri
                                  setCurrentDate(aptDate);
                               }
                            }} 
-                           className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-200 transition-colors text-sm flex items-center justify-center gap-2"
+                           className="flex-1 h-10 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-200 text-sm flex items-center justify-center gap-2"
                         >
                            <Clock size={16} /> Reagendar
-                        </button>
-                        <button onClick={handleDelete} className="p-2.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-bold rounded-xl hover:bg-red-100 transition-colors"><Trash2 size={20} /></button>
+                        </Button>
+                        <Button variant="destructive" onClick={handleDelete} className="h-10 w-10 p-0 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-bold rounded-xl hover:bg-red-100"><Trash2 size={20} /></Button>
                      </div>
                   </>
                )}
                {selectedAppointment.patientId === 'unregistered' && (selectedAppointment as any).type !== 'Anjo' && (
                   <div className="flex flex-wrap gap-2">
-                     <button onClick={handleDelete} className="w-full py-2.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-bold rounded-xl hover:bg-red-100 transition-colors flex justify-center items-center gap-2 text-sm"><Trash2 size={16} /> Cancelar Agendamento</button>
+                     <Button variant="destructive" onClick={handleDelete} className="w-full h-10 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-bold rounded-xl hover:bg-red-100 flex justify-center items-center gap-2 text-sm"><Trash2 size={16} /> Cancelar Agendamento</Button>
                   </div>
                )}
             </div>
-         </div>
-      </div>
+         </DialogContent>
+      </Dialog>
    );
 };

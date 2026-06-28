@@ -1,8 +1,31 @@
 import React from 'react';
 import { CalendarIcon, Clock, DollarSign, Heart, User, X } from 'lucide-react';
 import { useCalendarContext } from '../CalendarContext';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { api } from '../../../services/api';
 import { formatDateKey, formatPhone } from '../utils';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+
+// ── Schema Zod ────────────────────────────────────────────────────────────────
+const appointmentSchema = z.object({
+   patientId: z.string().optional(),
+   patientName: z.string().optional(),
+   date: z.string().min(1, 'Data é obrigatória'),
+   time: z.string().min(1, 'Horário é obrigatório'),
+   duration: z
+      .number({ message: 'Duração deve ser um número' })
+      .positive('Duração deve ser positiva')
+      .optional(),
+}).superRefine((data, ctx) => {
+   // patientName obrigatório apenas para sessões não-Anjo (verificado no handler)
+   // Deixamos a validação de patientName para o handler existente pois depende de isAnjo
+});
+
+type AppointmentFormData = z.infer<typeof appointmentSchema>;
 
 export const AddAppointmentModal: React.FC = () => {
    const {
@@ -15,6 +38,22 @@ export const AddAppointmentModal: React.FC = () => {
       showNotification,
       setSuccessPopup
    } = useCalendarContext();
+
+   const {
+      register,
+      handleSubmit,
+      setValue,
+      formState: { errors },
+   } = useForm<AppointmentFormData>({
+      resolver: zodResolver(appointmentSchema),
+      defaultValues: {
+         patientId: addModal?.patientId ?? '',
+         patientName: addModal?.patientName ?? '',
+         date: addModal?.date ? formatDateKey(addModal.date) : '',
+         time: addModal?.time ?? '',
+         duration: undefined,
+      },
+   });
 
    if (!addModal?.isOpen) return null;
 
@@ -49,10 +88,17 @@ export const AddAppointmentModal: React.FC = () => {
       }
    };
 
+   // Wrapper que valida com RHF/zod antes de chamar o handler original
+   const onSubmitValidated = handleSubmit(() => {
+      handleConfirmAdd();
+   });
+
    return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-         <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setAddModal(null)} />
-         <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden relative z-10 animate-slide-up border border-slate-100 dark:border-slate-800 flex flex-col max-h-[90vh]">
+      <Dialog open={addModal?.isOpen} onOpenChange={(open) => !open && setAddModal(null)}>
+         <DialogContent className="p-0 overflow-hidden sm:max-w-md bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-2xl flex flex-col max-h-[90vh] gap-0">
+            <DialogTitle className="sr-only">Agendar Sessão</DialogTitle>
+            <DialogDescription className="sr-only">Preencha os dados do agendamento</DialogDescription>
+            
             <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950">
                <div>
                   <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
@@ -60,31 +106,30 @@ export const AddAppointmentModal: React.FC = () => {
                   </h3>
                   <p className="text-sm text-slate-500 mt-1">Preencha os dados do agendamento</p>
                </div>
-               <button onClick={() => setAddModal(null)} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 transition-colors">
-                  <X size={20} />
-               </button>
             </div>
 
-            <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar">
+            <form onSubmit={onSubmitValidated} className="p-6 space-y-5 overflow-y-auto custom-scrollbar">
                <div className="p-1 bg-slate-100 dark:bg-slate-800/50 rounded-2xl flex gap-1">
-                  <button
+                  <Button
                      type="button"
+                     variant="ghost"
                      onClick={() => setAddModal({ ...addModal, isAnjo: false })}
-                     className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                        !addModal.isAnjo ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                     className={`flex-1 h-10 rounded-xl text-sm font-bold transition-all ${
+                        !addModal.isAnjo ? 'bg-white hover:bg-white dark:bg-slate-700 dark:hover:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-transparent'
                      }`}
                   >
                      Regular
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                      type="button"
+                     variant="ghost"
                      onClick={() => setAddModal({ ...addModal, isAnjo: true })}
-                     className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                        addModal.isAnjo ? 'bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 shadow-sm border border-rose-100 dark:border-rose-800/50' : 'text-slate-500 hover:text-slate-700'
+                     className={`flex-1 h-10 rounded-xl text-sm font-bold transition-all ${
+                        addModal.isAnjo ? 'bg-rose-50 hover:bg-rose-50 dark:bg-rose-900/30 dark:hover:bg-rose-900/30 text-rose-600 dark:text-rose-400 shadow-sm border border-rose-100 dark:border-rose-800/50' : 'text-slate-500 hover:text-slate-700 hover:bg-transparent'
                      }`}
                   >
                      Anjo (Gratuita)
-                  </button>
+                  </Button>
                </div>
 
                <div className="flex gap-4">
@@ -99,13 +144,19 @@ export const AddAppointmentModal: React.FC = () => {
                      <p className="text-xs text-slate-400 font-bold uppercase mb-1">Horário</p>
                      <div className="flex items-center gap-2">
                         <Clock size={16} className="text-slate-500 shrink-0" />
-                        <input
+                        <Input
                            type="time"
-                           className="font-semibold text-slate-800 dark:text-white bg-transparent outline-none w-full"
+                           className="font-semibold text-slate-800 dark:text-white bg-transparent h-auto py-0 px-0 w-full border-0 shadow-none focus-visible:ring-0"
                            value={addModal.time}
-                           onChange={(e) => setAddModal({ ...addModal, time: e.target.value })}
+                           onChange={(e) => {
+                              setAddModal({ ...addModal, time: e.target.value });
+                              setValue('time', e.target.value);
+                           }}
                         />
                      </div>
+                     {errors.time && (
+                        <p className="text-xs text-red-500 mt-1">{errors.time.message}</p>
+                     )}
                   </div>
                </div>
 
@@ -114,14 +165,15 @@ export const AddAppointmentModal: React.FC = () => {
                      <p className="text-xs text-slate-400 font-bold uppercase mb-1">{addModal.isAnjo ? 'Nome do Paciente (Opcional)' : 'Nome do Paciente *'}</p>
                      <div className="flex items-center gap-2">
                         <User size={16} className="text-slate-500 shrink-0" />
-                        <input
+                        <Input
                            type="text"
                            required={!addModal.isAnjo}
-                           className="w-full bg-transparent font-semibold text-slate-800 dark:text-white outline-none placeholder-slate-400"
+                           className="h-auto py-0 px-0 w-full bg-transparent border-0 shadow-none focus-visible:ring-0 font-semibold text-slate-800 dark:text-white placeholder-slate-400"
                            placeholder="Ex: João da Silva"
                            value={addModal.patientName || ''}
                            onChange={(e) => {
                               setAddModal({ ...addModal, patientName: e.target.value, patientId: undefined });
+                              setValue('patientName', e.target.value);
                               setShowPatientDropdown(true);
                            }}
                            onFocus={() => setShowPatientDropdown(true)}
@@ -146,6 +198,8 @@ export const AddAppointmentModal: React.FC = () => {
                                        patientEmail: p.email || '', 
                                        patientPhone: p.phone ? formatPhone(p.phone) : ''
                                     });
+                                    setValue('patientId', p.id);
+                                    setValue('patientName', p.name);
                                     setShowPatientDropdown(false);
                                  }}
                               >
@@ -160,9 +214,9 @@ export const AddAppointmentModal: React.FC = () => {
                   <div className="flex gap-3">
                      <div className="flex-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
                         <p className="text-xs text-slate-400 font-bold uppercase mb-1">E-mail (Opcional)</p>
-                        <input
+                        <Input
                            type="email"
-                           className="w-full bg-transparent text-sm text-slate-800 dark:text-white outline-none placeholder-slate-400"
+                           className="h-auto py-0 px-0 w-full bg-transparent border-0 shadow-none focus-visible:ring-0 text-sm text-slate-800 dark:text-white placeholder-slate-400"
                            placeholder="email@exemplo.com"
                            value={addModal.patientEmail || ''}
                            onChange={(e) => setAddModal({ ...addModal, patientEmail: e.target.value })}
@@ -170,9 +224,9 @@ export const AddAppointmentModal: React.FC = () => {
                      </div>
                      <div className="flex-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
                         <p className="text-xs text-slate-400 font-bold uppercase mb-1">WhatsApp (Opcional)</p>
-                        <input
+                        <Input
                            type="tel"
-                           className="w-full bg-transparent text-sm text-slate-800 dark:text-white outline-none placeholder-slate-400"
+                           className="h-auto py-0 px-0 w-full bg-transparent border-0 shadow-none focus-visible:ring-0 text-sm text-slate-800 dark:text-white placeholder-slate-400"
                            placeholder="(00) 00000-0000"
                            value={addModal.patientPhone || ''}
                            onChange={(e) => setAddModal({ ...addModal, patientPhone: formatPhone(e.target.value) })}
@@ -186,10 +240,10 @@ export const AddAppointmentModal: React.FC = () => {
                      <p className="text-xs text-slate-400 font-bold uppercase mb-1">Valor da Sessão</p>
                      <div className="flex items-center gap-2">
                         <span className="font-semibold text-slate-500">R$</span>
-                        <input
+                        <Input
                            id="new-apt-price"
                            type="number"
-                           className="w-full bg-transparent font-semibold text-slate-800 dark:text-white outline-none"
+                           className="h-auto py-0 px-0 w-full bg-transparent border-0 shadow-none focus-visible:ring-0 font-semibold text-slate-800 dark:text-white"
                            defaultValue={150}
                            step={10}
                            min={0}
@@ -210,25 +264,27 @@ export const AddAppointmentModal: React.FC = () => {
                )}
 
                <div className="flex gap-2">
-                  <button
+                  <Button
+                     type="button"
+                     variant="outline"
                      onClick={() => setAddModal(null)}
-                     className="flex-1 py-2.5 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-sm flex items-center justify-center gap-2"
+                     className="flex-1 h-12 text-slate-600 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-sm flex items-center justify-center gap-2"
                   >
                      <X size={16} /> Cancelar
-                  </button>
-                  <button
-                     onClick={handleConfirmAdd}
-                     className={`flex-1 py-2.5 font-bold rounded-xl text-white transition-all shadow-lg active:scale-95 text-sm flex items-center justify-center gap-2 ${
+                  </Button>
+                  <Button
+                     type="submit"
+                     className={`flex-1 h-12 font-bold rounded-xl text-white shadow-lg active:scale-95 text-sm flex items-center justify-center gap-2 ${
                         addModal.isAnjo
                            ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-500/20'
                            : 'bg-slate-800 dark:bg-slate-700 hover:bg-slate-900 dark:hover:bg-slate-600'
                      }`}
                   >
                      <CalendarIcon size={16} /> Confirmar
-                  </button>
+                  </Button>
                </div>
-            </div>
-         </div>
-      </div>
+            </form>
+         </DialogContent>
+      </Dialog>
    );
 };

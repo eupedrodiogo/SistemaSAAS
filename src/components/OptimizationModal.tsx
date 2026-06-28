@@ -1,5 +1,7 @@
 import React from 'react';
 import { X, Sparkles, ArrowRight, TrendingUp, Calendar, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 interface Suggestion {
     originalAppointmentId: string;
@@ -33,15 +35,10 @@ const OptimizationModal: React.FC<OptimizationModalProps> = ({ isOpen, onClose, 
     if (!isOpen || !data) return null;
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-            {/* Backdrop */}
-            <div
-                className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
-                onClick={onClose}
-            ></div>
-
-            {/* Modal Content */}
-            <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl ring-1 ring-slate-200 dark:ring-slate-800 animate-scale-up overflow-hidden max-h-[90vh] flex flex-col">
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="p-0 overflow-hidden sm:max-w-2xl bg-white dark:bg-slate-900 border-0 shadow-2xl ring-1 ring-slate-200 dark:ring-slate-800 flex flex-col max-h-[90vh] gap-0">
+                <DialogTitle className="sr-only">Otimização Inteligente</DialogTitle>
+                <DialogDescription className="sr-only">Sugestões da IA para sua agenda</DialogDescription>
 
                 {/* Header */}
                 <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-violet-50 to-indigo-50 dark:from-violet-900/20 dark:to-indigo-900/20 flex items-center justify-between shrink-0">
@@ -54,12 +51,6 @@ const OptimizationModal: React.FC<OptimizationModalProps> = ({ isOpen, onClose, 
                             <p className="text-sm text-slate-500 dark:text-slate-400">Sugestões da IA para sua agenda</p>
                         </div>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 transition-colors"
-                    >
-                        <X size={20} />
-                    </button>
                 </div>
 
                 {/* Scrollable Body */}
@@ -141,22 +132,23 @@ const OptimizationModal: React.FC<OptimizationModalProps> = ({ isOpen, onClose, 
 
                 {/* Footer */}
                 <div className="p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex justify-end gap-3 shrink-0">
-                    <button
+                    <Button
                         onClick={onClose}
-                        className="px-5 py-2.5 rounded-xl text-slate-600 hover:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-800 font-medium transition-all"
+                        variant="ghost"
+                        className="px-5 py-6 rounded-xl font-medium transition-all text-base"
                     >
                         Fechar
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         onClick={onApply}
-                        className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold shadow-lg shadow-violet-500/20 active:scale-95 transition-all flex items-center gap-2"
+                        className="px-5 py-6 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold shadow-lg shadow-violet-500/20 active:scale-95 transition-all flex items-center gap-2 text-base"
                     >
                         <CheckCircle2 size={18} />
                         Aplicar Sugestões
-                    </button>
+                    </Button>
                 </div>
-            </div>
-        </div>
+            </DialogContent>
+        </Dialog>
     );
 };
 

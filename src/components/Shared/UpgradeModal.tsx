@@ -1,5 +1,7 @@
 import React from 'react';
 import { X, Zap, CheckCircle2, Lock, ArrowRight } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 interface UpgradeModalProps {
     isOpen: boolean;
@@ -24,16 +26,13 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, featureNam
     ];
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full border border-slate-200 dark:border-slate-800 overflow-hidden">
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="p-0 overflow-hidden sm:max-w-md bg-white dark:bg-slate-900 border-0 shadow-2xl flex flex-col gap-0 [&>button]:text-white [&>button]:top-4 [&>button]:right-4">
+                <DialogTitle className="sr-only">Upgrade Profissional</DialogTitle>
+                <DialogDescription className="sr-only">Desbloqueie todo o potencial do TeraNexus com o plano Profissional.</DialogDescription>
+
                 {/* Header with gradient */}
                 <div className="bg-gradient-to-r from-primary-600 to-secondary-600 p-6 text-white relative">
-                    <button
-                        onClick={onClose}
-                        className="absolute top-4 right-4 p-1 rounded-full hover:bg-white/20 transition-colors"
-                    >
-                        <X size={20} />
-                    </button>
 
                     <div className="flex items-center gap-3 mb-3">
                         <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
@@ -82,22 +81,23 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, featureNam
                     </div>
 
                     <div className="flex gap-3">
-                        <button
+                        <Button
+                            variant="outline"
                             onClick={onClose}
-                            className="flex-1 py-3 px-4 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                            className="flex-1 h-12 rounded-xl text-slate-700 dark:text-slate-300 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                         >
                             Continuar no Iniciante
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             onClick={handleUpgrade}
-                            className="flex-1 py-3 px-4 rounded-xl bg-primary-600 text-white font-bold hover:bg-primary-500 transition-colors shadow-lg shadow-primary-500/30 flex items-center justify-center gap-2"
+                            className="flex-1 h-12 rounded-xl bg-primary-600 text-white font-bold hover:bg-primary-500 transition-colors shadow-lg shadow-primary-500/30 flex items-center justify-center gap-2"
                         >
                             Fazer Upgrade <ArrowRight size={16} />
-                        </button>
+                        </Button>
                     </div>
                 </div>
-            </div>
-        </div>
+            </DialogContent>
+        </Dialog>
     );
 };
 

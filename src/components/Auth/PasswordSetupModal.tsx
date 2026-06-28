@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Lock, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 interface PasswordSetupModalProps {
     isOpen: boolean;
@@ -53,8 +56,14 @@ const PasswordSetupModal: React.FC<PasswordSetupModalProps> = ({ isOpen, onSucce
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in duration-300">
+        <Dialog open={isOpen}>
+            <DialogContent 
+                showCloseButton={false}
+                className="p-0 overflow-hidden sm:max-w-md bg-white dark:bg-slate-900 border-0 shadow-2xl flex flex-col gap-0"
+            >
+                <DialogTitle className="sr-only">Defina sua Senha</DialogTitle>
+                <DialogDescription className="sr-only">Para garantir sua segurança e facilitar o próximo acesso, crie uma senha agora.</DialogDescription>
+                
                 <div className="p-6 bg-primary-600">
                     <div className="flex justify-center mb-4">
                         <div className="bg-white/20 p-3 rounded-full">
@@ -74,11 +83,11 @@ const PasswordSetupModal: React.FC<PasswordSetupModalProps> = ({ isOpen, onSucce
                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                     Nova Senha
                                 </label>
-                                <input
+                                <Input
                                     type="password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full rounded-lg border border-slate-300 dark:border-slate-700 px-4 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
+                                    className="w-full h-10 px-4"
                                     placeholder="Mínimo 6 caracteres"
                                     required
                                 />
@@ -87,11 +96,11 @@ const PasswordSetupModal: React.FC<PasswordSetupModalProps> = ({ isOpen, onSucce
                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                     Confirmar Senha
                                 </label>
-                                <input
+                                <Input
                                     type="password"
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
-                                    className="w-full rounded-lg border border-slate-300 dark:border-slate-700 px-4 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
+                                    className="w-full h-10 px-4"
                                     placeholder="Repita a senha"
                                     required
                                 />
@@ -105,10 +114,10 @@ const PasswordSetupModal: React.FC<PasswordSetupModalProps> = ({ isOpen, onSucce
                             </div>
                         )}
 
-                        <button
+                        <Button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-primary-500/20 transition-all mt-6 flex items-center justify-center gap-2 disabled:opacity-70"
+                            className="w-full h-12 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-lg shadow-primary-500/20 transition-all mt-6 flex items-center justify-center gap-2"
                         >
                             {isLoading ? (
                                 <Loader2 className="animate-spin" size={20} />
@@ -118,11 +127,11 @@ const PasswordSetupModal: React.FC<PasswordSetupModalProps> = ({ isOpen, onSucce
                                     Salvar Senha e Continuar
                                 </>
                             )}
-                        </button>
+                        </Button>
                     </form>
                 </div>
-            </div>
-        </div>
+            </DialogContent>
+        </Dialog>
     );
 };
 

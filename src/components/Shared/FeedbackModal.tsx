@@ -1,6 +1,7 @@
-
 import React, { useState } from 'react';
 import { X, Star, MessageSquare, Send, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 interface FeedbackModalProps {
     isOpen: boolean;
@@ -79,8 +80,11 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, userType
     ];
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in zoom-in-95 duration-200">
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="p-0 overflow-hidden sm:max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col gap-0">
+                <DialogTitle className="sr-only">Sua Opinião Importa</DialogTitle>
+                <DialogDescription className="sr-only">Ajude-nos a melhorar o TeraNexus com o seu feedback.</DialogDescription>
+                
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
                     <div className="flex items-center gap-3">
@@ -92,12 +96,6 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, userType
                             <p className="text-xs text-slate-500 dark:text-slate-400">Ajude-nos a melhorar o TeraNexus</p>
                         </div>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
-                    >
-                        <X size={20} />
-                    </button>
                 </div>
 
                 <div className="p-6">
@@ -175,7 +173,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, userType
                                 </div>
                             )}
 
-                            <button
+                            <Button
                                 type="submit"
                                 disabled={isSubmitting}
                                 className="w-full h-12 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary-600/20 active:scale-[0.98]"
@@ -188,12 +186,12 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, userType
                                         Enviar Feedback
                                     </>
                                 )}
-                            </button>
+                            </Button>
                         </form>
                     )}
                 </div>
-            </div>
-        </div>
+            </DialogContent>
+        </Dialog>
     );
 };
 

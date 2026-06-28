@@ -3,6 +3,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation, 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { Moon, Sun } from 'lucide-react';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { queryClient } from './lib/react-query';
+import { Toaster } from 'sonner';
 
 
 // Components
@@ -152,13 +156,27 @@ function AppContent() {
 
 function App() {
   return (
-    <Router>
-      <ThemeProvider>
-        <AuthProvider>
-          <AppContent />
-        </AuthProvider>
-      </ThemeProvider>
-    </Router>
+    <QueryClientProvider client={queryClient}>
+      <Router>
+        <ThemeProvider>
+          <AuthProvider>
+            <AppContent />
+          </AuthProvider>
+          <Toaster
+            position="bottom-right"
+            richColors
+            closeButton
+            toastOptions={{
+              duration: 4000,
+              classNames: {
+                toast: 'font-sans text-sm',
+              },
+            }}
+          />
+        </ThemeProvider>
+      </Router>
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
   );
 }
 

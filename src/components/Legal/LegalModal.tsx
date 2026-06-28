@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { X, Shield, FileText, Check } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 interface LegalModalProps {
     isOpen: boolean;
@@ -60,16 +62,12 @@ const LegalModal: React.FC<LegalModalProps> = ({ isOpen, onClose, type }) => {
     const active = content[type];
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            {/* Backdrop */}
-            <div
-                className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm animate-fade-in"
-                onClick={onClose}
-            ></div>
-
-            {/* Modal */}
-            <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden animate-scale-in border border-slate-200 dark:border-slate-800">
-                <div className="h-1 bg-gradient-to-r from-primary-500 to-primary-700"></div>
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="p-0 overflow-hidden sm:max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl flex flex-col gap-0">
+                <DialogTitle className="sr-only">{active.title}</DialogTitle>
+                <DialogDescription className="sr-only">Termos legais do TeraNexus.</DialogDescription>
+                
+                <div className="h-1 bg-gradient-to-r from-primary-500 to-primary-700 w-full shrink-0"></div>
 
                 {/* Header */}
                 <div className="px-8 py-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
@@ -82,12 +80,6 @@ const LegalModal: React.FC<LegalModalProps> = ({ isOpen, onClose, type }) => {
                             <p className="text-sm text-slate-500 mt-1 uppercase tracking-wider font-bold">TeraNexus Legal</p>
                         </div>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 dark:text-slate-500 transition-colors"
-                    >
-                        <X size={20} />
-                    </button>
                 </div>
 
                 {/* Content */}
@@ -121,15 +113,15 @@ const LegalModal: React.FC<LegalModalProps> = ({ isOpen, onClose, type }) => {
 
                 {/* Footer */}
                 <div className="px-8 py-6 bg-slate-50 dark:bg-slate-800/30 border-t border-slate-100 dark:border-slate-800 flex justify-end">
-                    <button
+                    <Button
                         onClick={onClose}
-                        className="px-6 py-2.5 bg-primary-600 hover:bg-primary-500 text-white font-bold rounded-xl shadow-lg shadow-primary-500/20 transition-all active:scale-95"
+                        className="px-6 h-10 bg-primary-600 hover:bg-primary-500 text-white font-bold rounded-xl shadow-lg shadow-primary-500/20 transition-all active:scale-95"
                     >
                         Entendi
-                    </button>
+                    </Button>
                 </div>
-            </div>
-        </div>
+            </DialogContent>
+        </Dialog>
     );
 };
 

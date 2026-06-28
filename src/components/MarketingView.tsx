@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { toast as sonnerToast } from 'sonner';
 import {
    Plus,
    Target,
@@ -676,7 +677,7 @@ const MarketingView: React.FC = () => {
                         <button
                            onClick={() => {
                               navigator.clipboard.writeText(`${window.location.origin}/agendar/u/${user?.id || 'seu-id-terapeuta'}`);
-                              alert('Link copiado!');
+                              sonnerToast.success('Link copiado!');
                            }}
                            className="-ml-px relative inline-flex items-center space-x-2 px-4 py-2 border border-gray-300 text-sm font-medium rounded-r-md text-gray-700 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                         >
@@ -740,11 +741,11 @@ const MarketingView: React.FC = () => {
                                  className="focus:ring-purple-500 focus:border-purple-500 block w-full rounded-none rounded-l-md sm:text-sm border-gray-300 bg-gray-50 text-gray-500"
                               />
                            </div>
-                           <button
-                              onClick={() => {
-                                 navigator.clipboard.writeText(`${window.location.origin}/t/${user?.id || 'seu-id-terapeuta'}`);
-                                 alert('Link do perfil copiado!');
-                              }}
+                            <button
+                               onClick={() => {
+                                  navigator.clipboard.writeText(`${window.location.origin}/t/${user?.id || 'seu-id-terapeuta'}`);
+                                  sonnerToast.success('Link do perfil copiado!');
+                               }}
                               className="-ml-px relative inline-flex items-center space-x-2 px-4 py-2 border border-gray-300 text-sm font-medium rounded-r-md text-gray-700 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
                            >
                               <Copy className="h-4 w-4 text-gray-400" />

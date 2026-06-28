@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { toast } from 'sonner';
 import {
   ArrowLeft,
   X,
@@ -943,8 +944,7 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
 
   const saveRecordingToGallery = async () => {
     // Mock saving to gallery
-    // For now, simpler feedback
-    alert('Gravação Salva na Galeria!');
+    toast.success('Gravação salva na galeria!');
     console.log('Gravação salva, chunks:', recordedChunks.length);
   };
 
