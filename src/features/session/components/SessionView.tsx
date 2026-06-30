@@ -159,6 +159,7 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
   return (
     <div className="h-screen w-full flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden font-sans">
       <SessionHeader
+        handleStartSession={handleStartSession}
         handleEndSession={handleEndSession}
         selectedPatientId={selectedPatientId}
         handleManualPatientSelect={(e) => handleManualPatientSelect(e.target.value)}
@@ -176,25 +177,27 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
       />
 
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col lg:flex-row p-3 pt-0 lg:pt-3 gap-0 lg:gap-3 relative">
-        <SessionSidebar
-          isFasesOpen={isFasesOpen}
-          phases={phases}
-          phase={phase}
-          isEditingProtocol={isEditingProtocol}
-          isSafetyOpen={isSafetyOpen}
-          sentiment="neutral"
-          handlePhaseChange={handlePhaseChange}
-          setIsEditingProtocol={setIsEditingProtocol}
-          setIsSafetyOpen={setIsSafetyOpen}
-          handleMovePhase={() => {}}
-          handleRenamePhase={() => {}}
-          handleDeletePhase={() => {}}
-          handleAddCustomPhase={() => {}}
-          hasPhaseData={() => false}
-          isSessionStarted={isSessionStarted}
-          selectedAgeRange={selectedAgeRange}
-          sessionData={sessionData}
-        />
+        {isSessionStarted && (
+          <SessionSidebar
+            isFasesOpen={isFasesOpen}
+            phases={phases}
+            phase={phase}
+            isEditingProtocol={isEditingProtocol}
+            isSafetyOpen={isSafetyOpen}
+            sentiment="neutral"
+            handlePhaseChange={handlePhaseChange}
+            setIsEditingProtocol={setIsEditingProtocol}
+            setIsSafetyOpen={setIsSafetyOpen}
+            handleMovePhase={() => {}}
+            handleRenamePhase={() => {}}
+            handleDeletePhase={() => {}}
+            handleAddCustomPhase={() => {}}
+            hasPhaseData={() => false}
+            isSessionStarted={isSessionStarted}
+            selectedAgeRange={selectedAgeRange}
+            sessionData={sessionData}
+          />
+        )}
 
         <SessionCenterView
           phase={phase}
@@ -217,41 +220,47 @@ const SessionView: React.FC<SessionViewProps> = ({ onSessionActiveChange, onNavi
           toggleVideo={toggleVideo}
           toggleMic={toggleMic}
           isMicMuted={isMicMuted}
+          handleStartSession={handleStartSession}
+          patients={patients}
+          selectedPatientId={selectedPatientId}
+          handleManualPatientSelect={handleManualPatientSelect}
         />
 
-        <CockpitPanel
-          mode="dual"
-          phaseLabel={phases.find(p => p.id === phase)?.label || 'Fase'}
-          isKeyboardOpen={isKeyboardOpen}
-          showAgeRanges={phase === 'cronologico'}
-          showMentalSud={phase !== 'somatico'}
-          showPhysicalSud={['cronologico', 'somatico', 'tematico', 'futuro'].includes(phase)}
-          ageRanges={AGE_RANGES}
-          selectedAgeRange={selectedAgeRange}
-          onAgeRangeChange={handleAgeRangeChange}
-          selectedCycle={selectedCycle}
-          onCycleChange={setSelectedCycle}
-          mentalSud={mentalSud}
-          onMentalSudChange={setMentalSud}
-          onRegisterMentalSud={() => {}}
-          mentalHistory={[]}
-          physicalSud={physicalSud}
-          onPhysicalSudChange={setPhysicalSud}
-          onRegisterPhysicalSud={() => {}}
-          physicalHistory={[]}
-          singleSud={0}
-          onSingleSudChange={() => {}}
-          onRegisterSingleSud={() => {}}
-          singleHistory={[]}
-          isPositiveScale={phase === 'potencializacao'}
-          clinicalNotes={''}
-          onClinicalNotesChange={() => {}}
-          onSaveClinicalNotes={() => {}}
-          onAdvancePhase={() => {
-             const idx = phases.findIndex(p => p.id === phase);
-             if (idx < phases.length - 1) handlePhaseChange(phases[idx + 1].id);
-          }}
-        />
+        {isSessionStarted && (
+          <CockpitPanel
+            mode="dual"
+            phaseLabel={phases.find(p => p.id === phase)?.label || 'Fase'}
+            isKeyboardOpen={isKeyboardOpen}
+            showAgeRanges={phase === 'cronologico'}
+            showMentalSud={phase !== 'somatico'}
+            showPhysicalSud={['cronologico', 'somatico', 'tematico', 'futuro'].includes(phase)}
+            ageRanges={AGE_RANGES}
+            selectedAgeRange={selectedAgeRange}
+            onAgeRangeChange={handleAgeRangeChange}
+            selectedCycle={selectedCycle}
+            onCycleChange={setSelectedCycle}
+            mentalSud={mentalSud}
+            onMentalSudChange={setMentalSud}
+            onRegisterMentalSud={() => {}}
+            mentalHistory={[]}
+            physicalSud={physicalSud}
+            onPhysicalSudChange={setPhysicalSud}
+            onRegisterPhysicalSud={() => {}}
+            physicalHistory={[]}
+            singleSud={0}
+            onSingleSudChange={() => {}}
+            onRegisterSingleSud={() => {}}
+            singleHistory={[]}
+            isPositiveScale={phase === 'potencializacao'}
+            clinicalNotes={''}
+            onClinicalNotesChange={() => {}}
+            onSaveClinicalNotes={() => {}}
+            onAdvancePhase={() => {
+               const idx = phases.findIndex(p => p.id === phase);
+               if (idx < phases.length - 1) handlePhaseChange(phases[idx + 1].id);
+            }}
+          />
+        )}
       </div>
     </div>
   );

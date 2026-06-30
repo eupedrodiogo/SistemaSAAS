@@ -1,8 +1,9 @@
 import React from 'react';
-import { ArrowLeft, Sparkles, Minimize2, Maximize2, HelpCircle, Power, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Sparkles, Minimize2, Maximize2, HelpCircle, Power, ChevronDown, Play } from 'lucide-react';
 import { SessionTimer } from '../../../components/Session/SessionTimer';
 
 interface SessionHeaderProps {
+  handleStartSession: () => void;
   handleEndSession: () => void;
   selectedPatientId: string;
   handleManualPatientSelect: (e: React.ChangeEvent<HTMLSelectElement>) => void;
@@ -20,6 +21,7 @@ interface SessionHeaderProps {
 }
 
 export const SessionHeader: React.FC<SessionHeaderProps> = ({
+  handleStartSession,
   handleEndSession,
   selectedPatientId,
   handleManualPatientSelect,

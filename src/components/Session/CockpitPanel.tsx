@@ -187,7 +187,7 @@ export const CockpitPanel: React.FC<CockpitPanelProps> = ({
          */
         <aside className="
             flex flex-col gap-0
-            lg:h-full w-full
+            lg:h-full w-full lg:w-80 xl:w-96 shrink-0
             bg-slate-900 border border-slate-700/60
             rounded-2xl overflow-hidden shadow-xl
         ">

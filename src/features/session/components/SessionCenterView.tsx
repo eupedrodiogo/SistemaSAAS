@@ -3,7 +3,7 @@ import { SessionNotes } from '../../../components/Session/SessionNotes';
 import { ChronologicalPhase } from '../../../components/Session/ChronologicalPhase';
 import { StandardPhase } from '../../../components/Session/StandardPhase';
 import { ProtocolPhase } from '../../../components/Session/ProtocolPhases';
-import { PanelLeftClose, PanelLeftOpen, VideoOff } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, VideoOff, Video as VideoIcon, Play, FileText, ChevronDown } from 'lucide-react';
 import { ClientIntakeData } from 'types';
 
 interface SessionCenterViewProps {
@@ -27,6 +27,10 @@ interface SessionCenterViewProps {
   toggleVideo: () => void;
   toggleMic: () => void;
   isMicMuted: boolean;
+  handleStartSession: () => void;
+  patients: any[];
+  selectedPatientId: string;
+  handleManualPatientSelect: (e: React.ChangeEvent<HTMLSelectElement>) => void;
 }
 
 export const SessionCenterView: React.FC<SessionCenterViewProps> = ({
@@ -49,7 +53,11 @@ export const SessionCenterView: React.FC<SessionCenterViewProps> = ({
   stopCamera,
   toggleVideo,
   toggleMic,
-  isMicMuted
+  isMicMuted,
+  handleStartSession,
+  patients,
+  selectedPatientId,
+  handleManualPatientSelect
 }) => {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -128,6 +136,67 @@ export const SessionCenterView: React.FC<SessionCenterViewProps> = ({
           <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500">
             <VideoOff size={48} className="mb-4 opacity-50" />
             <p className="text-sm font-medium">{isSessionStarted ? 'Aguardando cliente conectar...' : 'Câmera desativada'}</p>
+          </div>
+        )}
+
+        {!isSessionStarted && (
+          <div className="absolute inset-0 z-[60] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto custom-scrollbar">
+            <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-lg flex flex-col items-center justify-center p-8 shadow-[0_0_50px_rgba(0,0,0,0.5)] relative overflow-hidden m-auto animate-fade-in-up">
+              <div className="absolute inset-0 bg-gradient-to-b from-slate-800/20 to-slate-950/80 pointer-events-none"></div>
+              
+              <div className="relative z-10 flex flex-col items-center w-full">
+                <div className="w-20 h-20 mb-6 rounded-full bg-slate-800 flex items-center justify-center shadow-lg border border-slate-700/50">
+                  <VideoIcon size={32} className="text-slate-500" />
+                </div>
+                
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-2 tracking-tight text-center">Sala de Espera</h2>
+                <p className="text-slate-400 mb-8 text-center text-sm sm:text-base leading-relaxed">
+                  O ambiente está configurado e seguro. Clique abaixo para iniciar a sessão e revelar os painéis terapêuticos.
+                </p>
+                
+                <div className="mb-8 p-1.5 bg-slate-800/80 border border-slate-700/50 rounded-2xl flex items-center shadow-lg w-full max-w-md relative z-20 transition-all hover:border-indigo-500/50">
+                  <div className="flex items-center justify-center pl-4 pr-2 shrink-0">
+                    <span className="relative flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                    </span>
+                  </div>
+                  <div className="relative group flex-1 min-w-0">
+                    <select
+                      value={selectedPatientId}
+                      onChange={handleManualPatientSelect}
+                      className="w-full appearance-none bg-transparent text-sm font-bold text-white pl-2 pr-10 py-3 rounded-xl outline-none cursor-pointer group-hover:text-indigo-300 transition-colors truncate"
+                    >
+                      <option value="" disabled>Selecione o Cliente</option>
+                      {patients.map(p => (
+                        <option key={p.id} value={p.id} className="text-slate-200 bg-slate-900 text-left">
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none group-hover:text-indigo-400 transition-colors" />
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full">
+                  <button
+                    className="group bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 text-sm md:text-base font-bold py-3.5 px-6 rounded-full shadow-lg transition-all duration-300 hover:scale-[1.03] active:scale-95 flex items-center gap-2 border border-indigo-500/30"
+                    title="Revisar dados da anamnese preenchida pelo cliente"
+                  >
+                    <FileText className="w-5 h-5" />
+                    Ver anamnese?
+                  </button>
+
+                  <button
+                    onClick={handleStartSession}
+                    className="group bg-emerald-600 hover:bg-emerald-500 text-white text-lg font-bold py-4 px-10 rounded-full shadow-[0_0_25px_rgba(5,150,105,0.4)] transition-all duration-300 hover:scale-[1.03] active:scale-95 flex items-center gap-3 border border-emerald-400/30"
+                  >
+                    <Play className="w-5 h-5 fill-white group-hover:scale-110 transition-transform" />
+                    Iniciar Sessão
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
