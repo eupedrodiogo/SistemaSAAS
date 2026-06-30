@@ -10,7 +10,7 @@ import UpgradeModal from '../Shared/UpgradeModal';
 import MainDashboardView from '../MainDashboardView';
 import PatientsList from '../PatientsList';
 import CalendarView from '../Calendar';
-import SessionView from '../SessionView';
+import SessionView from '../../features/session/components/SessionView';
 import FinancialView from '../FinancialView';
 import MarketingView from '../MarketingView';
 import ReportsView from '../ReportsView';
