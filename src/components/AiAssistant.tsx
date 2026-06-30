@@ -172,7 +172,7 @@ const AiAssistant: React.FC<AiAssistantProps> = ({ currentView = AppView.DASHBOA
         onPointerUp={onTabPointerUp}
         onPointerCancel={onTabPointerUp}
         style={{ top: tabTop !== null ? `${tabTop}px` : '50%', touchAction: 'none' }}
-        className="fixed right-0 -translate-y-1/2 z-[90] bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-r-0 border-slate-200 dark:border-white/10 shadow-[-8px_0_30px_rgba(0,0,0,0.08)] dark:shadow-[-8px_0_30px_rgba(0,0,0,0.4)] rounded-l-[30px] flex flex-col items-center justify-between py-6 px-1 w-[46px] hover:w-[56px] transition-all duration-300 group cursor-grab active:cursor-grabbing overflow-hidden touch-none"
+        className="fixed right-0 -translate-y-1/2 z-[90] bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-r-0 border-slate-200 dark:border-white/10 shadow-[-8px_0_30px_rgba(0,0,0,0.08)] dark:shadow-[-8px_0_30px_rgba(0,0,0,0.4)] rounded-l-[30px] flex flex-col items-center justify-between py-6 px-1 w-[24px] hover:w-[32px] transition-all duration-300 group cursor-grab active:cursor-grabbing overflow-hidden touch-none"
       >
         {/* Glow indicator at the top */}
         <div className="w-2 h-2 bg-red-500 rounded-full shadow-[0_0_8px_rgba(239,68,68,0.6)] mb-6 group-hover:bg-green-500 group-hover:shadow-[0_0_12px_rgba(34,197,94,0.8)] group-hover:animate-pulse transition-all duration-500 relative">

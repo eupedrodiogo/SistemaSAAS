@@ -6,26 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { api } from '../../../services/api';
 import { formatDateKey, formatPhone } from '../utils';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-
-// ── Schema Zod ────────────────────────────────────────────────────────────────
-const appointmentSchema = z.object({
-   patientId: z.string().optional(),
-   patientName: z.string().optional(),
-   date: z.string().min(1, 'Data é obrigatória'),
-   time: z.string().min(1, 'Horário é obrigatório'),
-   duration: z
-      .number({ message: 'Duração deve ser um número' })
-      .positive('Duração deve ser positiva')
-      .optional(),
-}).superRefine((data, ctx) => {
-   // patientName obrigatório apenas para sessões não-Anjo (verificado no handler)
-   // Deixamos a validação de patientName para o handler existente pois depende de isAnjo
-});
-
-type AppointmentFormData = z.infer<typeof appointmentSchema>;
 
 export const AddAppointmentModal: React.FC = () => {
    const {
@@ -39,28 +19,18 @@ export const AddAppointmentModal: React.FC = () => {
       setSuccessPopup
    } = useCalendarContext();
 
-   const {
-      register,
-      handleSubmit,
-      setValue,
-      formState: { errors },
-   } = useForm<AppointmentFormData>({
-      resolver: zodResolver(appointmentSchema),
-      defaultValues: {
-         patientId: addModal?.patientId ?? '',
-         patientName: addModal?.patientName ?? '',
-         date: addModal?.date ? formatDateKey(addModal.date) : '',
-         time: addModal?.time ?? '',
-         duration: undefined,
-      },
-   });
-
    if (!addModal?.isOpen) return null;
 
-   const handleConfirmAdd = async () => {
+   const handleConfirmAdd = async (e?: React.FormEvent) => {
+      e?.preventDefault();
       try {
          if (!addModal.isAnjo && !addModal.patientName) {
             showNotification('O nome do paciente é obrigatório', 'error');
+            return;
+         }
+
+         if (!addModal.time) {
+            showNotification('O horário é obrigatório', 'error');
             return;
          }
 
@@ -88,11 +58,6 @@ export const AddAppointmentModal: React.FC = () => {
       }
    };
 
-   // Wrapper que valida com RHF/zod antes de chamar o handler original
-   const onSubmitValidated = handleSubmit(() => {
-      handleConfirmAdd();
-   });
-
    return (
       <Dialog open={addModal?.isOpen} onOpenChange={(open) => !open && setAddModal(null)}>
          <DialogContent className="p-0 overflow-hidden sm:max-w-md bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-2xl flex flex-col max-h-[90vh] gap-0">
@@ -108,7 +73,7 @@ export const AddAppointmentModal: React.FC = () => {
                </div>
             </div>
 
-            <form onSubmit={onSubmitValidated} className="p-6 space-y-5 overflow-y-auto custom-scrollbar">
+            <form onSubmit={handleConfirmAdd} className="p-6 space-y-5 overflow-y-auto custom-scrollbar">
                <div className="p-1 bg-slate-100 dark:bg-slate-800/50 rounded-2xl flex gap-1">
                   <Button
                      type="button"
@@ -150,12 +115,11 @@ export const AddAppointmentModal: React.FC = () => {
                            value={addModal.time}
                            onChange={(e) => {
                               setAddModal({ ...addModal, time: e.target.value });
-                              setValue('time', e.target.value);
                            }}
                         />
                      </div>
-                     {errors.time && (
-                        <p className="text-xs text-red-500 mt-1">{errors.time.message}</p>
+                     {!addModal.time && (
+                        <p className="text-xs text-red-500 mt-1">Horário é obrigatório</p>
                      )}
                   </div>
                </div>
@@ -173,7 +137,6 @@ export const AddAppointmentModal: React.FC = () => {
                            value={addModal.patientName || ''}
                            onChange={(e) => {
                               setAddModal({ ...addModal, patientName: e.target.value, patientId: undefined });
-                              setValue('patientName', e.target.value);
                               setShowPatientDropdown(true);
                            }}
                            onFocus={() => setShowPatientDropdown(true)}
@@ -198,8 +161,6 @@ export const AddAppointmentModal: React.FC = () => {
                                        patientEmail: p.email || '', 
                                        patientPhone: p.phone ? formatPhone(p.phone) : ''
                                     });
-                                    setValue('patientId', p.id);
-                                    setValue('patientName', p.name);
                                     setShowPatientDropdown(false);
                                  }}
                               >
