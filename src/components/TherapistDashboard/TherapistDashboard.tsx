@@ -295,8 +295,8 @@ const TherapistDashboard: React.FC = () => {
 
     return (
         <div className={`flex min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300`}>
-            {/* Sidebar global — ocultada APENAS durante a Sessão ATIVA */}
-            {(currentView !== AppView.THERAPY || !isTherapySessionActive) && (
+            {/* Sidebar global — ocultada durante toda a view de Sessão (Sala de Espera + Sessão Ativa) */}
+            {currentView !== AppView.THERAPY && (
                 <Sidebar
                     isMobileOpen={isMobileOpen}
                     toggleMobile={() => setIsMobileOpen(!isMobileOpen)}

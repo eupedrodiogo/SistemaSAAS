@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { SessionNotes } from '../../../components/Session/SessionNotes';
 import { ChronologicalPhase } from '../../../components/Session/ChronologicalPhase';
 import { StandardPhase } from '../../../components/Session/StandardPhase';
@@ -61,6 +61,7 @@ export const SessionCenterView: React.FC<SessionCenterViewProps> = ({
 }) => {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const [showAnamnese, setShowAnamnese] = useState(false);
 
   useEffect(() => {
     const el = localVideoRef.current;
@@ -121,13 +122,15 @@ export const SessionCenterView: React.FC<SessionCenterViewProps> = ({
 
   return (
     <div className="flex-1 min-w-0 flex flex-col gap-0 lg:gap-3 relative">
-      <button
-        onClick={() => setIsFasesOpen(!isFasesOpen)}
-        className="hidden lg:flex absolute top-1/2 -left-6 z-40 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full p-1.5 shadow-md text-slate-500 hover:text-indigo-600 transition-colors"
-        title={isFasesOpen ? "Recolher Fases" : "Expandir Fases"}
-      >
-        {isFasesOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
-      </button>
+      {isSessionStarted && (
+        <button
+          onClick={() => setIsFasesOpen(!isFasesOpen)}
+          className="hidden lg:flex absolute top-1/2 -left-4 z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full p-1.5 shadow-md text-slate-500 hover:text-indigo-600 transition-colors"
+          title={isFasesOpen ? "Recolher Fases" : "Expandir Fases"}
+        >
+          {isFasesOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+        </button>
+      )}
 
       <div className={`transition-all duration-500 ${isSessionStarted ? 'h-32 sm:h-48 lg:h-64 mb-3' : 'h-[60vh]'} shrink-0 relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800/50 shadow-inner group`}>
         {remoteStream ? (
@@ -180,6 +183,7 @@ export const SessionCenterView: React.FC<SessionCenterViewProps> = ({
 
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full">
                   <button
+                    onClick={() => setShowAnamnese(prev => !prev)}
                     className="group bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 text-sm md:text-base font-bold py-3.5 px-6 rounded-full shadow-lg transition-all duration-300 hover:scale-[1.03] active:scale-95 flex items-center gap-2 border border-indigo-500/30"
                     title="Revisar dados da anamnese preenchida pelo cliente"
                   >
@@ -209,22 +213,35 @@ export const SessionCenterView: React.FC<SessionCenterViewProps> = ({
 
       </div>
 
-      <div className="flex-1 bg-white dark:bg-slate-900 rounded-none lg:rounded-2xl border-x lg:border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col relative z-20">
-        <div className="lg:hidden p-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex overflow-x-auto no-scrollbar gap-2 shrink-0">
-          {phases.map(p => (
-            <button
-              key={p.id}
-              onClick={() => { /* setPhase here via props if needed on mobile */ }}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors border ${phase === p.id ? 'bg-primary-600 border-primary-500 text-white shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'}`}
-            >
-              {p.label}
-            </button>
-          ))}
+      {(isSessionStarted || showAnamnese) && (
+        <div className="flex-1 bg-white dark:bg-slate-900 rounded-none lg:rounded-2xl border-x lg:border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col relative z-20">
+          {showAnamnese && !isSessionStarted && (
+            <div className="flex items-center justify-between px-4 py-2 bg-indigo-950/60 border-b border-indigo-800/40">
+              <span className="text-xs font-bold text-indigo-300 uppercase tracking-wider">Anamnese do Cliente</span>
+              <button
+                onClick={() => setShowAnamnese(false)}
+                className="text-xs text-slate-400 hover:text-white transition-colors"
+              >
+                Fechar ✕
+              </button>
+            </div>
+          )}
+          <div className="lg:hidden p-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex overflow-x-auto no-scrollbar gap-2 shrink-0">
+            {phases.map(p => (
+              <button
+                key={p.id}
+                onClick={() => { /* setPhase here via props if needed on mobile */ }}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors border ${phase === p.id ? 'bg-primary-600 border-primary-500 text-white shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'}`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {renderPhaseContent()}
+          </div>
         </div>
-        <div className="flex-1 overflow-y-auto">
-          {renderPhaseContent()}
-        </div>
-      </div>
+      )}
     </div>
   );
 };

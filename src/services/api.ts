@@ -438,6 +438,49 @@ export const api = {
         } catch (e) { }
       }
       
+      // ─── Disparar email de confirmação (cliente + terapeuta) ──────────
+      // Fire-and-forget: não bloqueia nem quebra o agendamento em caso de falha.
+      try {
+        const { data: therapistData } = await supabase
+          .from('therapists')
+          .select('name, email, phone')
+          .eq('id', therapistId)
+          .single();
+
+        const patientName  = data.patients?.name  || apt.patientName  || 'Paciente';
+        const patientEmail = data.patients?.email || apt.patientEmail  || null;
+        const patientPhone = data.patients?.phone || apt.patientPhone  || null;
+
+        // Formata a data para DD/MM/AAAA (o endpoint espera esse formato)
+        const rawDate = data.date as string; // "YYYY-MM-DD"
+        const [y, m, d2] = rawDate.split('-');
+        const formattedDate = `${d2}/${m}/${y}`;
+
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+
+        if (token && (patientEmail || therapistData?.email)) {
+          apiFetch('/api/emails/confirmacao-agendamento', {
+            method: 'POST',
+            body: JSON.stringify({
+              patientName,
+              patientEmail,
+              patientPhone,
+              therapistName:  therapistData?.name  || 'Terapeuta TeraNexus',
+              therapistEmail: therapistData?.email  || null,
+              date: formattedDate,
+              time: data.time,
+              type: (apt as any).type || 'Regular',
+            }),
+            headers: { Authorization: `Bearer ${token}` },
+          }).catch(() => {/* silencioso */});
+        }
+      } catch (_emailErr) {
+        // Não propaga: email é melhor-esforço
+        console.warn('[api.appointments.create] Falha ao disparar email de confirmação:', _emailErr);
+      }
+      // ──────────────────────────────────────────────────────────────────
+
       return {
         ...data,
         patientName: data.patients?.name || data.session_data?.patientName || apt.patientName || 'Desconhecido',
@@ -446,6 +489,7 @@ export const api = {
         patientId: data.patient_id || 'unregistered'
       };
     },
+
     update: async (id: string, aptData: Partial<Appointment>) => {
       const payload: any = { ...aptData };
       
