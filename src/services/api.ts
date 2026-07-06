@@ -441,39 +441,46 @@ export const api = {
       // ─── Disparar email de confirmação (cliente + terapeuta) ──────────
       // Fire-and-forget: não bloqueia nem quebra o agendamento em caso de falha.
       try {
-        const { data: therapistData } = await supabase
+        const { data: therapistRow } = await supabase
           .from('therapists')
           .select('name, email, phone')
           .eq('id', therapistId)
           .single();
 
-        const patientName  = data.patients?.name  || apt.patientName  || 'Paciente';
-        const patientEmail = data.patients?.email || apt.patientEmail  || null;
-        const patientPhone = data.patients?.phone || apt.patientPhone  || null;
+        const notifPatientName  = data.patients?.name  || apt.patientName  || 'Paciente';
+        const notifPatientEmail = data.patients?.email || apt.patientEmail  || null;
+        const notifPatientPhone = data.patients?.phone || apt.patientPhone  || null;
 
-        // Formata a data para DD/MM/AAAA (o endpoint espera esse formato)
-        const rawDate = data.date as string; // "YYYY-MM-DD"
-        const [y, m, d2] = rawDate.split('-');
-        const formattedDate = `${d2}/${m}/${y}`;
+        // Formata a data para DD/MM/AAAA (formato esperado pelo template)
+        const rawDate = (data.date as string) || ''; // "YYYY-MM-DD"
+        const [yyyy, mm, dd] = rawDate.split('-');
+        const formattedDate = dd && mm && yyyy ? `${dd}/${mm}/${yyyy}` : rawDate;
 
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token;
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData?.session?.access_token;
 
-        if (token && (patientEmail || therapistData?.email)) {
-          apiFetch('/api/emails/confirmacao-agendamento', {
+        if (accessToken && (notifPatientEmail || therapistRow?.email)) {
+          const baseUrl = typeof window !== 'undefined'
+            ? window.location.origin
+            : (process.env.VITE_APP_URL || '');
+
+          fetch(`${baseUrl}/api/emails/confirmacao-agendamento`, {
             method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${accessToken}`,
+            },
             body: JSON.stringify({
-              patientName,
-              patientEmail,
-              patientPhone,
-              therapistName:  therapistData?.name  || 'Terapeuta TeraNexus',
-              therapistEmail: therapistData?.email  || null,
-              date: formattedDate,
-              time: data.time,
-              type: (apt as any).type || 'Regular',
+              patientName:    notifPatientName,
+              patientEmail:   notifPatientEmail,
+              patientPhone:   notifPatientPhone,
+              therapistName:  therapistRow?.name  || 'Terapeuta TeraNexus',
+              therapistEmail: therapistRow?.email || null,
+              date:           formattedDate,
+              time:           data.time,
+              type:           (apt as any).type || 'Regular',
             }),
-            headers: { Authorization: `Bearer ${token}` },
-          }).catch(() => {/* silencioso */});
+          }).catch(() => {/* silencioso — email é melhor-esforço */});
         }
       } catch (_emailErr) {
         // Não propaga: email é melhor-esforço

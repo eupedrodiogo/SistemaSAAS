@@ -5,11 +5,12 @@ import { createClient } from '@supabase/supabase-js';
 
 // ─── Enviar Email via Resend (preferencial) ou SMTP (fallback) ────────────────
 async function sendEmail(to: string, subject: string, html: string): Promise<void> {
-    const resendKey = process.env.RESEND_API_KEY;
+    // .trim() é obrigatório: as env vars no Vercel podem ter \r\n ao final
+    const resendKey = (process.env.RESEND_API_KEY || '').trim();
 
     if (resendKey) {
         const resend = new Resend(resendKey);
-        const fromAddress = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+        const fromAddress = (process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev').trim();
         const { error: sendError } = await resend.emails.send({
             from: `TeraNexus <${fromAddress}>`,
             to: [to],
@@ -21,7 +22,7 @@ async function sendEmail(to: string, subject: string, html: string): Promise<voi
     }
 
     // Fallback SMTP
-    const port = Number(process.env.SMTP_PORT) || 587;
+    const port = Number((process.env.SMTP_PORT || '587').trim());
     const host = (process.env.SMTP_HOST || '').trim();
     const smtpUser = (process.env.SMTP_USER || '').trim();
     const pass = (process.env.SMTP_PASS || '').trim();

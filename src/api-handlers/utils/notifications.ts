@@ -102,14 +102,19 @@ export async function sendBookingNotification(data: BookingNotificationData) {
 
     // 1. Email Notification - Setup Transporter
     try {
-        if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        // .trim() obrigatório: env vars no Vercel têm \r\n ao final
+        const smtpHost = (process.env.SMTP_HOST || '').trim();
+        const smtpUser = (process.env.SMTP_USER || '').trim();
+        const smtpPass = (process.env.SMTP_PASS || '').trim();
+
+        if (!smtpHost || !smtpUser || !smtpPass) {
             console.warn('SMTP credentials not found. Skipping email sending.');
             result.status = 'skipped_no_credentials';
         } else {
-            const port = Number(process.env.SMTP_PORT) || 587;
-            const host = (process.env.SMTP_HOST || '').trim();
-            const user = (process.env.SMTP_USER || '').trim();
-            const pass = (process.env.SMTP_PASS || '').trim();
+            const port = Number((process.env.SMTP_PORT || '587').trim()) || 587;
+            const host = smtpHost;
+            const user = smtpUser;
+            const pass = smtpPass;
 
             const transporter = nodemailer.createTransport({
                 host: host,
