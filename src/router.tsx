@@ -8,6 +8,7 @@ import { ProtectedLayout } from './layouts/ProtectedLayout';
 // Components (Synchronous)
 import BetaLandingPage from './components/BetaLandingPage';
 import BetaLandingPageV2 from './components/BetaLandingPageV2';
+import AdsLandingPage from './components/AdsLandingPage';
 import LoginPage from './components/Auth/LoginPage';
 import RegisterPage from './components/Auth/RegisterPage';
 import ForgotPasswordPage from './components/Auth/ForgotPasswordPage';
@@ -63,6 +64,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <BetaLandingWrapper /> },
       { path: 'beta-v2', element: <BetaLandingPageV2 /> },
+      { path: 'lp', element: <AdsLandingPage /> },
       { path: 'success', element: <PaymentSuccess /> },
       { path: 'login', element: <LoginPage /> },
       { path: 'forgot-password', element: <ForgotPasswordPage /> },

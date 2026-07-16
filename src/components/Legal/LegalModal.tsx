@@ -10,8 +10,9 @@ interface LegalModalProps {
 }
 
 const LegalModal: React.FC<LegalModalProps> = ({ isOpen, onClose, type }) => {
-    if (!isOpen) return null;
-
+    // O Dialog precisa permanecer montado: se o componente montar já com
+    // open=true durante o clique que o abriu, o Base UI trata o próprio
+    // clique como "clique fora" e fecha o modal imediatamente.
     const content = {
         terms: {
             title: 'Termos de Uso',
