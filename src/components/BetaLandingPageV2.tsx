@@ -84,7 +84,7 @@ const BetaLandingPage: React.FC = () => {
 
                         <div className="space-y-6 text-lg text-gray-300 leading-relaxed font-light">
                             <p>
-                                Sou o <strong className="text-white font-semibold">Pedro Diogo</strong>, desenvolvedor de software. Tudo começou em casa: eu planejava criar um sistema genérico para psicólogos, até que minha esposa — que está se formando em TRG — me questionou: <em className="text-[#2dd4bf] bg-[#2dd4bf]/5 px-1 rounded">'E para a minha área? A gente precisa de algo específico!'</em>.
+                                Sou o <strong className="text-white font-semibold">Pedro Diogo</strong>, Engenheiro de Produto. Tudo começou em casa: eu planejava criar um sistema genérico para psicólogos, até que minha esposa — que está se formando em TRG — me questionou: <em className="text-[#2dd4bf] bg-[#2dd4bf]/5 px-1 rounded">'E para a minha área? A gente precisa de algo específico!'</em>.
                             </p>
 
                             <p>

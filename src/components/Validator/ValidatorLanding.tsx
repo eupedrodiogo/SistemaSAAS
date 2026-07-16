@@ -33,7 +33,7 @@ export default function ValidatorLanding() {
                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">Terapia TRG</span>
                 </h1>
                 <p className="text-slate-400 text-lg md:text-xl leading-relaxed max-w-xl mx-auto">
-                    Sou o Pedro, desenvolvedor de software. Percebi que muitos terapeutas sofrem para organizar prontuários e evoluções.
+                    Sou o Pedro, Engenheiro de Produto. Percebi que muitos terapeutas sofrem para organizar prontuários e evoluções.
                     Estou construindo uma solução e preciso da sua opinião para não criar algo inútil.
                 </p>
             </div>

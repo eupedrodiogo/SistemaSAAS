@@ -159,7 +159,7 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                         <h2 className="text-4xl font-bold mb-8 text-slate-900 dark:text-white">"E para a minha área?"</h2>
                         <div className="space-y-6 text-slate-700 dark:text-slate-300 italic border-l-4 border-blue-600 pl-8 py-2">
                             <p className="text-lg leading-relaxed">
-                                "Sou o Pedro Diogo, desenvolvedor. Tudo começou quando minha esposa — futura Terapeuta TRG — me viu criando um sistema genérico e perguntou: <strong className="text-slate-900 dark:text-white">'Por que não algo específico para nós?'</strong>"
+                                "Sou o Pedro Diogo, Engenheiro de Produto. Tudo começou quando minha esposa — futura Terapeuta TRG — me viu criando um sistema genérico e perguntou: <strong className="text-slate-900 dark:text-white">'Por que não algo específico para nós?'</strong>"
                             </p>
                             <p className="text-lg leading-relaxed">
                                 "Aceitei o desafio. Estudei a rotina, o TRG Club, e vi que faltava o elo perdido: <strong className="text-slate-900 dark:text-white">a Gestão do dia a dia.</strong> O Tera Nexus nasce para ser esse braço direito."
@@ -198,8 +198,8 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                             },
                             {
                                 icon: <BadgeDollarSign size={28} />,
-                                title: '"Cliente "esquece" de pagar e eu fico constrangida de cobrar"',
-                                desc: 'A cobrança manual gera desconforto e, muitas vezes, prejuízo. É impossível ser terapeuta e cobrador ao mesmo tempo.'
+                                title: '"Cliente "esquece" de pagar e eu me desgasto cobrando"',
+                                desc: 'A cobrança manual gera desconforto e, muitas vezes, prejuízo. É difícil ser terapeuta e cobrador ao mesmo tempo.'
                             },
                             {
                                 icon: <FileText size={28} />,
@@ -209,7 +209,7 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                             {
                                 icon: <Calendar size={28} />,
                                 title: '"Já tive duplo-agendamento duas vezes esse mês"',
-                                desc: 'Sem uma agenda automatizada, erros acontecem. E cancelar um cliente de última hora é péssimo para a reputação.'
+                                desc: 'Sem uma agenda automatizada, erros acontecem. Cancelar um cliente de última hora é péssimo para a reputação. Além disso, gera transtornos e atrapalha o progresso do cliente.'
                             },
                             {
                                 icon: <Smartphone size={28} />,
@@ -267,7 +267,7 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                                 icon: <BadgeDollarSign size={24} className="text-blue-600 dark:text-blue-400" />,
                                 badge: 'Cobrança Automática',
                                 title: 'Receba em dia, sem constrangimento',
-                                desc: 'Cobranças configuradas uma vez e enviadas automaticamente. Você nunca mais precisa ser a "vilã" da situação.'
+                                desc: 'Cobranças configuradas uma vez e enviadas automaticamente. Evite a inadimplência e receba em dia, sem desgastar a relação ou perder o cliente.'
                             },
                             {
                                 icon: <FileText size={24} className="text-blue-600 dark:text-blue-400" />,
@@ -276,10 +276,10 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                                 desc: 'Registre sessões, protocolos e observações de qualquer dispositivo. Seguro, organizado e sempre disponível.'
                             },
                             {
-                                icon: <BrainCircuit size={24} className="text-blue-600 dark:text-blue-400" />,
-                                badge: 'Relatórios com IA',
-                                title: 'Insights que vão além dos seus registros',
-                                desc: 'A IA analisa o progresso dos clientes e gera resumos e sugestões baseadas no TRG, economizando horas de trabalho por semana.'
+                                icon: <Clock size={24} className="text-blue-600 dark:text-blue-400" />,
+                                badge: 'Histórico de Sessões',
+                                title: 'A linha do tempo do cliente organizada',
+                                desc: 'Consulte atendimentos passados em segundos. Tenha um histórico de sessões estruturado e acessível para guiar sua próxima evolução técnica.'
                             },
                         ].map((sol, i) => (
                             <div key={i} className="flex gap-5 p-6 rounded-2xl border border-blue-200 dark:border-blue-900/40 bg-white dark:bg-blue-950/20 hover:border-blue-300 dark:hover:border-blue-600/50 shadow-md dark:shadow-none transition-all duration-300 group">
@@ -376,7 +376,7 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                 <div className="max-w-5xl mx-auto px-6 relative z-10 text-center">
                     <h2 className="text-3xl md:text-5xl font-bold mb-6">Escolha o seu plano</h2>
                     <p className="text-slate-600 dark:text-slate-400 mb-12 max-w-xl mx-auto">
-                        Comece grátis e experimente tudo por 1 mês. Sem cartão de crédito, sem surpresas.
+                        Pague apenas pelos módulos que usar. Comece grátis por 30 dias com acesso total — sem cartão de crédito.
                     </p>
 
                     {/* Pricing Clarification Alert */}
@@ -393,79 +393,126 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                         </div>
                     </div>
 
-                    <div className="grid md:grid-cols-3 gap-6 items-center">
+                    <div className="flex flex-col gap-6 text-left">
 
-                        {/* Teste Gratuito */}
-                        <div className="p-8 rounded-3xl border-2 border-emerald-500 bg-white dark:bg-emerald-950/30 relative shadow-xl dark:shadow-2xl dark:shadow-emerald-500/20 order-first">
-                            <div className="absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                                <span className="bg-emerald-500 text-white text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5">
+                        {/* ── Teste Gratuito ─────────────────────────────── */}
+                        <div className="relative mt-3 rounded-3xl border-2 border-emerald-500 bg-white dark:bg-emerald-950/20 shadow-xl dark:shadow-emerald-500/10">
+                            {/* top badge */}
+                            <div className="absolute top-0 left-0 right-0 flex justify-center -translate-y-1/2 z-10 pointer-events-none">
+                                <span className="bg-emerald-500 text-white text-xs font-bold px-5 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 shadow-md">
                                     <Gift size={12} /> Comece Aqui — Grátis
                                 </span>
                             </div>
-                            <div className="mt-4">
-                                <h3 className="text-xl font-bold text-emerald-600 dark:text-emerald-300 mb-1">Teste Gratuito</h3>
-                                <p className="text-slate-500 dark:text-slate-400 text-xs mb-4">Sem cartão de crédito</p>
-                                <div className="my-5">
-                                    <span className="text-5xl font-extrabold text-emerald-500 dark:text-emerald-400">R$ 0</span>
-                                    <span className="text-slate-500 dark:text-slate-400 text-sm">/por 30 dias</span>
+                            <div className="flex flex-col md:flex-row rounded-3xl overflow-hidden">
+                                {/* Left: price panel */}
+                                <div className="md:w-64 shrink-0 bg-emerald-50 dark:bg-emerald-900/30 p-8 flex flex-col justify-center items-start gap-3 border-b md:border-b-0 md:border-r border-emerald-200 dark:border-emerald-800/50">
+                                    <h3 className="text-2xl font-bold text-emerald-700 dark:text-emerald-300 mt-4 md:mt-0">Teste Gratuito</h3>
+                                    <div className="inline-flex items-center gap-1.5 bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 text-xs font-semibold px-3 py-1 rounded-full">
+                                        ✦ Igual ao Profissional Beta
+                                    </div>
+                                    <div>
+                                        <span className="text-5xl font-extrabold text-emerald-500 dark:text-emerald-400">R$ 0</span>
+                                        <span className="text-slate-500 dark:text-slate-400 text-sm ml-1">/30 dias</span>
+                                    </div>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">Sem cartão de crédito • Sem limitações</p>
+                                    <button
+                                        onClick={() => navigate('/register')}
+                                        className="mt-2 w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold shadow-lg transition-all hover:shadow-emerald-500/40 hover:scale-105 text-sm">
+                                        Experimentar Grátis →
+                                    </button>
+                                    <p className="text-xs text-slate-400 text-center w-full">Cancele facilmente direto no seu perfil.</p>
                                 </div>
-                                <ul className="space-y-3 mb-8 text-left text-sm text-slate-600 dark:text-slate-300">
-                                    <li className="flex gap-2 items-start"><Check size={16} className="text-emerald-500 dark:text-emerald-400 shrink-0 mt-0.5" /> Acesso completo por <strong className="text-slate-900 dark:text-white ml-1">1 mês</strong></li>
-                                    <li className="flex gap-2 items-start"><Check size={16} className="text-emerald-500 dark:text-emerald-400 shrink-0 mt-0.5" /> Até 10 Clientes</li>
-                                    <li className="flex gap-2 items-start"><Check size={16} className="text-emerald-500 dark:text-emerald-400 shrink-0 mt-0.5" /> Agenda & Registro de Dados</li>
-                                    <li className="flex gap-2 items-start"><Check size={16} className="text-emerald-500 dark:text-emerald-400 shrink-0 mt-0.5" /> Suporte pelo WhatsApp</li>
-                                </ul>
-                                <button
-                                    onClick={() => navigate('/register')}
-                                    className="w-full py-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold shadow-lg transition-all hover:shadow-emerald-500/50 hover:scale-105">
-                                    Experimentar Grátis →
-                                </button>
-                                <p className="text-xs text-slate-500 mt-3">Cancele quando quiser, sem burocracia.</p>
+                                {/* Right: features */}
+                                <div className="flex-1 p-8">
+                                    <div className="mb-5 p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 text-sm text-blue-700 dark:text-blue-300">
+                                        🚀 Você experimenta <strong>tudo</strong> do Profissional Beta por 30 dias: clientes ilimitados, agenda completa, módulo financeiro, sessões com escala de desconforto, landing page e muito mais.
+                                    </div>
+                                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 text-sm text-slate-600 dark:text-slate-300">
+                                        <li className="flex gap-2 items-start"><Check size={15} className="text-emerald-500 shrink-0 mt-0.5" /> <strong className="text-slate-800 dark:text-white">Acesso total</strong> — igual ao Profissional Beta</li>
+                                        <li className="flex gap-2 items-start"><Check size={15} className="text-emerald-500 shrink-0 mt-0.5" /> Renova automaticamente após 30 dias</li>
+                                        <li className="flex gap-2 items-start"><Check size={15} className="text-emerald-500 shrink-0 mt-0.5" /> Alerta por e-mail antes da renovação</li>
+                                        <li className="flex gap-2 items-start"><Check size={15} className="text-emerald-500 shrink-0 mt-0.5" /> Cancele quando quiser nas configurações do sistema</li>
+                                    </ul>
+                                    <div className="mt-5 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40 text-xs text-emerald-700 dark:text-emerald-300">
+                                        Após o período, enviaremos um alerta por e-mail antes da renovação. O cancelamento é feito com 1 clique no seu perfil.
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        {/* Iniciante */}
-                        <div className="p-8 rounded-3xl border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-500 transition-colors bg-white dark:bg-slate-800/50 shadow-md dark:shadow-none">
-                            <h3 className="text-xl font-bold text-slate-800 dark:text-slate-300">Iniciante Beta</h3>
-                            <div className="my-6">
-                                <span className="text-4xl font-extrabold text-slate-900 dark:text-white">R$ 47</span>
-                                <span className="text-slate-500 text-sm">/único</span>
+                        {/* ── Iniciante Beta ─────────────────────────────── */}
+                        <div className="relative rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 shadow-md overflow-hidden">
+                            <div className="flex flex-col md:flex-row">
+                                {/* Left: price panel */}
+                                <div className="md:w-64 shrink-0 bg-slate-50 dark:bg-slate-800 p-8 flex flex-col justify-center items-start gap-3 border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-700">
+                                    <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-200">Iniciante Beta</h3>
+                                    <div>
+                                        <span className="text-5xl font-extrabold text-slate-900 dark:text-white">R$ 47</span>
+                                        <span className="text-slate-500 text-sm ml-1">/mês</span>
+                                    </div>
+                                    <p className="text-xs text-slate-500">Ideal para quem está começando</p>
+                                    <button
+                                        onClick={() => handleCheckout('price_1ScuH5KPo7EypB7VnIs6qfbQ')}
+                                        className="mt-2 w-full py-3 rounded-xl border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 font-semibold transition-all text-sm text-slate-800 dark:text-slate-200">
+                                        Garantir Vaga
+                                    </button>
+                                </div>
+                                {/* Right: features */}
+                                <div className="flex-1 p-8">
+                                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">O que está incluído</p>
+                                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 text-sm text-slate-600 dark:text-slate-300">
+                                        <li className="flex gap-2 items-start"><Check size={15} className="text-slate-400 shrink-0 mt-0.5" /> Até 10 Clientes</li>
+                                        <li className="flex gap-2 items-start"><Check size={15} className="text-slate-400 shrink-0 mt-0.5" /> Agenda Básica</li>
+                                        <li className="flex gap-2 items-start"><Check size={15} className="text-slate-400 shrink-0 mt-0.5" /> Registro de Dados Simples</li>
+                                        <li className="flex gap-2 items-start"><Check size={15} className="text-slate-400 shrink-0 mt-0.5" /> Suporte via chat e e-mail após às 18h</li>
+                                        <li className="flex gap-2 items-start"><Check size={15} className="text-slate-400 shrink-0 mt-0.5" /> Lista de espera</li>
+                                        <li className="flex gap-2 items-start"><Check size={15} className="text-slate-400 shrink-0 mt-0.5" /> Rede de transbordo</li>
+                                    </ul>
+                                </div>
                             </div>
-                            <ul className="space-y-3 mb-8 text-left text-sm text-slate-600 dark:text-slate-300">
-                                <li className="flex gap-2"><Check size={16} className="text-slate-400" /> Até 10 Clientes</li>
-                                <li className="flex gap-2"><Check size={16} className="text-slate-400" /> Agenda Básica</li>
-                                <li className="flex gap-2"><Check size={16} className="text-slate-400" /> Registro de Dados Simples</li>
-                            </ul>
-                            <button
-                                onClick={() => handleCheckout('price_1ScuH5KPo7EypB7VnIs6qfbQ')}
-                                className="w-full py-3 rounded-xl border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 font-semibold transition-all">
-                                Garantir Vaga
-                            </button>
                         </div>
 
-                        {/* Profissional */}
-                        <div className="p-8 rounded-3xl border-2 border-blue-500 bg-white dark:bg-slate-800 relative shadow-xl dark:shadow-2xl dark:shadow-blue-500/20 transform md:scale-105">
-                            <div className="absolute top-0 right-0 bg-blue-500 text-white text-xs font-bold px-3 py-1 rounded-bl-xl uppercase tracking-wider">Mais Escolhido</div>
-                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">Profissional Beta</h3>
-                            <div className="my-6">
-                                <span className="text-5xl font-extrabold text-blue-600 dark:text-blue-400">R$ 97</span>
-                                <span className="text-slate-500 text-sm">/único</span>
+                        {/* ── Profissional Beta ──────────────────────────── */}
+                        <div className="relative rounded-3xl border-2 border-blue-500 bg-white dark:bg-slate-800 shadow-xl dark:shadow-blue-500/10 overflow-hidden">
+                            {/* "Mais Escolhido" badge */}
+                            <div className="absolute top-0 right-0 bg-blue-500 text-white text-xs font-bold px-4 py-1.5 rounded-bl-2xl uppercase tracking-wider">
+                                Mais Escolhido
                             </div>
-                            <ul className="space-y-3 mb-8 text-left text-sm text-slate-700 dark:text-slate-200">
-                                <li className="flex gap-2"><Check size={16} className="text-blue-500 dark:text-blue-400" /> <strong>Clientes Ilimitados</strong></li>
-                                <li className="flex gap-2"><Check size={16} className="text-blue-500 dark:text-blue-400" /> Protocolos Exclusivos</li>
-                                <li className="flex gap-2"><Check size={16} className="text-blue-500 dark:text-blue-400" /> Relatórios com IA</li>
-                                <li className="flex gap-2"><Check size={16} className="text-blue-500 dark:text-blue-400" /> Acesso Vitalício</li>
-                            </ul>
-                            <button
-                                onClick={() => handleCheckout('price_1Sd8DXKPo7EypB7VZwytTUEP')}
-                                className="w-full py-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-lg transition-all hover:shadow-blue-500/50">
-                                Quero Acesso Vitalício
-                            </button>
-                            <p className="text-xs text-slate-500 mt-4">Oferta limitada aos primeiros 50 inscritos.</p>
+                            <div className="flex flex-col md:flex-row">
+                                {/* Left: price panel */}
+                                <div className="md:w-64 shrink-0 bg-blue-50 dark:bg-blue-900/20 p-8 flex flex-col justify-center items-start gap-3 border-b md:border-b-0 md:border-r border-blue-200 dark:border-blue-800/50">
+                                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white">Profissional Beta</h3>
+                                    <div>
+                                        <span className="text-5xl font-extrabold text-blue-600 dark:text-blue-400">R$ 97</span>
+                                        <span className="text-slate-500 text-sm ml-1">/mês</span>
+                                    </div>
+                                    <p className="text-xs text-slate-500">Tudo do Iniciante, mais recursos avançados</p>
+                                    <button
+                                        onClick={() => handleCheckout('price_1Sd8DXKPo7EypB7VZwytTUEP')}
+                                        className="mt-2 w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-lg transition-all hover:shadow-blue-500/40 text-sm">
+                                        Assinar Profissional
+                                    </button>
+                                    <p className="text-xs text-slate-400 text-center w-full">Oferta limitada aos primeiros 50 inscritos.</p>
+                                </div>
+                                {/* Right: features */}
+                                <div className="flex-1 p-8">
+                                    <p className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-4">Tudo do Iniciante +</p>
+                                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 text-sm text-slate-700 dark:text-slate-200">
+                                        <li className="flex gap-2 items-start"><Check size={15} className="text-blue-500 shrink-0 mt-0.5" /> <strong>Clientes Ilimitados</strong></li>
+                                        <li className="flex gap-2 items-start"><Check size={15} className="text-blue-500 shrink-0 mt-0.5" /> Atendimento via WhatsApp das 9h às 22h</li>
+                                        <li className="flex gap-2 items-start"><Check size={15} className="text-blue-500 shrink-0 mt-0.5" /> Módulo Sessão com notas e escala de desconforto</li>
+                                        <li className="flex gap-2 items-start"><Check size={15} className="text-blue-500 shrink-0 mt-0.5" /> Agenda Completa</li>
+                                        <li className="flex gap-2 items-start"><Check size={15} className="text-blue-500 shrink-0 mt-0.5" /> Módulo Financeiro</li>
+                                        <li className="flex gap-2 items-start"><Check size={15} className="text-blue-500 shrink-0 mt-0.5" /> Rede de transbordo</li>
+                                        <li className="flex gap-2 items-start"><Check size={15} className="text-blue-500 shrink-0 mt-0.5" /> Landing page profissional exclusiva</li>
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
 
                     </div>
+
+
                 </div>
             </section>
 
