@@ -21,6 +21,7 @@ import {
     FileText
 } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
+import { toast } from 'sonner';
 
 const stripePromise = loadStripe('pk_live_51MPKq2Lz0qOQeXyX0B9gZ5q5q5q5q5q5');
 
@@ -46,7 +47,6 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
     }, [user, loading, navigate]);
 
     const handleCheckout = async (priceId: string) => {
-        // Basic checkout redirection logic (simplified for restoration)
         try {
             const response = await fetch('/api/payments?action=checkout', {
                 method: 'POST',
@@ -58,12 +58,25 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                     cancelUrl: window.location.origin + '/'
                 })
             });
-            const data = await response.json();
-            if (data.url) window.location.href = data.url;
-            else navigate('/register'); // Fallback
-        } catch (e) {
-            console.error("Checkout error", e);
-            navigate('/register');
+
+            const data = await response.json().catch(() => null);
+
+            if (response.ok && data?.url) {
+                window.location.href = data.url;
+                return;
+            }
+
+            // Falha no checkout: mostra erro visível em vez de mandar o usuário
+            // para o cadastro em silêncio (escondia falhas de pagamento).
+            console.error('Checkout error', data);
+            toast.error(
+                data?.message
+                    ? `Não foi possível iniciar o pagamento: ${data.message}`
+                    : 'Não foi possível iniciar o pagamento. Tente novamente em instantes.'
+            );
+        } catch (e: any) {
+            console.error('Checkout error', e);
+            toast.error('Erro de conexão ao iniciar o pagamento. Verifique sua internet e tente novamente.');
         }
     };
 
