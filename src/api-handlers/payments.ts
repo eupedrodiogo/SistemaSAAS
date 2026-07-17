@@ -51,11 +51,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 mode: mode as Stripe.Checkout.Session.Mode,
                 success_url: successUrl,
                 cancel_url: cancelUrl,
-                payment_intent_data: {
-                    metadata: req.body.metadata, // Pass metadata to PaymentIntent
-                },
                 metadata: req.body.metadata, // Also pass to Session for easy access
             };
+
+            // O Stripe só aceita `payment_intent_data` em modo `payment`. Para
+            // assinaturas, a metadata deve ir em `subscription_data`.
+            if (mode === 'subscription') {
+                sessionParams.subscription_data = {
+                    metadata: req.body.metadata,
+                };
+            } else {
+                sessionParams.payment_intent_data = {
+                    metadata: req.body.metadata, // Pass metadata to PaymentIntent
+                };
+            }
 
             if (couponId) {
                 sessionParams.discounts = [{ coupon: couponId }];
