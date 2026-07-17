@@ -21,6 +21,7 @@ import {
     FileText
 } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
+import { toast } from 'sonner';
 
 const stripePromise = loadStripe('pk_live_51MPKq2Lz0qOQeXyX0B9gZ5q5q5q5q5q5');
 
@@ -46,24 +47,36 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
     }, [user, loading, navigate]);
 
     const handleCheckout = async (priceId: string) => {
-        // Basic checkout redirection logic (simplified for restoration)
         try {
             const response = await fetch('/api/payments?action=checkout', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     priceId,
-                    mode: 'payment',
+                    mode: 'subscription', // Planos Iniciante/Profissional são mensais recorrentes
                     successUrl: window.location.origin + '/success',
                     cancelUrl: window.location.origin + '/'
                 })
             });
-            const data = await response.json();
-            if (data.url) window.location.href = data.url;
-            else navigate('/register'); // Fallback
-        } catch (e) {
-            console.error("Checkout error", e);
-            navigate('/register');
+
+            const data = await response.json().catch(() => null);
+
+            if (response.ok && data?.url) {
+                window.location.href = data.url;
+                return;
+            }
+
+            // Falha no checkout: mostra erro visível em vez de mandar o usuário
+            // para o cadastro em silêncio (escondia falhas de pagamento).
+            console.error('Checkout error', data);
+            toast.error(
+                data?.message
+                    ? `Não foi possível iniciar o pagamento: ${data.message}`
+                    : 'Não foi possível iniciar o pagamento. Tente novamente em instantes.'
+            );
+        } catch (e: any) {
+            console.error('Checkout error', e);
+            toast.error('Erro de conexão ao iniciar o pagamento. Verifique sua internet e tente novamente.');
         }
     };
 
@@ -420,7 +433,7 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                                         className="mt-2 w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold shadow-lg transition-all hover:shadow-emerald-500/40 hover:scale-105 text-sm">
                                         Experimentar Grátis →
                                     </button>
-                                    <p className="text-xs text-slate-400 text-center w-full">Cancele facilmente direto no seu perfil.</p>
+                                    <p className="text-xs text-slate-400 text-center w-full">Sem compromisso — continue só se quiser.</p>
                                 </div>
                                 {/* Right: features */}
                                 <div className="flex-1 p-8">
@@ -429,12 +442,12 @@ const BetaLandingPage: React.FC<any> = ({ onLoginClick, isDarkMode, toggleTheme 
                                     </div>
                                     <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 text-sm text-slate-600 dark:text-slate-300">
                                         <li className="flex gap-2 items-start"><Check size={15} className="text-emerald-500 shrink-0 mt-0.5" /> <strong className="text-slate-800 dark:text-white">Acesso total</strong> — igual ao Profissional Beta</li>
-                                        <li className="flex gap-2 items-start"><Check size={15} className="text-emerald-500 shrink-0 mt-0.5" /> Renova automaticamente após 30 dias</li>
-                                        <li className="flex gap-2 items-start"><Check size={15} className="text-emerald-500 shrink-0 mt-0.5" /> Alerta por e-mail antes da renovação</li>
-                                        <li className="flex gap-2 items-start"><Check size={15} className="text-emerald-500 shrink-0 mt-0.5" /> Cancele quando quiser nas configurações do sistema</li>
+                                        <li className="flex gap-2 items-start"><Check size={15} className="text-emerald-500 shrink-0 mt-0.5" /> Nada é cobrado automaticamente</li>
+                                        <li className="flex gap-2 items-start"><Check size={15} className="text-emerald-500 shrink-0 mt-0.5" /> Lembrete por e-mail antes de acabar</li>
+                                        <li className="flex gap-2 items-start"><Check size={15} className="text-emerald-500 shrink-0 mt-0.5" /> Ao fim dos 30 dias, você escolhe se continua</li>
                                     </ul>
                                     <div className="mt-5 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40 text-xs text-emerald-700 dark:text-emerald-300">
-                                        Após o período, enviaremos um alerta por e-mail antes da renovação. O cancelamento é feito com 1 clique no seu perfil.
+                                        Enviaremos um lembrete por e-mail quando o período estiver acabando. Nada é cobrado sem você escolher um plano — sem cartão, sem cobrança automática.
                                     </div>
                                 </div>
                             </div>
